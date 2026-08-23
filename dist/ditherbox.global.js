@@ -974,7 +974,7 @@ const PARAMS = [
   },
   {
     key: 'strength',
-    label: 'Intensita',
+    label: 'Intensità',
     group: 'dither',
     type: 'range',
     min: 0,
@@ -982,7 +982,7 @@ const PARAMS = [
     step: 5,
     default: 100,
     unit: '%',
-    hint: 'Quanta parte dell errore (o del rumore ordinato) viene applicata',
+    hint: 'Quanta parte dell’errore (o del rumore ordinato) viene applicata',
   },
   {
     key: 'bias',
@@ -1018,7 +1018,7 @@ const PARAMS = [
 
   {
     key: 'brightness',
-    label: 'Luminosita',
+    label: 'Luminosità',
     group: 'tone',
     type: 'range',
     min: -100,

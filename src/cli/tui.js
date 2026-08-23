@@ -364,7 +364,7 @@ export class DitherTui {
       ['↑ ↓  j k', 'Scorri i parametri o i file'],
       ['← →  h l', 'Regola il valore selezionato'],
       ['H L  shift+← →', 'Regola a passi di cinque'],
-      ['invio  spazio', 'Attiva: carica il file, gira l interruttore'],
+      ['invio  spazio', 'Attiva: carica il file, gira l’interruttore'],
       ['tab', 'Sposta il fuoco fra controlli e file'],
       ['n  N', 'Immagine successiva / precedente'],
       ['g  G  home  fine', 'Vai in cima / in fondo'],
@@ -531,7 +531,7 @@ export class DitherTui {
   #openPathPrompt() {
     this.#promptOverlay({
       title: 'APRI',
-      hint: 'Percorso di un immagine o di una cartella',
+      hint: 'Percorso di un’immagine o di una cartella',
       initial: this.imagePath ? dirname(this.imagePath) + '/' : `${this.dir}/`,
       onConfirm: async (input) => {
         if (!input) return;
@@ -660,7 +660,7 @@ export class DitherTui {
 
     const status = this.toast
       ? `${fg(t[this.toast.kind] || t.fg)}${this.toast.text}${RESET}`
-      : `${fg(t.fg)}${preview ? `anteprima ${preview.image.width}×${preview.image.height} · export ${this.#exportSize()}` : 'in attesa di un immagine'}${RESET}`;
+      : `${fg(t.fg)}${preview ? `anteprima ${preview.image.width}×${preview.image.height} · export ${this.#exportSize()}` : 'in attesa di un’immagine'}${RESET}`;
     const right = `${MODES[this.previewMode].label.toLowerCase()} · ${this.themeName}`;
     const statusWidth = inner - visibleLength(right) - 1;
     const line3 = `${pad(truncate(status, statusWidth), statusWidth)} ${fg(t.fg)}${right}${RESET}`;
@@ -738,10 +738,12 @@ export class DitherTui {
     // I megapixel dichiarati sono quelli che l'immagine ha gia': il
     // ridimensionamento l'abbiamo fatto noi qui sopra, alla misura esatta
     // della griglia del terminale, e il motore non deve rifarlo.
+    // upscale resta quello scelto dall'utente: forzandolo a spento, con
+    // Pixel maggiore di uno l'anteprima si rimpiccioliva invece di mostrare
+    // blocchi piu' grossi, e finiva in un angolo del pannello.
     const result = processImage(small, {
       ...this.options,
       megapixels: (small.width * small.height) / 1e6,
-      upscale: false,
     });
     this.cache = { key, result };
     return result;

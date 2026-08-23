@@ -208,7 +208,6 @@ async function printToTerminal(path, options, mode, themeName) {
   const { image } = processImage(small, {
     ...options,
     megapixels: (small.width * small.height) / 1e6,
-    upscale: false,
   });
   process.stdout.write(`${renderImage(image, mode, theme).join('\n')}\n`);
 }

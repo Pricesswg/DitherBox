@@ -131,15 +131,26 @@ async function build() {
     + `global.DitherBox = Object.assign(${varName('src/web/ditherbox.js')}.DitherBox, {\n  ${[...publicNames].join(',\n  ')}\n});\n`
     + `})(typeof globalThis !== 'undefined' ? globalThis : this);\n`;
 
-  await mkdir(join(ROOT, 'dist'), { recursive: true });
-  await writeFile(join(ROOT, 'dist', 'ditherbox.global.js'), out);
+  await mkdir(destinazione, { recursive: true });
+  await writeFile(join(destinazione, 'ditherbox.global.js'), out);
   await writeFile(
-    join(ROOT, 'dist', 'ditherbox.css'),
+    join(destinazione, 'ditherbox.css'),
     await readFile(join(ROOT, 'src/web/ditherbox.css'), 'utf8'),
   );
 
   const kb = (out.length / 1024).toFixed(1);
-  process.stdout.write(`dist/ditherbox.global.js  ${kb} kB\ndist/ditherbox.css\n`);
+  process.stdout.write(`${join(destinazione, 'ditherbox.global.js')}  ${kb} kB\n`);
 }
+
+/**
+ * Destinazione: dist/ salvo diversa indicazione. Serve ai test, che
+ * costruiscono in una cartella temporanea per confrontarla con quella
+ * committata senza sovrascriverla - se no il controllo di allineamento si
+ * ripara da solo e smette di dire la verita'.
+ */
+const indice = process.argv.indexOf('--out');
+const destinazione = indice > 0 && process.argv[indice + 1]
+  ? resolve(process.argv[indice + 1])
+  : join(ROOT, 'dist');
 
 await build();

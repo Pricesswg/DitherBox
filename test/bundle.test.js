@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { resolve, dirname, join } from 'node:path';
@@ -64,20 +66,22 @@ test('la grana casuale e davvero casuale anche nel bundle', async () => {
   assert.notDeepEqual([...a.data], [...b.data]);
 });
 
-test('il bundle sul disco e allineato ai sorgenti', async () => {
-  const prima = await readFile(BUNDLE, 'utf8');
-  await run(process.execPath, [join(ROOT, 'scripts', 'build.js')], { cwd: ROOT });
-  const dopo = await readFile(BUNDLE, 'utf8');
+test('il bundle sul disco e allineato ai sorgenti', async (t) => {
+  // Si costruisce in una cartella temporanea e si confronta: sovrascrivendo
+  // dist/ il controllo si riparerebbe da solo e non direbbe piu' niente.
+  const tmp = mkdtempSync(join(tmpdir(), 'ditherbox-build-'));
+  t.after(() => rmSync(tmp, { recursive: true, force: true }));
+  await run(process.execPath, [join(ROOT, 'scripts', 'build.js'), '--out', tmp], { cwd: ROOT });
+
   assert.equal(
-    prima, dopo,
+    await readFile(BUNDLE, 'utf8'),
+    await readFile(join(tmp, 'ditherbox.global.js'), 'utf8'),
     'dist/ditherbox.global.js non e aggiornato: lancia npm run build e ricommetti',
   );
-});
-
-test('il foglio di stile impacchettato e copia di quello sorgente', async () => {
   assert.equal(
     await readFile(join(ROOT, 'dist', 'ditherbox.css'), 'utf8'),
-    await readFile(join(ROOT, 'src', 'web', 'ditherbox.css'), 'utf8'),
+    await readFile(join(tmp, 'ditherbox.css'), 'utf8'),
+    'dist/ditherbox.css non e aggiornato: lancia npm run build e ricommetti',
   );
 });
 
