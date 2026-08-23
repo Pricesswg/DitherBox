@@ -10,9 +10,10 @@
  */
 
 import {
-  PARAMS, GROUP_LABELS, PRESETS, DEFAULTS,
-  normalizeOptions, formatValue, applyPreset,
-  processImage, fitWithin,
+  PARAMS, GROUP_LABELS, PRESETS, DEFAULTS, PALETTES,
+  normalizeOptions, formatValue, applyPreset, paramSteps, stepIndex,
+  processImage, targetSize, resampleBox, fitWithin,
+  paletteInfo, rgbToHex, stringifyPalette, isCustomPalette,
 } from '../core/index.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -26,12 +27,6 @@ function el(tag, className, attrs = {}) {
     else node.setAttribute(k, v);
   }
   return node;
-}
-
-/** Sposta un valore al gradino di slider piu' vicino, evitando 0.30000000004. */
-function snap(value, step) {
-  const decimals = (String(step).split('.')[1] || '').length;
-  return Number((Math.round(value / step) * step).toFixed(decimals));
 }
 
 /**
@@ -100,10 +95,12 @@ export class DitherBox {
     };
     this.options = normalizeOptions(config.options);
     this.source = null;        // ImageData a piena risoluzione
-    this.previewSource = null; // ImageData ridotto, per l anteprima interattiva
+    this.previewBase = null;   // copia ridotta, base di tutte le anteprime
+    this.previewCache = null;  // { megapixels, image } per non ricampionare a vuoto
     this.sourceName = null;
     this.listeners = { change: [], load: [], error: [] };
     this.controls = new Map();
+    this.customColors = ['#0a0c10', '#c2fe0b'];
     this._pending = null;
 
     this.#build();
@@ -119,9 +116,15 @@ export class DitherBox {
       const drawable = await decodeSource(source);
       this.source = toImageData(drawable);
       if (drawable.close) drawable.close();
-      this.previewSource = fitWithin(this.source, this.config.previewMaxSize, this.config.previewMaxSize);
+      // Base dell'anteprima: si calcola una volta sola al caricamento, cosi'
+      // muovere un cursore non costa mai un ricampionamento della foto intera.
+      this.previewBase = fitWithin(
+        this.source, this.config.previewMaxSize, this.config.previewMaxSize,
+      );
+      this.previewCache = null;
       this.sourceName = name || (source instanceof File ? source.name : null);
       this.root.classList.add('is-loaded');
+      if (this.fileName) this.fileName.textContent = this.sourceName || 'immagine caricata';
       this.render();
       this.#emit('load', { width: this.source.width, height: this.source.height });
     } catch (err) {
@@ -149,7 +152,7 @@ export class DitherBox {
 
   /** Ricalcola l anteprima. Debounced: gli slider sparano decine di eventi. */
   render() {
-    if (!this.previewSource) return;
+    if (!this.previewBase) return;
     if (this._pending) cancelAnimationFrame(this._pending);
     this._pending = requestAnimationFrame(() => {
       this._pending = null;
@@ -164,12 +167,7 @@ export class DitherBox {
   renderFull() {
     if (!this.source) throw new Error('Nessuna immagine caricata');
     const { image } = processImage(this.source, this.options);
-    const canvas = document.createElement('canvas');
-    canvas.width = image.width;
-    canvas.height = image.height;
-    const ctx = canvas.getContext('2d');
-    ctx.putImageData(new ImageData(image.data, image.width, image.height), 0, 0);
-    return canvas;
+    return this.#toCanvas(image);
   }
 
   /** @returns {Promise<Blob>} il PNG a piena risoluzione. */
@@ -196,7 +194,7 @@ export class DitherBox {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    this.#status(null);
+    this.render();
   }
 
   on(event, fn) {
@@ -204,10 +202,10 @@ export class DitherBox {
     return this;
   }
 
-  /** Smonta il widget e libera i listener globali. */
+  /** Smonta il widget e libera i listener. */
   destroy() {
     if (this._pending) cancelAnimationFrame(this._pending);
-    for (const [event, fn] of this._globalListeners || []) {
+    for (const [event, fn] of this._rootListeners || []) {
       this.root.removeEventListener(event, fn);
     }
     this.root.replaceChildren();
@@ -221,80 +219,233 @@ export class DitherBox {
     root.classList.add('dbx');
     root.replaceChildren();
 
-    // --- palco con l anteprima -------------------------------------
+    root.append(this.#buildStage(), this.#buildPanel());
+    this.#wireDropZone();
+    this.#syncControls();
+  }
+
+  #buildStage() {
     const stage = el('div', 'dbx__stage');
     this.canvas = el('canvas', 'dbx__canvas');
     this.ctx = this.canvas.getContext('2d');
     stage.appendChild(this.canvas);
 
     const drop = el('div', 'dbx__drop');
+    const invito = el('button', 'dbx__drop-button', {
+      type: 'button', text: 'Scegli una foto',
+    });
+    invito.addEventListener('click', () => this.fileInput.click());
     drop.append(
-      this.#dropIcon(),
+      this.#cameraIcon(),
       el('p', 'dbx__drop-title', { text: 'Trascina qui una foto' }),
-      el('p', 'dbx__drop-sub', { text: 'oppure usa i pulsanti qui sotto — l’immagine non lascia il tuo browser' }),
+      invito,
+      el('p', 'dbx__drop-sub', {
+        text: 'oppure incollala con Ctrl+V — l’immagine non lascia il tuo browser',
+      }),
     );
     stage.appendChild(drop);
 
     this.statusEl = el('div', 'dbx__status', { role: 'status', 'aria-live': 'polite' });
     stage.appendChild(this.statusEl);
-    root.appendChild(stage);
+    return stage;
+  }
 
-    // --- pannello dei controlli ------------------------------------
+  /**
+   * Il pannello e' diviso in tre fasce: la sorgente in cima e le azioni in
+   * fondo restano sempre visibili, solo i parametri scorrono. Prima scorreva
+   * tutto, e su schermi bassi il pulsante per aprire la foto finiva sotto il
+   * taglio: c'era, ma nessuno lo trovava.
+   */
+  #buildPanel() {
     const panel = el('div', 'dbx__panel');
+    panel.append(this.#buildSourceBar(), this.#buildScroller(), this.#buildActions());
+    return panel;
+  }
+
+  #buildSourceBar() {
+    const bar = el('div', 'dbx__source');
+
+    // Il campo file vero, dentro una label: cosi' il clic funziona su tutta
+    // la riga e la tastiera ci arriva senza trucchi.
+    const field = el('label', 'dbx__file-field');
+    this.fileInput = el('input', 'dbx__file-input', { type: 'file', accept: 'image/*' });
+    this.fileInput.addEventListener('change', () => {
+      const file = this.fileInput.files && this.fileInput.files[0];
+      if (file) this.load(file).catch(() => {});
+      this.fileInput.value = '';
+    });
+    this.fileName = el('span', 'dbx__file-name', { text: 'nessun file scelto' });
+    field.append(
+      this.fileInput,
+      el('span', 'dbx__file-label', { text: 'Apri foto' }),
+      this.fileName,
+    );
+    bar.appendChild(field);
+
+    this.cameraInput = el('input', 'dbx__file-input', {
+      type: 'file', accept: 'image/*', capture: 'environment',
+    });
+    this.cameraInput.addEventListener('change', () => {
+      const file = this.cameraInput.files && this.cameraInput.files[0];
+      if (file) this.load(file).catch(() => {});
+      this.cameraInput.value = '';
+    });
+    const shoot = el('button', 'dbx__button dbx__button--camera', {
+      type: 'button', text: 'Scatta', title: 'Scatta una foto con la fotocamera',
+    });
+    shoot.addEventListener('click', () => this.cameraInput.click());
+    bar.append(shoot, this.cameraInput);
+
+    return bar;
+  }
+
+  #buildScroller() {
+    const scroller = el('div', 'dbx__scroll');
 
     if (this.config.presets) {
-      const bar = el('div', 'dbx__presets');
-      bar.appendChild(el('span', 'dbx__presets-label', { text: 'Preset' }));
-      for (const [key, preset] of Object.entries(PRESETS)) {
-        const b = el('button', 'dbx__preset', { type: 'button', text: preset.label });
-        b.addEventListener('click', () => this.set(applyPreset(key, this.options)));
-        bar.appendChild(b);
-      }
-      panel.appendChild(bar);
+      scroller.appendChild(this.#buildSection('Preset', this.#buildPresetChips()));
     }
+    scroller.appendChild(this.#buildSection('Colori', this.#buildPaletteChips()));
 
     const groups = new Map();
     for (const param of PARAMS) {
+      // La palette ha gia' il suo selettore a campioni qui sopra.
+      if (param.key === 'palette') continue;
       if (!groups.has(param.group)) {
-        const section = el('section', 'dbx__group');
-        section.appendChild(el('h3', 'dbx__group-title', {
-          text: GROUP_LABELS[param.group] || param.group,
-        }));
-        groups.set(param.group, section);
-        panel.appendChild(section);
+        const body = el('div', 'dbx__controls');
+        groups.set(param.group, body);
+        scroller.appendChild(this.#buildSection(GROUP_LABELS[param.group] || param.group, body));
       }
       groups.get(param.group).appendChild(this.#buildControl(param));
     }
-
-    panel.appendChild(this.#buildActions());
-    root.appendChild(panel);
-
-    this.#wireDropZone();
-    this.#syncControls();
+    return scroller;
   }
 
-  #dropIcon() {
-    const svg = document.createElementNS(SVG_NS, 'svg');
-    svg.setAttribute('class', 'dbx__drop-icon');
-    svg.setAttribute('viewBox', '0 0 24 24');
-    svg.setAttribute('aria-hidden', 'true');
-    // Una macchina fotografica stilizzata, disegnata a mano per non
-    // trascinarsi dietro un font di icone.
-    const path = document.createElementNS(SVG_NS, 'path');
-    path.setAttribute('d', 'M4 7h3l1.5-2h7L17 7h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Z');
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke', 'currentColor');
-    path.setAttribute('stroke-width', '1.5');
-    path.setAttribute('stroke-linejoin', 'round');
-    const circle = document.createElementNS(SVG_NS, 'circle');
-    circle.setAttribute('cx', '12');
-    circle.setAttribute('cy', '13');
-    circle.setAttribute('r', '3.5');
-    circle.setAttribute('fill', 'none');
-    circle.setAttribute('stroke', 'currentColor');
-    circle.setAttribute('stroke-width', '1.5');
-    svg.append(path, circle);
-    return svg;
+  #buildSection(title, body) {
+    const section = el('section', 'dbx__group');
+    section.append(el('h3', 'dbx__group-title', { text: title }), body);
+    return section;
+  }
+
+  #buildPresetChips() {
+    const bar = el('div', 'dbx__chips');
+    for (const [key, preset] of Object.entries(PRESETS)) {
+      const b = el('button', 'dbx__chip', { type: 'button', text: preset.label });
+      b.addEventListener('click', () => this.set(applyPreset(key, this.options)));
+      bar.appendChild(b);
+    }
+    return bar;
+  }
+
+  /**
+   * Selettore delle palette a campioni di colore: un elenco a discesa non
+   * dice niente, mentre qui si sceglie guardando le tinte.
+   */
+  #buildPaletteChips() {
+    const wrap = el('div', 'dbx__palettes');
+    this.paletteButtons = new Map();
+
+    const aggiungi = (key, label, colors) => {
+      const b = el('button', 'dbx__palette', { type: 'button', title: label });
+      const swatch = el('span', 'dbx__swatch');
+      for (const c of colors.slice(0, 8)) {
+        const dot = el('span', 'dbx__swatch-dot');
+        dot.style.background = typeof c === 'string' ? c : rgbToHex(c);
+        swatch.appendChild(dot);
+      }
+      b.append(swatch, el('span', 'dbx__palette-name', { text: label }));
+      b.addEventListener('click', () => this.set({ palette: key }));
+      wrap.appendChild(b);
+      this.paletteButtons.set(key, b);
+      return b;
+    };
+
+    for (const [key, entry] of Object.entries(PALETTES)) {
+      aggiungi(key, entry.label, entry.colors);
+    }
+
+    // Voce personalizzata: si aggiorna insieme all'editor qui sotto.
+    this.customButton = aggiungi('__custom__', 'Su misura', this.customColors);
+    this.customButton.addEventListener('click', () => {
+      this.set({ palette: stringifyPalette(this.customColors) });
+    });
+
+    wrap.appendChild(this.#buildCustomEditor());
+    return wrap;
+  }
+
+  /** Editor della palette personalizzata: una fila di selettori colore. */
+  #buildCustomEditor() {
+    const editor = el('div', 'dbx__custom');
+    this.customList = el('div', 'dbx__custom-list');
+
+    const ridisegna = () => {
+      this.customList.replaceChildren();
+      this.customColors.forEach((colore, i) => {
+        const cella = el('span', 'dbx__custom-cell');
+        const input = el('input', 'dbx__custom-color', { type: 'color', value: colore });
+        input.addEventListener('input', () => {
+          this.customColors[i] = input.value;
+          this.#refreshCustomSwatch();
+          this.set({ palette: stringifyPalette(this.customColors) });
+        });
+        cella.appendChild(input);
+
+        if (this.customColors.length > 2) {
+          const togli = el('button', 'dbx__custom-remove', {
+            type: 'button', text: '×', title: 'Togli questo colore',
+          });
+          togli.addEventListener('click', () => {
+            this.customColors.splice(i, 1);
+            ridisegna();
+            this.#refreshCustomSwatch();
+            this.set({ palette: stringifyPalette(this.customColors) });
+          });
+          cella.appendChild(togli);
+        }
+        this.customList.appendChild(cella);
+      });
+    };
+
+    const aggiungi = el('button', 'dbx__custom-add', {
+      type: 'button', text: '+', title: 'Aggiungi un colore',
+    });
+    aggiungi.addEventListener('click', () => {
+      if (this.customColors.length >= 16) return;
+      this.customColors.push('#888888');
+      ridisegna();
+      this.#refreshCustomSwatch();
+      this.set({ palette: stringifyPalette(this.customColors) });
+    });
+
+    // Riempie l'editor coi colori della palette selezionata: e' il modo piu'
+    // naturale di partire da una predefinita e poi ritoccarla.
+    const copia = el('button', 'dbx__custom-add', {
+      type: 'button', text: '⧉', title: 'Copia qui i colori della palette scelta',
+    });
+    copia.addEventListener('click', () => {
+      const { colors } = paletteInfo(this.options.palette);
+      this.customColors = colors.slice(0, 16).map(rgbToHex);
+      ridisegna();
+      this.#refreshCustomSwatch();
+      this.set({ palette: stringifyPalette(this.customColors) });
+    });
+
+    this._redrawCustom = ridisegna;
+    ridisegna();
+    editor.append(this.customList, aggiungi, copia);
+    return editor;
+  }
+
+  #refreshCustomSwatch() {
+    if (!this.customButton) return;
+    const swatch = this.customButton.querySelector('.dbx__swatch');
+    swatch.replaceChildren();
+    for (const c of this.customColors.slice(0, 8)) {
+      const dot = el('span', 'dbx__swatch-dot');
+      dot.style.background = c;
+      swatch.appendChild(dot);
+    }
   }
 
   #buildControl(param) {
@@ -310,23 +461,26 @@ export class DitherBox {
     if (param.type === 'enum') {
       input = el('select', 'dbx__select', { id });
       for (const v of param.values) {
-        const opt = el('option', null, { value: v, text: (param.labels && param.labels[v]) || v });
-        input.appendChild(opt);
+        input.appendChild(el('option', null, {
+          value: v, text: (param.labels && param.labels[v]) || v,
+        }));
       }
       input.addEventListener('change', () => this.set({ [param.key]: input.value }));
     } else if (param.type === 'bool') {
       input = el('input', 'dbx__checkbox', { id, type: 'checkbox' });
       input.addEventListener('change', () => this.set({ [param.key]: input.checked }));
     } else {
+      // Il cursore lavora sull'indice del passo, non sul valore: e' l'unico
+      // modo per far scorrere allo stesso modo una scala regolare e una a
+      // gradini scelti a mano come quella dei megapixel.
+      const steps = paramSteps(param);
       input = el('input', 'dbx__range', {
-        id, type: 'range', min: param.min, max: param.max, step: param.step,
+        id, type: 'range', min: 0, max: steps.length - 1, step: 1,
       });
       value = el('output', 'dbx__value', { for: id });
-      // `input` per l anteprima continua mentre si trascina.
       input.addEventListener('input', () => {
-        this.set({ [param.key]: snap(Number(input.value), param.step) });
+        this.set({ [param.key]: steps[Number(input.value)] });
       });
-      // Doppio clic sull etichetta: torna al default di quel parametro.
       label.addEventListener('dblclick', () => this.set({ [param.key]: param.default }));
     }
 
@@ -341,37 +495,40 @@ export class DitherBox {
   #buildActions() {
     const actions = el('div', 'dbx__actions');
 
-    this.fileInput = el('input', 'dbx__file', { type: 'file', accept: 'image/*' });
-    this.fileInput.addEventListener('change', () => {
-      const file = this.fileInput.files && this.fileInput.files[0];
-      if (file) this.load(file).catch(() => {});
-      this.fileInput.value = '';
+    const save = el('button', 'dbx__button dbx__button--primary', {
+      type: 'button', text: 'Scarica PNG',
     });
-
-    this.cameraInput = el('input', 'dbx__file', {
-      type: 'file', accept: 'image/*', capture: 'environment',
-    });
-    this.cameraInput.addEventListener('change', () => {
-      const file = this.cameraInput.files && this.cameraInput.files[0];
-      if (file) this.load(file).catch(() => {});
-      this.cameraInput.value = '';
-    });
-
-    const open = el('button', 'dbx__button dbx__button--primary', { type: 'button', text: 'Apri foto' });
-    open.addEventListener('click', () => this.fileInput.click());
-
-    const shoot = el('button', 'dbx__button dbx__button--camera', { type: 'button', text: 'Scatta' });
-    shoot.addEventListener('click', () => this.cameraInput.click());
-
-    const save = el('button', 'dbx__button', { type: 'button', text: 'Scarica PNG' });
     save.addEventListener('click', () => this.download().catch((e) => this.#fail(e)));
 
-    const reset = el('button', 'dbx__button dbx__button--ghost', { type: 'button', text: 'Azzera' });
+    const reset = el('button', 'dbx__button dbx__button--ghost', {
+      type: 'button', text: 'Azzera',
+    });
     reset.addEventListener('click', () => this.reset());
 
-    actions.append(open, shoot, save, reset, this.fileInput, this.cameraInput);
-    this.saveButton = save;
+    actions.append(save, reset);
     return actions;
+  }
+
+  #cameraIcon() {
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('class', 'dbx__drop-icon');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', 'M4 7h3l1.5-2h7L17 7h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Z');
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', 'currentColor');
+    path.setAttribute('stroke-width', '1.5');
+    path.setAttribute('stroke-linejoin', 'round');
+    const circle = document.createElementNS(SVG_NS, 'circle');
+    circle.setAttribute('cx', '12');
+    circle.setAttribute('cy', '13');
+    circle.setAttribute('r', '3.5');
+    circle.setAttribute('fill', 'none');
+    circle.setAttribute('stroke', 'currentColor');
+    circle.setAttribute('stroke-width', '1.5');
+    svg.append(path, circle);
+    return svg;
   }
 
   #wireDropZone() {
@@ -405,7 +562,7 @@ export class DitherBox {
       }],
     ];
     for (const [event, fn] of listeners) root.addEventListener(event, fn);
-    this._globalListeners = listeners;
+    this._rootListeners = listeners;
   }
 
   // ------------------------------------------------------------ interni
@@ -414,28 +571,92 @@ export class DitherBox {
     for (const [key, { param, input, value }] of this.controls) {
       const v = this.options[key];
       if (param.type === 'bool') input.checked = Boolean(v);
+      else if (param.type === 'range') input.value = stepIndex(param, v);
       else input.value = v;
       if (value) value.textContent = formatValue(param, v);
     }
+
+    if (this.paletteButtons) {
+      const attiva = isCustomPalette(this.options.palette)
+        ? '__custom__'
+        : this.options.palette;
+      for (const [key, button] of this.paletteButtons) {
+        button.classList.toggle('is-active', key === attiva);
+        button.setAttribute('aria-pressed', String(key === attiva));
+      }
+    }
+  }
+
+  /**
+   * L'immagine su cui lavora l'anteprima.
+   *
+   * Deve subire la stessa riduzione in megapixel del risultato finale, se no
+   * l'anteprima resta nitida mentre il file scaricato esce sgranato: si
+   * sceglierebbe alla cieca.
+   */
+  #previewSource() {
+    const { megapixels } = this.options;
+    if (this.previewCache && this.previewCache.megapixels === megapixels) {
+      return this.previewCache.image;
+    }
+    const target = targetSize(this.source.width, this.source.height, megapixels);
+    const base = this.previewBase;
+    const k = Math.min(1, base.width / target.width, base.height / target.height);
+    const image = k < 1 || target.width < base.width
+      ? resampleBox(
+        base,
+        Math.max(1, Math.round(target.width * k)),
+        Math.max(1, Math.round(target.height * k)),
+      )
+      : base;
+    this.previewCache = { megapixels, image };
+    return image;
   }
 
   #draw() {
     const started = performance.now();
-    const { image } = processImage(this.previewSource, this.options);
-    this.canvas.width = image.width;
-    this.canvas.height = image.height;
+    const source = this.#previewSource();
+    // I megapixel li ha gia' applicati #previewSource: qui si dice al motore
+    // di non ridurre una seconda volta.
+    const { image } = processImage(source, {
+      ...this.options,
+      megapixels: (source.width * source.height) / 1e6,
+    });
     this.ctx.putImageData(new ImageData(image.data, image.width, image.height), 0, 0);
+    this.#showCanvas(image);
+
+    const out = targetSize(this.source.width, this.source.height, this.options.megapixels);
+    const mp = ((out.width * out.height) / 1e6).toFixed(2);
     const ms = Math.round(performance.now() - started);
     this.#status(
-      `${this.source.width}×${this.source.height} · anteprima ${image.width}×${image.height} · ${ms} ms`,
+      `${this.source.width}×${this.source.height} → ${out.width}×${out.height} (${mp} MP) · ${ms} ms`,
     );
+  }
+
+  #showCanvas(image) {
+    if (this.canvas.width !== image.width || this.canvas.height !== image.height) {
+      this.canvas.width = image.width;
+      this.canvas.height = image.height;
+      this.ctx.putImageData(new ImageData(image.data, image.width, image.height), 0, 0);
+    }
+  }
+
+  #toCanvas(image) {
+    const canvas = document.createElement('canvas');
+    canvas.width = image.width;
+    canvas.height = image.height;
+    canvas.getContext('2d').putImageData(
+      new ImageData(image.data, image.width, image.height), 0, 0,
+    );
+    return canvas;
   }
 
   #defaultFilename() {
     const base = this.sourceName
       ? this.sourceName.replace(/\.[^.]+$/, '')
       : 'ditherbox';
-    return `${base}-${this.options.palette}-${this.options.algorithm}.png`;
+    const palette = isCustomPalette(this.options.palette) ? 'custom' : this.options.palette;
+    return `${base}-${palette}-${this.options.algorithm}.png`;
   }
 
   #status(text) {
@@ -477,6 +698,8 @@ export function ditherToCanvas(drawable, options = {}) {
 /**
  * Aggancia automaticamente ogni elemento con `data-ditherbox`.
  * Gli attributi `data-*` diventano opzioni: data-palette, data-algorithm, ...
+ * Per una palette personalizzata basta un elenco di colori:
+ * `data-palette="#0a0c10,#c2fe0b"`.
  */
 export function autoInit(scope = document) {
   const boxes = [];
@@ -496,5 +719,5 @@ export function autoInit(scope = document) {
   return boxes;
 }
 
-export { PARAMS, PRESETS, DEFAULTS, processImage };
+export { PARAMS, PRESETS, PALETTES, DEFAULTS, processImage };
 export default DitherBox;

@@ -24,6 +24,13 @@ import DitherBox from '../components/DitherBox.astro';
 <DitherBox palette="bw" algorithm="atkinson" contrast={15} sharpen={40} />
 ```
 
+Per una tavolozza tua basta passarla come elenco di colori, senza registrarla
+da nessuna parte:
+
+```astro
+<DitherBox palette="#0a0c10,#c2fe0b" megapixels={0.3} algorithm="atkinson" />
+```
+
 ## Solo il motore, senza interfaccia
 
 Se l'interfaccia non ti serve e vuoi solo ditherare un'immagine, importa il
@@ -43,7 +50,7 @@ Nel browser la scorciatoia e' `ditherToCanvas`:
 import { ditherToCanvas } from 'ditherbox/web';
 
 const img = document.querySelector('img');
-const canvas = ditherToCanvas(img, { palette: 'gameboy', scale: 4 });
+const canvas = ditherToCanvas(img, { palette: 'gameboy', scale: 4, megapixels: 1 });
 img.replaceWith(canvas);
 ```
 

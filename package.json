@@ -11,7 +11,9 @@
     "atkinson",
     "pixel-art",
     "tui",
-    "astro"
+    "astro",
+    "marathon",
+    "palette"
   ],
   "bin": {
     "ditherbox": "bin/ditherbox.js"
@@ -34,7 +36,8 @@
   "scripts": {
     "build": "node scripts/build.js",
     "test": "node --test test/*.test.js",
-    "demo": "node bin/ditherbox.js"
+    "demo": "node bin/ditherbox.js",
+    "screenshot": "node scripts/screenshot.js"
   },
   "dependencies": {
     "jpeg-js": "^0.4.4",
@@ -42,5 +45,8 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1"
   }
 }

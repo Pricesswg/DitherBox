@@ -10,8 +10,10 @@ Dithering regolabile per le foto: lo stesso motore in due confezioni.
   colori, slider al posto dell'equalizzatore, l'anteprima disegnata dentro
   il terminale.
 
-Diciannove algoritmi di dithering, tredici palette (dal bianco e nero a un bit
-al Game Boy, dal CGA al C64), regolazioni di tono e otto preset pronti.
+Diciannove algoritmi di dithering, diciotto tavolozze (dal bianco e nero a un
+bit al Game Boy, dal CGA al C64 ai colori di Marathon) piu' quelle che ti
+scrivi da solo, regolazioni di tono, controllo della risoluzione in megapixel
+e otto preset pronti.
 
 ```
 ╭─ DITHERBOX ────────────────────────────────────────────────────────────────────────╮
@@ -90,11 +92,20 @@ Apri `examples/index.html` per vedere entrambe le forme al lavoro.
 
 ### Cosa sa fare il widget
 
-Trascinamento, incolla dagli appunti, selettore file, e su telefono il pulsante
-*Scatta* apre direttamente la fotocamera. L'orientamento EXIF viene rispettato,
-cosi' le foto verticali non arrivano coricate. L'anteprima lavora su una copia
-ridotta per restare reattiva mentre si trascinano gli slider; il PNG che scarichi
-viene rielaborato a piena risoluzione.
+Il campo **Apri foto** sta in cima al pannello e i pulsanti in fondo: sono due
+fasce ferme, solo i parametri in mezzo scorrono. Oltre al campo funzionano il
+trascinamento, l'incolla dagli appunti e — su telefono — il pulsante *Scatta*,
+che apre direttamente la fotocamera. L'orientamento EXIF viene rispettato, cosi'
+le foto verticali non arrivano coricate.
+
+L'anteprima subisce **la stessa riduzione in megapixel** del risultato finale:
+se scegli 0,05 MP la vedi sgranata come uscira' davvero, invece di scoprirlo
+dopo aver scaricato il file. La riga di stato dice sempre da quanto a quanto:
+`3024×4032 → 1224×1632 (2.00 MP)`.
+
+Il widget porta un azzeramento degli stili circoscritto a se stesso, cosi' le
+regole del sito che lo ospita (`section { margin-bottom: 2rem }` e compagnia)
+non gli scompongono la disposizione.
 
 ### API
 
@@ -103,7 +114,7 @@ import { DitherBox, ditherToCanvas, autoInit } from 'ditherbox/web';
 import { processImage, applyPreset, PALETTES } from 'ditherbox';
 
 const box = new DitherBox('#dither', {
-  options: { palette: 'bw', algorithm: 'atkinson' },
+  options: { palette: 'bw', algorithm: 'atkinson', megapixels: 2 },
   previewMaxSize: 900,   // lato massimo dell'anteprima interattiva
   presets: true,         // barra dei preset
   src: '/foto.jpg',      // immagine da caricare all'avvio
@@ -201,6 +212,7 @@ vero, non una foto sfocata.
 ```sh
 ditherbox foto.jpg -p macintosh -o esito.png
 ditherbox foto.jpg --palette gameboy --scale 4 --contrast 20 -o gb.png
+ditherbox foto.jpg --palette "#0a0c10,#c2fe0b" --megapixels 0.3 -o manifesto.png
 ditherbox ~/Foto --preset fanzine --out-dir ./esiti
 ditherbox --list                      # palette, algoritmi, preset, temi
 ditherbox --help
@@ -208,8 +220,8 @@ ditherbox --help
 
 Ogni parametro del motore ha la sua opzione: `--palette`, `--algorithm`,
 `--scale`, `--strength`, `--bias`, `--noise`, `--serpentine`, `--brightness`,
-`--contrast`, `--gamma`, `--saturation`, `--sharpen`, `--invert`, `--max-size`,
-`--upscale`. Gli interruttori si spengono con `--no-` davanti.
+`--contrast`, `--gamma`, `--saturation`, `--sharpen`, `--invert`,
+`--megapixels`, `--upscale`. Gli interruttori si spengono con `--no-` davanti.
 
 ### Configurazione
 
@@ -221,6 +233,7 @@ mode = "braille"
 palette = "bw"
 algorithm = "atkinson"
 contrast = 15
+megapixels = 2
 ```
 
 I temi personali vanno in `~/.config/ditherbox/themes/*.toml` e usano lo stesso
@@ -257,7 +270,7 @@ Temi inclusi: `winamp`, `gruvbox`, `dracula`, `nord`, `catppuccin`,
 | **Luminosita, Contrasto, Gamma, Saturazione** | | Regolazioni di tono, applicate prima del dithering |
 | **Nitidezza** | 0–200% | Maschera di contrasto: recupera i dettagli che il dithering mangia |
 | **Inverti** | on/off | Scambia chiari e scuri |
-| **Lato max** | 64–4096 px | Le foto da fotocamera vengono prima ridotte a questo lato |
+| **Megapixel** | 0,01–24 MP | Risoluzione del risultato: abbassala per sgranare di proposito la foto |
 | **Ringrandisci** | on/off | Riporta il risultato alla misura di partenza con pixel netti |
 
 ### Algoritmi
@@ -277,21 +290,49 @@ dalla sua posizione. Trama regolare, aria da vecchio videogioco: `bayer2`,
 
 **Senza trama** — `none` (soglia secca) e `random` (rumore puro).
 
-### Palette
+### Tavolozze
 
 `bw` (un bit), `gray4` `gray8` `gray16`, `gameboy`, `gameboyPocket`, `cgaCyan`,
-`cgaGreen`, `pico8`, `c64`, `zx`, `greenCrt`, `amberCrt`.
+`cgaGreen`, `pico8`, `c64`, `zx`, `greenCrt`, `amberCrt`, `marathon`,
+`marathonDuo`, `marathonTerm`, `risograph`, `blueprint`.
 
-Le palette che sono scale tonali (bianco e nero, grigi, Game Boy, fosfori)
-vengono mappate sulla **luminanza**, non sul colore RGB piu' vicino: e' l'unico
-modo perche' un rosso saturo finisca sul gradino scuro invece che sul verde
-chiaro che gli capita accanto nello spazio dei colori.
+`marathon` prende i colori del gioco del 2025: rosa e gialli iper-saturi su blu
+acciaio freddi e neri profondi. E' trattata come **scala di luminanza**, non
+come tavolozza a colori — ed e' la differenza fra il blocco piatto di colore
+che il gioco usa davvero e una nevicata di coriandoli. `marathonDuo` tiene solo
+nero e giallo acido, per il taglio da manifesto; `marathonTerm` sono i terminali
+verdi del Marathon del 1994.
 
-Puoi anche passare una tavolozza tua:
+Lo stesso vale per tutte le scale tonali (bianco e nero, grigi, Game Boy,
+fosfori, cianografia): vengono mappate sulla **luminanza** e non sul colore RGB
+piu' vicino. E' l'unico modo perche' un rosso saturo finisca sul gradino scuro
+invece che sul verde chiaro che gli capita accanto nello spazio dei colori.
+
+### Tavolozze su misura
+
+Un elenco di colori esadecimali separati da virgola vale ovunque si possa
+scrivere il nome di una tavolozza — nel widget, nella riga di comando, in
+`config.toml`, in un attributo `data-`:
+
+```sh
+ditherbox foto.jpg --palette "#0a0c10,#c2fe0b" -o manifesto.png
+```
+
+```html
+<div data-ditherbox data-palette="#1a1423,#f2e9e4,#c9ada7"></div>
+```
 
 ```js
-processImage(imageData, { palette: ['#1a1423', '#f2e9e4'] });
+processImage(imageData, { palette: '#1a1423,#f2e9e4' });
+processImage(imageData, { palette: ['#1a1423', '#f2e9e4'] });   // anche cosi'
 ```
+
+Nel widget c'e' l'editor: la voce **Su misura** apre una fila di selettori
+colore, con `+` per aggiungerne e `⧉` per partire dai colori della tavolozza
+che hai selezionato e poi ritoccarli.
+
+Con due sole tinte il risultato e' un duotono: il chiaro e lo scuro della foto
+finiscono sui due colori scelti, con il dithering a fare i mezzitoni.
 
 ### Preset
 
@@ -324,9 +365,18 @@ tutte e tre le interfacce lo leggono da li'.
 
 ```sh
 npm install
-npm test          # 80 test: motore, terminale, I/O, TUI, riga di comando, bundle
+npm test          # 92 test
 npm run build     # rigenera dist/ per l'uso con <script>
+npm run screenshot -- esito.png 1240 820 foto.png    # guarda il widget
 ```
+
+I test coprono motore, primitive di terminale, lettura e scrittura immagini,
+TUI, riga di comando e file impacchettato. Quelli in `test/layout.test.js`
+aprono davvero il widget in Chromium e controllano l'impaginazione: che le due
+colonne combacino, che niente sbordi dal riquadro, che il campo per aprire la
+foto e i pulsanti restino fermi mentre i parametri scorrono, e che il cursore
+dei megapixel cambi per davvero la misura dell'anteprima. Se Chromium non c'e'
+si saltano invece di far fallire la suite.
 
 Se tocchi qualcosa in `src/core/` o `src/web/`, rilancia `npm run build` e
 committa anche `dist/`: c'e' un test che verifica che il file impacchettato sia
@@ -340,7 +390,8 @@ src/cli/     app da terminale: TUI, temi, renderer, I/O immagini
 
 Le uniche dipendenze sono `jpeg-js` e `pngjs`, entrambe in puro JavaScript e
 usate solo dall'app da terminale: niente da compilare, niente moduli nativi. Il
-widget web non ha dipendenze del tutto.
+widget web non ha dipendenze del tutto. Playwright compare fra le dipendenze di
+sviluppo e serve solo ai controlli di impaginazione.
 
 ## Licenza
 

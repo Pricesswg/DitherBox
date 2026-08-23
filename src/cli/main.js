@@ -11,6 +11,7 @@ import { statSync, mkdirSync } from 'node:fs';
 import {
   PARAMS, PRESETS, PALETTES, ALGORITHM_LABELS, ALGORITHMS,
   DEFAULTS, normalizeOptions, applyPreset, processImage, resampleBox,
+  isCustomPalette,
 } from '../core/index.js';
 import { loadImage, saveImage, listImages, isSupported } from './imageio.js';
 import { cellTarget, renderImage, MODES, MODE_KEYS } from './preview.js';
@@ -91,6 +92,12 @@ function optionsFromFlags(flags) {
     } else if (param.type === 'bool') {
       out[param.key] = raw === true || raw === 'true' || raw === '1';
     } else {
+      // Una palette scritta a mano ("#0a0c10,#c2fe0b") non e' un nome
+      // dell'elenco ma e' perfettamente valida.
+      if (param.key === 'palette' && isCustomPalette(raw)) {
+        out[param.key] = raw;
+        continue;
+      }
       if (!param.values.includes(raw)) {
         throw new Error(`--${key}: "${raw}" non esiste. Valori: ${param.values.join(', ')}`);
       }
@@ -136,6 +143,11 @@ CONFIGURAZIONE
   ~/.config/ditherbox/config.toml     valori di partenza e tema
   ~/.config/ditherbox/themes/*.toml   temi personali (stesso schema di cliamp)
 
+PALETTE PERSONALIZZATE
+  Al posto di un nome puoi passare un elenco di colori:
+    ditherbox foto.jpg --palette "#0a0c10,#c2fe0b" -o out.png
+  Vale ovunque: qui, in config.toml e nell'attributo data-palette del widget.
+
 ESEMPI
   ditherbox ~/Foto                                  sfoglia una cartella
   ditherbox ritratto.jpg -p macintosh -o out.png    il classico Mac del 1984
@@ -178,7 +190,8 @@ async function expandInputs(paths) {
 /** Nome del file di uscita quando non e' stato indicato esplicitamente. */
 function defaultOutName(inputPath, options, outDir) {
   const base = basename(inputPath, extname(inputPath));
-  const name = `${base}-${options.palette}-${options.algorithm}.png`;
+  const palette = isCustomPalette(options.palette) ? 'custom' : options.palette;
+  const name = `${base}-${palette}-${options.algorithm}.png`;
   return join(outDir || dirname(inputPath), name);
 }
 
@@ -192,7 +205,11 @@ async function printToTerminal(path, options, mode, themeName) {
   const img = await loadImage(path);
   const target = cellTarget(img.width, img.height, cols, rows, mode);
   const small = resampleBox(img, target.width, target.height);
-  const { image } = processImage(small, { ...options, maxSize: 4096, upscale: false });
+  const { image } = processImage(small, {
+    ...options,
+    megapixels: (small.width * small.height) / 1e6,
+    upscale: false,
+  });
   process.stdout.write(`${renderImage(image, mode, theme).join('\n')}\n`);
 }
 

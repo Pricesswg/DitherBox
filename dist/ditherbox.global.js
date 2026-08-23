@@ -11,11 +11,17 @@ const __m_src_core_palettes_js = (() => {
  * il colore piu' vicino in distanza euclidea pesata sulla percezione.
  */
 
-const hex = (s) => [
-  parseInt(s.slice(1, 3), 16),
-  parseInt(s.slice(3, 5), 16),
-  parseInt(s.slice(5, 7), 16),
-];
+/** Legge #rgb o #rrggbb (con o senza cancelletto) in una terna 0-255. */
+const hex = (s) => {
+  const body = s.startsWith('#') ? s.slice(1) : s;
+  // La forma corta raddoppia ogni cifra: #f0a diventa #ff00aa.
+  const full = body.length === 3 ? body.replace(/./g, (c) => c + c) : body;
+  return [
+    parseInt(full.slice(0, 2), 16),
+    parseInt(full.slice(2, 4), 16),
+    parseInt(full.slice(4, 6), 16),
+  ];
+};
 
 /** Costruisce una scala di grigi con `levels` livelli equispaziati. */
 function grayRamp(levels) {
@@ -94,24 +100,88 @@ const PALETTES = {
   },
   greenCrt: { ramp: true, label: 'CRT verde', colors: phosphor('#33ff66', 4) },
   amberCrt: { ramp: true, label: 'CRT ambra', colors: phosphor('#ffb000', 4) },
+
+  // Marathon (Bungie, 2025). L'art director la chiama "graphic realism":
+  // rosa e gialli iper-saturi che spiccano su blu acciaio freddi e neri
+  // profondi, senza sfumature. Regge bene il dithering proprio perche' i
+  // colori sono pochi e lontanissimi fra loro.
+  marathon: {
+    // Rampa, non palette a colori: i suoi otto colori, ordinati per
+    // luminanza, salgono regolari dal nero al bianco sporco. Mappandoci
+    // sopra la luminanza si ottengono le fasce piatte di colore del gioco;
+    // cercando invece il colore RGB piu' vicino si ottengono coriandoli.
+    ramp: true,
+    label: 'Marathon',
+    colors: [
+      '#0a0c10', '#29324f', '#01ffff', '#59b41d',
+      '#c2fe0b', '#ff2d95', '#ff0d1a', '#f4f1e8',
+    ].map(hex),
+  },
+  // Due sole tinte, per il taglio da manifesto.
+  marathonDuo: {
+    ramp: true,
+    label: 'Marathon duo',
+    colors: ['#0a0c10', '#c2fe0b'].map(hex),
+  },
+  // I terminali del Marathon del 1994: verde su nero, con quel filo di
+  // verde acceso sulle lettere.
+  marathonTerm: {
+    ramp: true,
+    label: 'Marathon 94',
+    colors: ['#04120a', '#0d3b1e', '#1f7a3d', '#3dff7a'].map(hex),
+  },
+  risograph: {
+    label: 'Risografia',
+    colors: ['#1d1a2e', '#0078bf', '#ff48b0', '#f5f1e6'].map(hex),
+  },
+  blueprint: {
+    ramp: true,
+    label: 'Cianografia',
+    colors: ['#0b2545', '#13315c', '#8da9c4', '#eef4ed'].map(hex),
+  },
 };
 
 const PALETTE_KEYS = Object.keys(PALETTES);
 
+const HEX_RE = /^#?(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+/**
+ * Vero se la stringa e' un elenco di colori esadecimali separati da virgola,
+ * cioe' una palette scritta a mano: "#0a0c10,#c2fe0b".
+ *
+ * E' il formato che usiamo ovunque per le palette personalizzate: sta in un
+ * attributo data-*, in una riga di config.toml e in un argomento della riga
+ * di comando senza bisogno di trattamenti diversi.
+ */
+function isCustomPalette(value) {
+  if (typeof value !== 'string') return false;
+  const parts = value.split(',').map((s) => s.trim()).filter(Boolean);
+  return parts.length >= 2 && parts.every((p) => HEX_RE.test(p));
+}
+
+/** Trasforma un elenco di colori in stringa: l'inverso di isCustomPalette. */
+function stringifyPalette(colors) {
+  return colors.map((c) => (typeof c === 'string' ? c : rgbToHex(c))).join(',');
+}
+
+/** Legge una stringa "#aabbcc,#ddeeff" in un elenco di terne. */
+function parseCustomPalette(value) {
+  return value.split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => hex(s));
+}
+
 /**
  * Risolve l'opzione `palette` in un array di colori.
- * Accetta la chiave di una palette predefinita oppure un array custom
- * di stringhe esadecimali / terne gia' pronte.
+ * Accetta la chiave di una palette predefinita, un elenco di esadecimali
+ * separati da virgola, oppure un array gia' pronto.
  */
-function resolvePalette(palette, inkPaper) {
+function resolvePalette(palette) {
   if (Array.isArray(palette)) {
     return palette.map((c) => (typeof c === 'string' ? hex(c) : c.slice(0, 3)));
   }
-  if (palette === 'custom' && inkPaper) {
-    return [inkPaper.ink, inkPaper.paper].map((c) =>
-      typeof c === 'string' ? hex(c) : c.slice(0, 3),
-    );
-  }
+  if (isCustomPalette(palette)) return parseCustomPalette(palette);
   const entry = PALETTES[palette];
   if (!entry) throw new Error(`Palette sconosciuta: ${palette}`);
   return entry.colors;
@@ -129,15 +199,49 @@ function rgbToHex([r, g, b]) {
  * Come `resolvePalette`, ma restituisce anche se la palette e' una rampa
  * di luminanza (nel qual caso conviene quantizzare sul canale luma).
  */
-function paletteInfo(palette, inkPaper) {
-  const colors = resolvePalette(palette, inkPaper);
+function paletteInfo(palette) {
+  const colors = resolvePalette(palette);
   let ramp;
-  if (typeof palette === 'string' && PALETTES[palette]) ramp = !!PALETTES[palette].ramp;
-  else ramp = colors.length <= 2; // custom a due tinte: trattala come rampa
+  if (typeof palette === 'string' && PALETTES[palette]) {
+    ramp = !!PALETTES[palette].ramp;
+  } else {
+    // Una palette scritta a mano viene trattata come scala tonale quando i
+    // suoi colori stanno quasi in fila per luminanza: e' il caso del duotono
+    // e delle rampe, dove mappare sul grigio da' un risultato molto migliore
+    // che cercare il colore piu' vicino.
+    ramp = isMonotoneRamp(colors);
+  }
   return { colors, ramp };
 }
 
-  return { PALETTES, PALETTE_KEYS, grayRamp, hexToRgb: hex, paletteInfo, resolvePalette, rgbToHex };
+/**
+ * Vero se i colori, ordinati per luminanza, stanno quasi su una retta nello
+ * spazio RGB: allora sono gradini di una stessa tinta, non colori distinti.
+ */
+function isMonotoneRamp(colors) {
+  if (colors.length <= 2) return true;
+  const byLuma = [...colors].sort(
+    (a, b) => (0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2])
+      - (0.2126 * b[0] + 0.7152 * b[1] + 0.0722 * b[2]),
+  );
+  const first = byLuma[0];
+  const last = byLuma[byLuma.length - 1];
+  const axis = [last[0] - first[0], last[1] - first[1], last[2] - first[2]];
+  const axisLen = Math.hypot(...axis) || 1;
+
+  for (const c of byLuma) {
+    const v = [c[0] - first[0], c[1] - first[1], c[2] - first[2]];
+    const t = (v[0] * axis[0] + v[1] * axis[1] + v[2] * axis[2]) / (axisLen * axisLen);
+    // Distanza dal segmento che unisce il colore piu' scuro al piu' chiaro.
+    const scarto = Math.hypot(
+      v[0] - t * axis[0], v[1] - t * axis[1], v[2] - t * axis[2],
+    );
+    if (scarto > axisLen * 0.16) return false;
+  }
+  return true;
+}
+
+  return { PALETTES, PALETTE_KEYS, grayRamp, hexToRgb: hex, isCustomPalette, paletteInfo, parseCustomPalette, resolvePalette, rgbToHex, stringifyPalette };
 })();
 
 const __m_src_core_matrices_js = (() => {
@@ -825,7 +929,7 @@ function diffuse(img, out, q, kernel, { strength, biasValue, noiseAmp, serpentin
 
 const __m_src_core_options_js = (() => {
   const { ALGORITHMS, ALGORITHM_LABELS } = __m_src_core_dither_js;
-  const { PALETTES, PALETTE_KEYS } = __m_src_core_palettes_js;
+  const { PALETTES, PALETTE_KEYS, isCustomPalette } = __m_src_core_palettes_js;
 /**
  * Schema dei parametri, definito una volta sola.
  * Sia il widget web sia la TUI costruiscono i propri controlli iterando
@@ -974,16 +1078,22 @@ const PARAMS = [
   },
 
   {
-    key: 'maxSize',
-    label: 'Lato max',
+    key: 'megapixels',
+    label: 'Megapixel',
     group: 'output',
     type: 'range',
-    min: 64,
-    max: 4096,
-    step: 64,
-    default: 1024,
-    unit: 'px',
-    hint: 'Le foto da fotocamera vengono prima ridotte a questo lato massimo',
+    // Gradini scelti a mano invece di un intervallo regolare: fra 0.01 e 24
+    // megapixel ci sono tre ordini di grandezza, e un cursore lineare
+    // schiaccerebbe tutta la meta' bassa - proprio quella dove si sgrana
+    // davvero l'immagine - nei primi millimetri di corsa.
+    steps: [
+      0.01, 0.015, 0.02, 0.03, 0.05, 0.07,
+      0.1, 0.15, 0.2, 0.3, 0.5, 0.7,
+      1, 1.5, 2, 3, 4, 6, 8, 10, 12, 16, 20, 24,
+    ],
+    default: 2,
+    format: formatMegapixels,
+    hint: 'Risoluzione del risultato: abbassala per sgranare di proposito la foto',
   },
   {
     key: 'upscale',
@@ -994,6 +1104,15 @@ const PARAMS = [
     hint: 'Riporta il risultato alla dimensione di prima con pixel netti',
   },
 ];
+
+// I parametri con gradini espliciti ricavano da li' i propri estremi:
+// il resto del codice puo' continuare a leggere min e max senza saperlo.
+for (const p of PARAMS) {
+  if (p.steps) {
+    p.min = p.steps[0];
+    p.max = p.steps[p.steps.length - 1];
+  }
+}
 
 const PARAM_BY_KEY = Object.fromEntries(PARAMS.map((p) => [p.key, p]));
 
@@ -1043,6 +1162,64 @@ const PRESETS = {
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
+function formatMegapixels(v) {
+  if (v < 0.1) return `${Math.round(v * 1000)} kpx`;
+  if (v < 1) return `${v.toFixed(2).replace(/0$/, '')} MP`;
+  if (v < 10) return `${v.toFixed(1).replace(/\.0$/, '')} MP`;
+  return `${v.toFixed(0)} MP`;
+}
+
+const stepsCache = new WeakMap();
+
+/**
+ * I valori che un cursore puo' assumere, in ordine.
+ *
+ * Web e terminale lavorano tutti e due su questo elenco per indice: cosi'
+ * un passo di tastiera e uno di mouse portano esattamente allo stesso
+ * valore, e le scale logaritmiche non hanno bisogno di codice a parte.
+ */
+function paramSteps(param) {
+  if (param.type !== 'range') return null;
+  const memoria = stepsCache.get(param);
+  if (memoria) return memoria;
+
+  let values;
+  if (param.steps) {
+    values = param.steps;
+  } else {
+    const decimali = (String(param.step).split('.')[1] || '').length;
+    values = [];
+    for (let v = param.min; v <= param.max + param.step / 1000; v += param.step) {
+      values.push(Number(v.toFixed(decimali)));
+    }
+    if (values[values.length - 1] !== param.max) values.push(param.max);
+  }
+  stepsCache.set(param, values);
+  return values;
+}
+
+/** L'indice del passo piu' vicino a `value`. */
+function stepIndex(param, value) {
+  const steps = paramSteps(param);
+  let best = 0;
+  let bestD = Infinity;
+  for (let i = 0; i < steps.length; i++) {
+    const d = Math.abs(steps[i] - value);
+    if (d < bestD) {
+      bestD = d;
+      best = i;
+    }
+  }
+  return best;
+}
+
+/** Sposta un parametro di `delta` passi, restando dentro l'intervallo. */
+function stepBy(param, value, delta) {
+  const steps = paramSteps(param);
+  const i = clamp(stepIndex(param, value) + delta, 0, steps.length - 1);
+  return steps[i];
+}
+
 /**
  * Riempie i valori mancanti coi default e riporta ogni parametro nel
  * suo intervallo. Nessuna eccezione per un valore fuori scala: viene
@@ -1054,12 +1231,16 @@ function normalizeOptions(input = {}) {
     const v = out[p.key];
     if (p.type === 'range') {
       const n = Number(v);
-      out[p.key] = Number.isFinite(n) ? clamp(n, p.min, p.max) : p.default;
+      // Il valore viene agganciato al passo piu' vicino: cosi' quello che
+      // arriva da un attributo HTML o da un file di configurazione e' sempre
+      // uno dei valori che i cursori sanno rappresentare.
+      out[p.key] = Number.isFinite(n) ? stepBy(p, clamp(n, p.min, p.max), 0) : p.default;
     } else if (p.type === 'bool') {
       out[p.key] = Boolean(v);
     } else if (p.type === 'enum') {
-      // Una palette custom arriva come array di colori: va lasciata passare.
-      if (p.key === 'palette' && Array.isArray(v)) continue;
+      // Una palette scritta a mano (array o elenco di esadecimali) passa
+      // indenne: non e' uno dei nomi predefiniti ed e' giusto cosi'.
+      if (p.key === 'palette' && (Array.isArray(v) || isCustomPalette(v))) continue;
       if (!p.values.includes(v)) out[p.key] = p.default;
     }
   }
@@ -1069,7 +1250,11 @@ function normalizeOptions(input = {}) {
 /** Testo del valore di un parametro, usato identico da web e terminale. */
 function formatValue(param, value) {
   if (param.type === 'bool') return value ? 'ON' : 'OFF';
-  if (param.type === 'enum') return (param.labels && param.labels[value]) || String(value);
+  if (param.type === 'enum') {
+    if (isCustomPalette(value)) return 'Personalizzata';
+    return (param.labels && param.labels[value]) || String(value);
+  }
+  if (param.format) return param.format(Number(value));
   const n = Number(value);
   const text = param.decimals ? n.toFixed(param.decimals) : String(Math.round(n));
   return param.unit ? `${text}${param.unit}` : text;
@@ -1082,11 +1267,11 @@ function applyPreset(name, base = DEFAULTS) {
   return normalizeOptions({ ...base, ...preset.options });
 }
 
-  return { DEFAULTS, GROUP_LABELS, PARAMS, PARAM_BY_KEY, PRESETS, applyPreset, formatValue, normalizeOptions };
+  return { DEFAULTS, GROUP_LABELS, PARAMS, PARAM_BY_KEY, PRESETS, applyPreset, formatValue, normalizeOptions, paramSteps, stepBy, stepIndex };
 })();
 
 const __m_src_core_process_js = (() => {
-  const { applyAdjustments, sharpen, downscaleByFactor, upscaleByFactor, fitWithin, cloneImage } = __m_src_core_adjust_js;
+  const { applyAdjustments, sharpen, downscaleByFactor, upscaleByFactor, resampleBox, cloneImage } = __m_src_core_adjust_js;
   const { buildQuantizer, ditherImage } = __m_src_core_dither_js;
   const { paletteInfo } = __m_src_core_palettes_js;
   const { normalizeOptions } = __m_src_core_options_js;
@@ -1106,11 +1291,15 @@ const __m_src_core_process_js = (() => {
  */
 function processImage(source, rawOptions = {}) {
   const options = normalizeOptions(rawOptions);
-  const { colors, ramp } = paletteInfo(options.palette, options.inkPaper);
+  const { colors, ramp } = paletteInfo(options.palette);
 
-  // 1. Le foto da fotocamera sono enormi: si riduce subito, se no ogni
-  //    spostamento di slider costa secondi.
-  let img = fitWithin(source, options.maxSize, options.maxSize);
+  // 1. Riduzione alla risoluzione richiesta. E' anche il motivo per cui le
+  //    foto da fotocamera non fanno arrancare l'interfaccia: si lavora su
+  //    due megapixel, non su dodici.
+  const target = targetSize(source.width, source.height, options.megapixels);
+  let img = target.scale < 1
+    ? resampleBox(source, target.width, target.height)
+    : cloneImage(source);
 
   // 2. Regolazioni tonali sul pieno dettaglio, prima di buttare via pixel.
   applyAdjustments(img, options);
@@ -1146,13 +1335,29 @@ function processImage(source, rawOptions = {}) {
   };
 }
 
-  return { processImage };
+/**
+ * Le misure a cui un'immagine va portata per stare in `megapixels`.
+ * Non ingrandisce mai: se la foto e' gia' piu' piccola resta com'e'.
+ *
+ * La usano anche le interfacce, per scrivere "3024x4032 -> 1224x1632"
+ * accanto al cursore senza dover elaborare davvero l'immagine.
+ */
+function targetSize(width, height, megapixels) {
+  const scale = Math.min(1, Math.sqrt((megapixels * 1e6) / (width * height)));
+  return {
+    scale,
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  };
+}
+
+  return { processImage, targetSize };
 })();
 
 const __m_src_core_index_js = Object.assign({}, __m_src_core_palettes_js, __m_src_core_matrices_js, __m_src_core_adjust_js, __m_src_core_dither_js, __m_src_core_options_js, __m_src_core_process_js);
 
 const __m_src_web_ditherbox_js = (() => {
-  const { PARAMS, GROUP_LABELS, PRESETS, DEFAULTS, normalizeOptions, formatValue, applyPreset, processImage, fitWithin } = __m_src_core_index_js;
+  const { PARAMS, GROUP_LABELS, PRESETS, DEFAULTS, PALETTES, normalizeOptions, formatValue, applyPreset, paramSteps, stepIndex, processImage, targetSize, resampleBox, fitWithin, paletteInfo, rgbToHex, stringifyPalette, isCustomPalette } = __m_src_core_index_js;
 /**
  * DitherBox - widget per il browser.
  *
@@ -1177,12 +1382,6 @@ function el(tag, className, attrs = {}) {
     else node.setAttribute(k, v);
   }
   return node;
-}
-
-/** Sposta un valore al gradino di slider piu' vicino, evitando 0.30000000004. */
-function snap(value, step) {
-  const decimals = (String(step).split('.')[1] || '').length;
-  return Number((Math.round(value / step) * step).toFixed(decimals));
 }
 
 /**
@@ -1251,10 +1450,12 @@ class DitherBox {
     };
     this.options = normalizeOptions(config.options);
     this.source = null;        // ImageData a piena risoluzione
-    this.previewSource = null; // ImageData ridotto, per l anteprima interattiva
+    this.previewBase = null;   // copia ridotta, base di tutte le anteprime
+    this.previewCache = null;  // { megapixels, image } per non ricampionare a vuoto
     this.sourceName = null;
     this.listeners = { change: [], load: [], error: [] };
     this.controls = new Map();
+    this.customColors = ['#0a0c10', '#c2fe0b'];
     this._pending = null;
 
     this.#build();
@@ -1270,9 +1471,15 @@ class DitherBox {
       const drawable = await decodeSource(source);
       this.source = toImageData(drawable);
       if (drawable.close) drawable.close();
-      this.previewSource = fitWithin(this.source, this.config.previewMaxSize, this.config.previewMaxSize);
+      // Base dell'anteprima: si calcola una volta sola al caricamento, cosi'
+      // muovere un cursore non costa mai un ricampionamento della foto intera.
+      this.previewBase = fitWithin(
+        this.source, this.config.previewMaxSize, this.config.previewMaxSize,
+      );
+      this.previewCache = null;
       this.sourceName = name || (source instanceof File ? source.name : null);
       this.root.classList.add('is-loaded');
+      if (this.fileName) this.fileName.textContent = this.sourceName || 'immagine caricata';
       this.render();
       this.#emit('load', { width: this.source.width, height: this.source.height });
     } catch (err) {
@@ -1300,7 +1507,7 @@ class DitherBox {
 
   /** Ricalcola l anteprima. Debounced: gli slider sparano decine di eventi. */
   render() {
-    if (!this.previewSource) return;
+    if (!this.previewBase) return;
     if (this._pending) cancelAnimationFrame(this._pending);
     this._pending = requestAnimationFrame(() => {
       this._pending = null;
@@ -1315,12 +1522,7 @@ class DitherBox {
   renderFull() {
     if (!this.source) throw new Error('Nessuna immagine caricata');
     const { image } = processImage(this.source, this.options);
-    const canvas = document.createElement('canvas');
-    canvas.width = image.width;
-    canvas.height = image.height;
-    const ctx = canvas.getContext('2d');
-    ctx.putImageData(new ImageData(image.data, image.width, image.height), 0, 0);
-    return canvas;
+    return this.#toCanvas(image);
   }
 
   /** @returns {Promise<Blob>} il PNG a piena risoluzione. */
@@ -1347,7 +1549,7 @@ class DitherBox {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    this.#status(null);
+    this.render();
   }
 
   on(event, fn) {
@@ -1355,10 +1557,10 @@ class DitherBox {
     return this;
   }
 
-  /** Smonta il widget e libera i listener globali. */
+  /** Smonta il widget e libera i listener. */
   destroy() {
     if (this._pending) cancelAnimationFrame(this._pending);
-    for (const [event, fn] of this._globalListeners || []) {
+    for (const [event, fn] of this._rootListeners || []) {
       this.root.removeEventListener(event, fn);
     }
     this.root.replaceChildren();
@@ -1372,80 +1574,233 @@ class DitherBox {
     root.classList.add('dbx');
     root.replaceChildren();
 
-    // --- palco con l anteprima -------------------------------------
+    root.append(this.#buildStage(), this.#buildPanel());
+    this.#wireDropZone();
+    this.#syncControls();
+  }
+
+  #buildStage() {
     const stage = el('div', 'dbx__stage');
     this.canvas = el('canvas', 'dbx__canvas');
     this.ctx = this.canvas.getContext('2d');
     stage.appendChild(this.canvas);
 
     const drop = el('div', 'dbx__drop');
+    const invito = el('button', 'dbx__drop-button', {
+      type: 'button', text: 'Scegli una foto',
+    });
+    invito.addEventListener('click', () => this.fileInput.click());
     drop.append(
-      this.#dropIcon(),
+      this.#cameraIcon(),
       el('p', 'dbx__drop-title', { text: 'Trascina qui una foto' }),
-      el('p', 'dbx__drop-sub', { text: 'oppure usa i pulsanti qui sotto — l’immagine non lascia il tuo browser' }),
+      invito,
+      el('p', 'dbx__drop-sub', {
+        text: 'oppure incollala con Ctrl+V — l’immagine non lascia il tuo browser',
+      }),
     );
     stage.appendChild(drop);
 
     this.statusEl = el('div', 'dbx__status', { role: 'status', 'aria-live': 'polite' });
     stage.appendChild(this.statusEl);
-    root.appendChild(stage);
+    return stage;
+  }
 
-    // --- pannello dei controlli ------------------------------------
+  /**
+   * Il pannello e' diviso in tre fasce: la sorgente in cima e le azioni in
+   * fondo restano sempre visibili, solo i parametri scorrono. Prima scorreva
+   * tutto, e su schermi bassi il pulsante per aprire la foto finiva sotto il
+   * taglio: c'era, ma nessuno lo trovava.
+   */
+  #buildPanel() {
     const panel = el('div', 'dbx__panel');
+    panel.append(this.#buildSourceBar(), this.#buildScroller(), this.#buildActions());
+    return panel;
+  }
+
+  #buildSourceBar() {
+    const bar = el('div', 'dbx__source');
+
+    // Il campo file vero, dentro una label: cosi' il clic funziona su tutta
+    // la riga e la tastiera ci arriva senza trucchi.
+    const field = el('label', 'dbx__file-field');
+    this.fileInput = el('input', 'dbx__file-input', { type: 'file', accept: 'image/*' });
+    this.fileInput.addEventListener('change', () => {
+      const file = this.fileInput.files && this.fileInput.files[0];
+      if (file) this.load(file).catch(() => {});
+      this.fileInput.value = '';
+    });
+    this.fileName = el('span', 'dbx__file-name', { text: 'nessun file scelto' });
+    field.append(
+      this.fileInput,
+      el('span', 'dbx__file-label', { text: 'Apri foto' }),
+      this.fileName,
+    );
+    bar.appendChild(field);
+
+    this.cameraInput = el('input', 'dbx__file-input', {
+      type: 'file', accept: 'image/*', capture: 'environment',
+    });
+    this.cameraInput.addEventListener('change', () => {
+      const file = this.cameraInput.files && this.cameraInput.files[0];
+      if (file) this.load(file).catch(() => {});
+      this.cameraInput.value = '';
+    });
+    const shoot = el('button', 'dbx__button dbx__button--camera', {
+      type: 'button', text: 'Scatta', title: 'Scatta una foto con la fotocamera',
+    });
+    shoot.addEventListener('click', () => this.cameraInput.click());
+    bar.append(shoot, this.cameraInput);
+
+    return bar;
+  }
+
+  #buildScroller() {
+    const scroller = el('div', 'dbx__scroll');
 
     if (this.config.presets) {
-      const bar = el('div', 'dbx__presets');
-      bar.appendChild(el('span', 'dbx__presets-label', { text: 'Preset' }));
-      for (const [key, preset] of Object.entries(PRESETS)) {
-        const b = el('button', 'dbx__preset', { type: 'button', text: preset.label });
-        b.addEventListener('click', () => this.set(applyPreset(key, this.options)));
-        bar.appendChild(b);
-      }
-      panel.appendChild(bar);
+      scroller.appendChild(this.#buildSection('Preset', this.#buildPresetChips()));
     }
+    scroller.appendChild(this.#buildSection('Colori', this.#buildPaletteChips()));
 
     const groups = new Map();
     for (const param of PARAMS) {
+      // La palette ha gia' il suo selettore a campioni qui sopra.
+      if (param.key === 'palette') continue;
       if (!groups.has(param.group)) {
-        const section = el('section', 'dbx__group');
-        section.appendChild(el('h3', 'dbx__group-title', {
-          text: GROUP_LABELS[param.group] || param.group,
-        }));
-        groups.set(param.group, section);
-        panel.appendChild(section);
+        const body = el('div', 'dbx__controls');
+        groups.set(param.group, body);
+        scroller.appendChild(this.#buildSection(GROUP_LABELS[param.group] || param.group, body));
       }
       groups.get(param.group).appendChild(this.#buildControl(param));
     }
-
-    panel.appendChild(this.#buildActions());
-    root.appendChild(panel);
-
-    this.#wireDropZone();
-    this.#syncControls();
+    return scroller;
   }
 
-  #dropIcon() {
-    const svg = document.createElementNS(SVG_NS, 'svg');
-    svg.setAttribute('class', 'dbx__drop-icon');
-    svg.setAttribute('viewBox', '0 0 24 24');
-    svg.setAttribute('aria-hidden', 'true');
-    // Una macchina fotografica stilizzata, disegnata a mano per non
-    // trascinarsi dietro un font di icone.
-    const path = document.createElementNS(SVG_NS, 'path');
-    path.setAttribute('d', 'M4 7h3l1.5-2h7L17 7h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Z');
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke', 'currentColor');
-    path.setAttribute('stroke-width', '1.5');
-    path.setAttribute('stroke-linejoin', 'round');
-    const circle = document.createElementNS(SVG_NS, 'circle');
-    circle.setAttribute('cx', '12');
-    circle.setAttribute('cy', '13');
-    circle.setAttribute('r', '3.5');
-    circle.setAttribute('fill', 'none');
-    circle.setAttribute('stroke', 'currentColor');
-    circle.setAttribute('stroke-width', '1.5');
-    svg.append(path, circle);
-    return svg;
+  #buildSection(title, body) {
+    const section = el('section', 'dbx__group');
+    section.append(el('h3', 'dbx__group-title', { text: title }), body);
+    return section;
+  }
+
+  #buildPresetChips() {
+    const bar = el('div', 'dbx__chips');
+    for (const [key, preset] of Object.entries(PRESETS)) {
+      const b = el('button', 'dbx__chip', { type: 'button', text: preset.label });
+      b.addEventListener('click', () => this.set(applyPreset(key, this.options)));
+      bar.appendChild(b);
+    }
+    return bar;
+  }
+
+  /**
+   * Selettore delle palette a campioni di colore: un elenco a discesa non
+   * dice niente, mentre qui si sceglie guardando le tinte.
+   */
+  #buildPaletteChips() {
+    const wrap = el('div', 'dbx__palettes');
+    this.paletteButtons = new Map();
+
+    const aggiungi = (key, label, colors) => {
+      const b = el('button', 'dbx__palette', { type: 'button', title: label });
+      const swatch = el('span', 'dbx__swatch');
+      for (const c of colors.slice(0, 8)) {
+        const dot = el('span', 'dbx__swatch-dot');
+        dot.style.background = typeof c === 'string' ? c : rgbToHex(c);
+        swatch.appendChild(dot);
+      }
+      b.append(swatch, el('span', 'dbx__palette-name', { text: label }));
+      b.addEventListener('click', () => this.set({ palette: key }));
+      wrap.appendChild(b);
+      this.paletteButtons.set(key, b);
+      return b;
+    };
+
+    for (const [key, entry] of Object.entries(PALETTES)) {
+      aggiungi(key, entry.label, entry.colors);
+    }
+
+    // Voce personalizzata: si aggiorna insieme all'editor qui sotto.
+    this.customButton = aggiungi('__custom__', 'Su misura', this.customColors);
+    this.customButton.addEventListener('click', () => {
+      this.set({ palette: stringifyPalette(this.customColors) });
+    });
+
+    wrap.appendChild(this.#buildCustomEditor());
+    return wrap;
+  }
+
+  /** Editor della palette personalizzata: una fila di selettori colore. */
+  #buildCustomEditor() {
+    const editor = el('div', 'dbx__custom');
+    this.customList = el('div', 'dbx__custom-list');
+
+    const ridisegna = () => {
+      this.customList.replaceChildren();
+      this.customColors.forEach((colore, i) => {
+        const cella = el('span', 'dbx__custom-cell');
+        const input = el('input', 'dbx__custom-color', { type: 'color', value: colore });
+        input.addEventListener('input', () => {
+          this.customColors[i] = input.value;
+          this.#refreshCustomSwatch();
+          this.set({ palette: stringifyPalette(this.customColors) });
+        });
+        cella.appendChild(input);
+
+        if (this.customColors.length > 2) {
+          const togli = el('button', 'dbx__custom-remove', {
+            type: 'button', text: '×', title: 'Togli questo colore',
+          });
+          togli.addEventListener('click', () => {
+            this.customColors.splice(i, 1);
+            ridisegna();
+            this.#refreshCustomSwatch();
+            this.set({ palette: stringifyPalette(this.customColors) });
+          });
+          cella.appendChild(togli);
+        }
+        this.customList.appendChild(cella);
+      });
+    };
+
+    const aggiungi = el('button', 'dbx__custom-add', {
+      type: 'button', text: '+', title: 'Aggiungi un colore',
+    });
+    aggiungi.addEventListener('click', () => {
+      if (this.customColors.length >= 16) return;
+      this.customColors.push('#888888');
+      ridisegna();
+      this.#refreshCustomSwatch();
+      this.set({ palette: stringifyPalette(this.customColors) });
+    });
+
+    // Riempie l'editor coi colori della palette selezionata: e' il modo piu'
+    // naturale di partire da una predefinita e poi ritoccarla.
+    const copia = el('button', 'dbx__custom-add', {
+      type: 'button', text: '⧉', title: 'Copia qui i colori della palette scelta',
+    });
+    copia.addEventListener('click', () => {
+      const { colors } = paletteInfo(this.options.palette);
+      this.customColors = colors.slice(0, 16).map(rgbToHex);
+      ridisegna();
+      this.#refreshCustomSwatch();
+      this.set({ palette: stringifyPalette(this.customColors) });
+    });
+
+    this._redrawCustom = ridisegna;
+    ridisegna();
+    editor.append(this.customList, aggiungi, copia);
+    return editor;
+  }
+
+  #refreshCustomSwatch() {
+    if (!this.customButton) return;
+    const swatch = this.customButton.querySelector('.dbx__swatch');
+    swatch.replaceChildren();
+    for (const c of this.customColors.slice(0, 8)) {
+      const dot = el('span', 'dbx__swatch-dot');
+      dot.style.background = c;
+      swatch.appendChild(dot);
+    }
   }
 
   #buildControl(param) {
@@ -1461,23 +1816,26 @@ class DitherBox {
     if (param.type === 'enum') {
       input = el('select', 'dbx__select', { id });
       for (const v of param.values) {
-        const opt = el('option', null, { value: v, text: (param.labels && param.labels[v]) || v });
-        input.appendChild(opt);
+        input.appendChild(el('option', null, {
+          value: v, text: (param.labels && param.labels[v]) || v,
+        }));
       }
       input.addEventListener('change', () => this.set({ [param.key]: input.value }));
     } else if (param.type === 'bool') {
       input = el('input', 'dbx__checkbox', { id, type: 'checkbox' });
       input.addEventListener('change', () => this.set({ [param.key]: input.checked }));
     } else {
+      // Il cursore lavora sull'indice del passo, non sul valore: e' l'unico
+      // modo per far scorrere allo stesso modo una scala regolare e una a
+      // gradini scelti a mano come quella dei megapixel.
+      const steps = paramSteps(param);
       input = el('input', 'dbx__range', {
-        id, type: 'range', min: param.min, max: param.max, step: param.step,
+        id, type: 'range', min: 0, max: steps.length - 1, step: 1,
       });
       value = el('output', 'dbx__value', { for: id });
-      // `input` per l anteprima continua mentre si trascina.
       input.addEventListener('input', () => {
-        this.set({ [param.key]: snap(Number(input.value), param.step) });
+        this.set({ [param.key]: steps[Number(input.value)] });
       });
-      // Doppio clic sull etichetta: torna al default di quel parametro.
       label.addEventListener('dblclick', () => this.set({ [param.key]: param.default }));
     }
 
@@ -1492,37 +1850,40 @@ class DitherBox {
   #buildActions() {
     const actions = el('div', 'dbx__actions');
 
-    this.fileInput = el('input', 'dbx__file', { type: 'file', accept: 'image/*' });
-    this.fileInput.addEventListener('change', () => {
-      const file = this.fileInput.files && this.fileInput.files[0];
-      if (file) this.load(file).catch(() => {});
-      this.fileInput.value = '';
+    const save = el('button', 'dbx__button dbx__button--primary', {
+      type: 'button', text: 'Scarica PNG',
     });
-
-    this.cameraInput = el('input', 'dbx__file', {
-      type: 'file', accept: 'image/*', capture: 'environment',
-    });
-    this.cameraInput.addEventListener('change', () => {
-      const file = this.cameraInput.files && this.cameraInput.files[0];
-      if (file) this.load(file).catch(() => {});
-      this.cameraInput.value = '';
-    });
-
-    const open = el('button', 'dbx__button dbx__button--primary', { type: 'button', text: 'Apri foto' });
-    open.addEventListener('click', () => this.fileInput.click());
-
-    const shoot = el('button', 'dbx__button dbx__button--camera', { type: 'button', text: 'Scatta' });
-    shoot.addEventListener('click', () => this.cameraInput.click());
-
-    const save = el('button', 'dbx__button', { type: 'button', text: 'Scarica PNG' });
     save.addEventListener('click', () => this.download().catch((e) => this.#fail(e)));
 
-    const reset = el('button', 'dbx__button dbx__button--ghost', { type: 'button', text: 'Azzera' });
+    const reset = el('button', 'dbx__button dbx__button--ghost', {
+      type: 'button', text: 'Azzera',
+    });
     reset.addEventListener('click', () => this.reset());
 
-    actions.append(open, shoot, save, reset, this.fileInput, this.cameraInput);
-    this.saveButton = save;
+    actions.append(save, reset);
     return actions;
+  }
+
+  #cameraIcon() {
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('class', 'dbx__drop-icon');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', 'M4 7h3l1.5-2h7L17 7h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Z');
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', 'currentColor');
+    path.setAttribute('stroke-width', '1.5');
+    path.setAttribute('stroke-linejoin', 'round');
+    const circle = document.createElementNS(SVG_NS, 'circle');
+    circle.setAttribute('cx', '12');
+    circle.setAttribute('cy', '13');
+    circle.setAttribute('r', '3.5');
+    circle.setAttribute('fill', 'none');
+    circle.setAttribute('stroke', 'currentColor');
+    circle.setAttribute('stroke-width', '1.5');
+    svg.append(path, circle);
+    return svg;
   }
 
   #wireDropZone() {
@@ -1556,7 +1917,7 @@ class DitherBox {
       }],
     ];
     for (const [event, fn] of listeners) root.addEventListener(event, fn);
-    this._globalListeners = listeners;
+    this._rootListeners = listeners;
   }
 
   // ------------------------------------------------------------ interni
@@ -1565,28 +1926,92 @@ class DitherBox {
     for (const [key, { param, input, value }] of this.controls) {
       const v = this.options[key];
       if (param.type === 'bool') input.checked = Boolean(v);
+      else if (param.type === 'range') input.value = stepIndex(param, v);
       else input.value = v;
       if (value) value.textContent = formatValue(param, v);
     }
+
+    if (this.paletteButtons) {
+      const attiva = isCustomPalette(this.options.palette)
+        ? '__custom__'
+        : this.options.palette;
+      for (const [key, button] of this.paletteButtons) {
+        button.classList.toggle('is-active', key === attiva);
+        button.setAttribute('aria-pressed', String(key === attiva));
+      }
+    }
+  }
+
+  /**
+   * L'immagine su cui lavora l'anteprima.
+   *
+   * Deve subire la stessa riduzione in megapixel del risultato finale, se no
+   * l'anteprima resta nitida mentre il file scaricato esce sgranato: si
+   * sceglierebbe alla cieca.
+   */
+  #previewSource() {
+    const { megapixels } = this.options;
+    if (this.previewCache && this.previewCache.megapixels === megapixels) {
+      return this.previewCache.image;
+    }
+    const target = targetSize(this.source.width, this.source.height, megapixels);
+    const base = this.previewBase;
+    const k = Math.min(1, base.width / target.width, base.height / target.height);
+    const image = k < 1 || target.width < base.width
+      ? resampleBox(
+        base,
+        Math.max(1, Math.round(target.width * k)),
+        Math.max(1, Math.round(target.height * k)),
+      )
+      : base;
+    this.previewCache = { megapixels, image };
+    return image;
   }
 
   #draw() {
     const started = performance.now();
-    const { image } = processImage(this.previewSource, this.options);
-    this.canvas.width = image.width;
-    this.canvas.height = image.height;
+    const source = this.#previewSource();
+    // I megapixel li ha gia' applicati #previewSource: qui si dice al motore
+    // di non ridurre una seconda volta.
+    const { image } = processImage(source, {
+      ...this.options,
+      megapixels: (source.width * source.height) / 1e6,
+    });
     this.ctx.putImageData(new ImageData(image.data, image.width, image.height), 0, 0);
+    this.#showCanvas(image);
+
+    const out = targetSize(this.source.width, this.source.height, this.options.megapixels);
+    const mp = ((out.width * out.height) / 1e6).toFixed(2);
     const ms = Math.round(performance.now() - started);
     this.#status(
-      `${this.source.width}×${this.source.height} · anteprima ${image.width}×${image.height} · ${ms} ms`,
+      `${this.source.width}×${this.source.height} → ${out.width}×${out.height} (${mp} MP) · ${ms} ms`,
     );
+  }
+
+  #showCanvas(image) {
+    if (this.canvas.width !== image.width || this.canvas.height !== image.height) {
+      this.canvas.width = image.width;
+      this.canvas.height = image.height;
+      this.ctx.putImageData(new ImageData(image.data, image.width, image.height), 0, 0);
+    }
+  }
+
+  #toCanvas(image) {
+    const canvas = document.createElement('canvas');
+    canvas.width = image.width;
+    canvas.height = image.height;
+    canvas.getContext('2d').putImageData(
+      new ImageData(image.data, image.width, image.height), 0, 0,
+    );
+    return canvas;
   }
 
   #defaultFilename() {
     const base = this.sourceName
       ? this.sourceName.replace(/\.[^.]+$/, '')
       : 'ditherbox';
-    return `${base}-${this.options.palette}-${this.options.algorithm}.png`;
+    const palette = isCustomPalette(this.options.palette) ? 'custom' : this.options.palette;
+    return `${base}-${palette}-${this.options.algorithm}.png`;
   }
 
   #status(text) {
@@ -1628,6 +2053,8 @@ function ditherToCanvas(drawable, options = {}) {
 /**
  * Aggancia automaticamente ogni elemento con `data-ditherbox`.
  * Gli attributi `data-*` diventano opzioni: data-palette, data-algorithm, ...
+ * Per una palette personalizzata basta un elenco di colori:
+ * `data-palette="#0a0c10,#c2fe0b"`.
  */
 function autoInit(scope = document) {
   const boxes = [];
@@ -1650,7 +2077,7 @@ function autoInit(scope = document) {
 
 
 
-  return { DEFAULTS, DitherBox, PARAMS, PRESETS, autoInit, ditherToCanvas, processImage };
+  return { DEFAULTS, DitherBox, PALETTES, PARAMS, PRESETS, autoInit, ditherToCanvas, processImage };
 })();
 
 global.DitherBox = Object.assign(__m_src_web_ditherbox_js.DitherBox, {
@@ -1683,18 +2110,26 @@ global.DitherBox = Object.assign(__m_src_web_ditherbox_js.DitherBox, {
   formatValue: __m_src_core_index_js.formatValue,
   grayRamp: __m_src_core_index_js.grayRamp,
   hexToRgb: __m_src_core_index_js.hexToRgb,
+  isCustomPalette: __m_src_core_index_js.isCustomPalette,
   luma: __m_src_core_index_js.luma,
   lumaHistogram: __m_src_core_index_js.lumaHistogram,
   normalizeOptions: __m_src_core_index_js.normalizeOptions,
   paletteInfo: __m_src_core_index_js.paletteInfo,
+  paramSteps: __m_src_core_index_js.paramSteps,
+  parseCustomPalette: __m_src_core_index_js.parseCustomPalette,
   processImage: __m_src_core_index_js.processImage,
   resampleBox: __m_src_core_index_js.resampleBox,
   resolvePalette: __m_src_core_index_js.resolvePalette,
   rgbToHex: __m_src_core_index_js.rgbToHex,
   sharpen: __m_src_core_index_js.sharpen,
+  stepBy: __m_src_core_index_js.stepBy,
+  stepIndex: __m_src_core_index_js.stepIndex,
+  stringifyPalette: __m_src_core_index_js.stringifyPalette,
+  targetSize: __m_src_core_index_js.targetSize,
   upscaleByFactor: __m_src_core_index_js.upscaleByFactor,
   DEFAULTS: __m_src_web_ditherbox_js.DEFAULTS,
   DitherBox: __m_src_web_ditherbox_js.DitherBox,
+  PALETTES: __m_src_web_ditherbox_js.PALETTES,
   PARAMS: __m_src_web_ditherbox_js.PARAMS,
   PRESETS: __m_src_web_ditherbox_js.PRESETS,
   autoInit: __m_src_web_ditherbox_js.autoInit,

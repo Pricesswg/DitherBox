@@ -15,6 +15,12 @@ const run = promisify(execFile);
 const BIN = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'ditherbox.js');
 const cli = (args, opts = {}) => run(process.execPath, [BIN, ...args], opts);
 
+/** Misure di un file immagine, per non ripetere la lettura ogni volta. */
+async function size(path) {
+  const img = await loadImage(path);
+  return [img.width, img.height];
+}
+
 test('parseArgs distingue posizionali, valori e interruttori', () => {
   const { flags, positional } = parseArgs([
     'a.png', 'b.png', '--palette', 'gameboy', '--scale=4',
@@ -40,7 +46,7 @@ test('parseArgs protesta se manca il valore', () => {
 
 test('l aiuto elenca tutte le opzioni di elaborazione', () => {
   const text = helpText();
-  for (const flag of ['--palette', '--algorithm', '--scale', '--max-size', '--out-dir']) {
+  for (const flag of ['--palette', '--algorithm', '--scale', '--megapixels', '--out-dir']) {
     assert.ok(text.includes(flag), `manca ${flag} nell aiuto`);
   }
 });
@@ -76,13 +82,50 @@ test('elabora un file e ne salva un altro', async (t) => {
   assert.deepEqual([...colori].sort((a, b) => a - b), [0, 255]);
 });
 
-test('rispetta lato massimo e scala anche senza interfaccia', async (t) => {
+test('rispetta megapixel e scala anche senza interfaccia', async (t) => {
   const dir = tempDir(t);
-  const input = await writeSample(dir, 'in.png', 400, 200);
+  const input = await writeSample(dir, 'in.png', 400, 200);   // 0.08 MP
+
+  // 0.02 MP = un quarto dei pixel, cioe' meta' per lato: 200x100.
+  // Poi --scale 4 riduce a blocchi e --no-upscale lascia il risultato crudo.
   const out = join(dir, 'p.png');
-  await cli([input, '--max-size', '100', '--scale', '4', '--no-upscale', '-o', out]);
+  await cli([input, '--megapixels', '0.02', '--scale', '4', '--no-upscale', '-o', out]);
+  assert.deepEqual(
+    await size(out), [50, 25],
+  );
+
+  // Chiedere piu' megapixel della foto non la ingrandisce.
+  const grande = join(dir, 'g.png');
+  await cli([input, '--megapixels', '24', '-o', grande]);
+  assert.deepEqual(await size(grande), [400, 200]);
+});
+
+test('accetta una palette scritta a mano', async (t) => {
+  const dir = tempDir(t);
+  const input = await writeSample(dir, 'in.png', 120, 90);
+  const out = join(dir, 'duo.png');
+  await cli([input, '--palette', '#0a0c10,#c2fe0b', '--algorithm', 'atkinson', '-o', out]);
+
   const img = await loadImage(out);
-  assert.deepEqual([img.width, img.height], [25, 12]);
+  const colori = new Set();
+  for (let i = 0; i < img.data.length; i += 4) {
+    colori.add(`${img.data[i]},${img.data[i + 1]},${img.data[i + 2]}`);
+  }
+  assert.ok(colori.size <= 2, `colori usati: ${[...colori].join(' | ')}`);
+  for (const c of colori) assert.ok(['10,12,16', '194,254,11'].includes(c), c);
+
+  // Una palette scritta male resta un errore comprensibile.
+  await assert.rejects(
+    () => cli([input, '--palette', 'rosso,verde', '-o', join(dir, 'x.png')]),
+    /non esiste/,
+  );
+});
+
+test('le palette Marathon ci sono e sono elencate', async () => {
+  const { stdout } = await cli(['--list']);
+  for (const nome of ['marathon', 'marathonDuo', 'marathonTerm']) {
+    assert.ok(stdout.includes(nome), `manca ${nome} in --list`);
+  }
 });
 
 test('elaborazione in blocco su una cartella', async (t) => {

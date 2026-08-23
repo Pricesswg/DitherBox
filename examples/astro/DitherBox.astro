@@ -7,6 +7,7 @@
  *   import DitherBox from '../components/DitherBox.astro';
  *   ---
  *   <DitherBox palette="gameboy" algorithm="bayer4" scale={4} />
+ *   <DitherBox palette="#0a0c10,#c2fe0b" megapixels={0.3} />
  *
  * Lo script sta in un blocco <script> normale: Astro lo impacchetta e lo
  * manda solo al browser, quindi il widget non viene mai eseguito sul server.
@@ -14,6 +15,8 @@
  * esattamente quello che autoInit() si aspetta di trovare.
  */
 export interface Props {
+  /** Nome di una tavolozza ("gameboy", "marathon") oppure un elenco di
+   *  colori scritto a mano: "#0a0c10,#c2fe0b". */
   palette?: string;
   algorithm?: string;
   scale?: number;
@@ -27,7 +30,7 @@ export interface Props {
   sharpen?: number;
   invert?: boolean;
   serpentine?: boolean;
-  maxSize?: number;
+  megapixels?: number;
   upscale?: boolean;
   /** Immagine da caricare all'avvio, invece della schermata vuota. */
   src?: string;

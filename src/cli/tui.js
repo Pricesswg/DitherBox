@@ -10,8 +10,9 @@ import { statSync } from 'node:fs';
 
 import {
   PARAMS, GROUP_LABELS, PRESETS, DEFAULTS,
-  normalizeOptions, formatValue, applyPreset,
-  processImage, resampleBox, cloneImage, applyAdjustments, lumaHistogram,
+  normalizeOptions, formatValue, applyPreset, paramSteps, stepIndex, stepBy,
+  processImage, targetSize, resampleBox, cloneImage,
+  applyAdjustments, lumaHistogram, isCustomPalette,
 } from '../core/index.js';
 
 import {
@@ -328,13 +329,15 @@ export class DitherTui {
 
     if (param.type === 'bool') return this.#setOption(param.key, steps > 0);
     if (param.type === 'enum') {
+      // Una palette scritta a mano non sta nell'elenco: si riparte da capo.
       const i = param.values.indexOf(current);
-      const next = (i + steps + param.values.length * 10) % param.values.length;
+      const base = i < 0 ? (steps > 0 ? -1 : 0) : i;
+      const next = (base + steps + param.values.length * 10) % param.values.length;
       return this.#setOption(param.key, param.values[next]);
     }
-    const decimals = (String(param.step).split('.')[1] || '').length;
-    const value = Number((current + steps * param.step).toFixed(decimals));
-    return this.#setOption(param.key, value);
+    // Gli stessi gradini che usa il cursore del widget: cosi' un passo di
+    // tastiera qui e uno di mouse la' portano allo stesso valore.
+    return this.#setOption(param.key, stepBy(param, current, steps));
   }
 
   #activate() {
@@ -556,9 +559,10 @@ export class DitherTui {
   #openSavePrompt() {
     if (!this.source) return this.#say('Nessuna immagine caricata', 'red');
     const base = basename(this.imagePath || 'ditherbox').replace(/\.[^.]+$/, '');
+    const palette = isCustomPalette(this.options.palette) ? 'custom' : this.options.palette;
     const suggested = join(
       dirname(this.imagePath || this.dir),
-      `${base}-${this.options.palette}-${this.options.algorithm}.png`,
+      `${base}-${palette}-${this.options.algorithm}.png`,
     );
     this.#promptOverlay({
       title: 'SALVA',
@@ -695,9 +699,8 @@ export class DitherTui {
 
   #exportSize() {
     if (!this.source) return '—';
-    const s = Math.min(this.options.maxSize / this.source.width, this.options.maxSize / this.source.height, 1);
-    let w = Math.round(this.source.width * s);
-    let h = Math.round(this.source.height * s);
+    const t = targetSize(this.source.width, this.source.height, this.options.megapixels);
+    let { width: w, height: h } = t;
     if (!this.options.upscale && this.options.scale > 1) {
       w = Math.floor(w / this.options.scale);
       h = Math.floor(h / this.options.scale);
@@ -732,9 +735,14 @@ export class DitherTui {
 
     const target = cellTarget(this.source.width, this.source.height, cols, rows, this.previewMode);
     const small = resampleBox(this.source, target.width, target.height);
-    // maxSize alto: il ridimensionamento l'abbiamo gia' fatto noi qui sopra,
-    // alla misura esatta della griglia del terminale.
-    const result = processImage(small, { ...this.options, maxSize: 4096, upscale: false });
+    // I megapixel dichiarati sono quelli che l'immagine ha gia': il
+    // ridimensionamento l'abbiamo fatto noi qui sopra, alla misura esatta
+    // della griglia del terminale, e il motore non deve rifarlo.
+    const result = processImage(small, {
+      ...this.options,
+      megapixels: (small.width * small.height) / 1e6,
+      upscale: false,
+    });
     this.cache = { key, result };
     return result;
   }
@@ -818,8 +826,11 @@ export class DitherTui {
 
     let line;
     if (param.type === 'range') {
-      const span = param.max - param.min;
-      const ratio = span ? (value - param.min) / span : 0;
+      // La posizione segue l'indice del passo, non il valore: su una scala a
+      // gradini scelti a mano come i megapixel il rapporto grezzo
+      // schiaccerebbe tutta la meta' bassa contro il bordo sinistro.
+      const passi = paramSteps(param);
+      const ratio = passi.length > 1 ? stepIndex(param, value) / (passi.length - 1) : 0;
       const barW = Math.max(4, width - labelW - valueW - 4);
       line = `${marker} ${pad(param.label, labelW)}`
         + `${fg(t.accent)}${bar(ratio, barW, '▰', '▱')}${RESET} `

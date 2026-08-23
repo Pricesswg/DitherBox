@@ -63,7 +63,10 @@
   box.on('change', (options) => console.log('parametri', options));
 
   // Gli elementi con data-ditherbox si agganciano da soli.
-  DitherBox.autoInit();
+  const auto = DitherBox.autoInit();
+
+  // Riferimenti per il collaudo automatico con browser headless.
+  window.__boxes = [box, ...auto];
 </script>
 </body>
 </html>

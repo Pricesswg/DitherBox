@@ -5,7 +5,7 @@
  */
 
 import { ALGORITHMS, ALGORITHM_LABELS } from './dither.js';
-import { PALETTES, PALETTE_KEYS } from './palettes.js';
+import { PALETTES, PALETTE_KEYS, isCustomPalette } from './palettes.js';
 
 /** @typedef {'enum'|'range'|'bool'} ParamType */
 
@@ -146,16 +146,22 @@ export const PARAMS = [
   },
 
   {
-    key: 'maxSize',
-    label: 'Lato max',
+    key: 'megapixels',
+    label: 'Megapixel',
     group: 'output',
     type: 'range',
-    min: 64,
-    max: 4096,
-    step: 64,
-    default: 1024,
-    unit: 'px',
-    hint: 'Le foto da fotocamera vengono prima ridotte a questo lato massimo',
+    // Gradini scelti a mano invece di un intervallo regolare: fra 0.01 e 24
+    // megapixel ci sono tre ordini di grandezza, e un cursore lineare
+    // schiaccerebbe tutta la meta' bassa - proprio quella dove si sgrana
+    // davvero l'immagine - nei primi millimetri di corsa.
+    steps: [
+      0.01, 0.015, 0.02, 0.03, 0.05, 0.07,
+      0.1, 0.15, 0.2, 0.3, 0.5, 0.7,
+      1, 1.5, 2, 3, 4, 6, 8, 10, 12, 16, 20, 24,
+    ],
+    default: 2,
+    format: formatMegapixels,
+    hint: 'Risoluzione del risultato: abbassala per sgranare di proposito la foto',
   },
   {
     key: 'upscale',
@@ -166,6 +172,15 @@ export const PARAMS = [
     hint: 'Riporta il risultato alla dimensione di prima con pixel netti',
   },
 ];
+
+// I parametri con gradini espliciti ricavano da li' i propri estremi:
+// il resto del codice puo' continuare a leggere min e max senza saperlo.
+for (const p of PARAMS) {
+  if (p.steps) {
+    p.min = p.steps[0];
+    p.max = p.steps[p.steps.length - 1];
+  }
+}
 
 export const PARAM_BY_KEY = Object.fromEntries(PARAMS.map((p) => [p.key, p]));
 
@@ -215,6 +230,64 @@ export const PRESETS = {
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
+function formatMegapixels(v) {
+  if (v < 0.1) return `${Math.round(v * 1000)} kpx`;
+  if (v < 1) return `${v.toFixed(2).replace(/0$/, '')} MP`;
+  if (v < 10) return `${v.toFixed(1).replace(/\.0$/, '')} MP`;
+  return `${v.toFixed(0)} MP`;
+}
+
+const stepsCache = new WeakMap();
+
+/**
+ * I valori che un cursore puo' assumere, in ordine.
+ *
+ * Web e terminale lavorano tutti e due su questo elenco per indice: cosi'
+ * un passo di tastiera e uno di mouse portano esattamente allo stesso
+ * valore, e le scale logaritmiche non hanno bisogno di codice a parte.
+ */
+export function paramSteps(param) {
+  if (param.type !== 'range') return null;
+  const memoria = stepsCache.get(param);
+  if (memoria) return memoria;
+
+  let values;
+  if (param.steps) {
+    values = param.steps;
+  } else {
+    const decimali = (String(param.step).split('.')[1] || '').length;
+    values = [];
+    for (let v = param.min; v <= param.max + param.step / 1000; v += param.step) {
+      values.push(Number(v.toFixed(decimali)));
+    }
+    if (values[values.length - 1] !== param.max) values.push(param.max);
+  }
+  stepsCache.set(param, values);
+  return values;
+}
+
+/** L'indice del passo piu' vicino a `value`. */
+export function stepIndex(param, value) {
+  const steps = paramSteps(param);
+  let best = 0;
+  let bestD = Infinity;
+  for (let i = 0; i < steps.length; i++) {
+    const d = Math.abs(steps[i] - value);
+    if (d < bestD) {
+      bestD = d;
+      best = i;
+    }
+  }
+  return best;
+}
+
+/** Sposta un parametro di `delta` passi, restando dentro l'intervallo. */
+export function stepBy(param, value, delta) {
+  const steps = paramSteps(param);
+  const i = clamp(stepIndex(param, value) + delta, 0, steps.length - 1);
+  return steps[i];
+}
+
 /**
  * Riempie i valori mancanti coi default e riporta ogni parametro nel
  * suo intervallo. Nessuna eccezione per un valore fuori scala: viene
@@ -226,12 +299,16 @@ export function normalizeOptions(input = {}) {
     const v = out[p.key];
     if (p.type === 'range') {
       const n = Number(v);
-      out[p.key] = Number.isFinite(n) ? clamp(n, p.min, p.max) : p.default;
+      // Il valore viene agganciato al passo piu' vicino: cosi' quello che
+      // arriva da un attributo HTML o da un file di configurazione e' sempre
+      // uno dei valori che i cursori sanno rappresentare.
+      out[p.key] = Number.isFinite(n) ? stepBy(p, clamp(n, p.min, p.max), 0) : p.default;
     } else if (p.type === 'bool') {
       out[p.key] = Boolean(v);
     } else if (p.type === 'enum') {
-      // Una palette custom arriva come array di colori: va lasciata passare.
-      if (p.key === 'palette' && Array.isArray(v)) continue;
+      // Una palette scritta a mano (array o elenco di esadecimali) passa
+      // indenne: non e' uno dei nomi predefiniti ed e' giusto cosi'.
+      if (p.key === 'palette' && (Array.isArray(v) || isCustomPalette(v))) continue;
       if (!p.values.includes(v)) out[p.key] = p.default;
     }
   }
@@ -241,7 +318,11 @@ export function normalizeOptions(input = {}) {
 /** Testo del valore di un parametro, usato identico da web e terminale. */
 export function formatValue(param, value) {
   if (param.type === 'bool') return value ? 'ON' : 'OFF';
-  if (param.type === 'enum') return (param.labels && param.labels[value]) || String(value);
+  if (param.type === 'enum') {
+    if (isCustomPalette(value)) return 'Personalizzata';
+    return (param.labels && param.labels[value]) || String(value);
+  }
+  if (param.format) return param.format(Number(value));
   const n = Number(value);
   const text = param.decimals ? n.toFixed(param.decimals) : String(Math.round(n));
   return param.unit ? `${text}${param.unit}` : text;

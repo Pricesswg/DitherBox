@@ -4,7 +4,7 @@
 
 import {
   applyAdjustments, sharpen, downscaleByFactor, upscaleByFactor,
-  fitWithin, cloneImage,
+  resampleBox, cloneImage,
 } from './adjust.js';
 import { buildQuantizer, ditherImage } from './dither.js';
 import { paletteInfo } from './palettes.js';
@@ -17,11 +17,15 @@ import { normalizeOptions } from './options.js';
  */
 export function processImage(source, rawOptions = {}) {
   const options = normalizeOptions(rawOptions);
-  const { colors, ramp } = paletteInfo(options.palette, options.inkPaper);
+  const { colors, ramp } = paletteInfo(options.palette);
 
-  // 1. Le foto da fotocamera sono enormi: si riduce subito, se no ogni
-  //    spostamento di slider costa secondi.
-  let img = fitWithin(source, options.maxSize, options.maxSize);
+  // 1. Riduzione alla risoluzione richiesta. E' anche il motivo per cui le
+  //    foto da fotocamera non fanno arrancare l'interfaccia: si lavora su
+  //    due megapixel, non su dodici.
+  const target = targetSize(source.width, source.height, options.megapixels);
+  let img = target.scale < 1
+    ? resampleBox(source, target.width, target.height)
+    : cloneImage(source);
 
   // 2. Regolazioni tonali sul pieno dettaglio, prima di buttare via pixel.
   applyAdjustments(img, options);
@@ -54,5 +58,21 @@ export function processImage(source, rawOptions = {}) {
     palette: colors,
     ditherWidth: dithered.width,
     ditherHeight: dithered.height,
+  };
+}
+
+/**
+ * Le misure a cui un'immagine va portata per stare in `megapixels`.
+ * Non ingrandisce mai: se la foto e' gia' piu' piccola resta com'e'.
+ *
+ * La usano anche le interfacce, per scrivere "3024x4032 -> 1224x1632"
+ * accanto al cursore senza dover elaborare davvero l'immagine.
+ */
+export function targetSize(width, height, megapixels) {
+  const scale = Math.min(1, Math.sqrt((megapixels * 1e6) / (width * height)));
+  return {
+    scale,
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
   };
 }

@@ -14,12 +14,18 @@
   --dbx-accent-fg: #08110c;
   --dbx-radius: 10px;
   --dbx-gap: 14px;
+  --dbx-panel-width: 320px;
+  --dbx-height: clamp(440px, 70vh, 780px);
   --dbx-font: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
     "Liberation Mono", monospace;
 
+  /* Le due colonne hanno la stessa altezza, fissata qui: e' quello che
+     tiene allineati il bordo del palco e quello del pannello. Prima si
+     dimensionavano ognuna per conto suo e i bordi non combaciavano mai. */
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-columns: minmax(0, 1fr) var(--dbx-panel-width);
   gap: var(--dbx-gap);
+  height: var(--dbx-height);
   padding: var(--dbx-gap);
   background: var(--dbx-bg);
   border: 1px solid var(--dbx-border);
@@ -28,6 +34,29 @@
   font-family: var(--dbx-font);
   font-size: 13px;
   line-height: 1.45;
+  box-sizing: border-box;
+}
+
+.dbx *,
+.dbx *::before,
+.dbx *::after { box-sizing: border-box; }
+
+/*
+ * Azzeramento circoscritto al widget.
+ *
+ * Serve perche' il widget finisce dentro il sito di qualcun altro, e i fogli
+ * di stile dei siti sono pieni di regole come `section { margin-bottom: 2.5rem }`
+ * o `button { text-transform: uppercase }` che si infilerebbero qui dentro e
+ * sfascerebbero la disposizione. La specificita' di `.dbx elemento` (0,1,1)
+ * basta a battere le regole per elemento della pagina ospite (0,0,1), senza
+ * pero' interferire con le nostre classi.
+ */
+.dbx :is(section, div, p, h1, h2, h3, h4, h5, h6, ul, ol, li,
+         label, button, input, select, output, span, canvas, svg, a) {
+  margin: 0;
+  font-family: inherit;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 @media (prefers-color-scheme: light) {
@@ -42,8 +71,13 @@
   }
 }
 
-@media (max-width: 720px) {
-  .dbx { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 760px) {
+  .dbx {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+  }
+  .dbx__stage { min-height: 300px; }
+  .dbx__panel { max-height: 60vh; }
 }
 
 /* --------------------------------------------------------------- palco */
@@ -53,7 +87,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 260px;
+  min-width: 0;
+  min-height: 0;
   padding: 12px;
   background:
     /* scacchiera di fondo, cosi' si vede subito cosa e' immagine e cosa no */
@@ -66,8 +101,13 @@
 
 .dbx__canvas {
   display: none;
-  max-width: 100%;
-  max-height: 68vh;
+  /* object-fit fa scalare il canvas nei due sensi: una foto grande rientra
+     nel palco, una ridotta a 150x200 dai megapixel viene ringrandita fino a
+     riempirlo invece di restare un francobollo in mezzo al vuoto. Le
+     proporzioni restano quelle giuste in entrambi i casi. */
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
   /* Il dithering va guardato a pixel netti: mai interpolare in upscaling. */
   image-rendering: pixelated;
   image-rendering: crisp-edges;
@@ -80,16 +120,26 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   padding: 24px;
   color: var(--dbx-muted);
   text-align: center;
-  pointer-events: none;
 }
 
 .dbx__drop-icon { width: 44px; height: 44px; opacity: 0.7; }
 .dbx__drop-title { margin: 0; font-size: 14px; color: var(--dbx-fg); }
-.dbx__drop-sub { margin: 0; font-size: 12px; max-width: 34ch; }
+.dbx__drop-sub { margin: 0; font-size: 12px; max-width: 42ch; }
+
+.dbx__drop-button {
+  padding: 8px 18px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--dbx-accent-fg);
+  cursor: pointer;
+  background: var(--dbx-accent);
+  border: 1px solid var(--dbx-accent);
+  border-radius: 6px;
+}
 
 .dbx.is-dragging .dbx__stage {
   border-color: var(--dbx-accent);
@@ -103,7 +153,8 @@
   padding: 3px 8px;
   font-size: 11px;
   color: var(--dbx-muted);
-  background: color-mix(in srgb, var(--dbx-bg) 82%, transparent);
+  background: var(--dbx-bg);
+  border: 1px solid var(--dbx-border);
   border-radius: 4px;
   pointer-events: none;
 }
@@ -115,32 +166,110 @@
 .dbx__panel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
   min-width: 0;
-  max-height: 72vh;
-  padding: 12px;
-  overflow-y: auto;
+  min-height: 0;
   background: var(--dbx-panel);
   border: 1px solid var(--dbx-border);
   border-radius: calc(var(--dbx-radius) - 2px);
+  overflow: hidden;
 }
 
-.dbx__presets {
+/* Fascia in alto: resta ferma, cosi' il modo di caricare una foto e'
+   sempre sotto gli occhi anche quando i parametri scorrono. */
+.dbx__source {
   display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  align-items: center;
+  gap: 6px;
+  align-items: stretch;
+  padding: 10px;
+  border-bottom: 1px solid var(--dbx-border);
 }
 
-.dbx__presets-label {
-  width: 100%;
+.dbx__file-field {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  background: var(--dbx-bg);
+  border: 1px dashed var(--dbx-border);
+  border-radius: 6px;
+}
+
+.dbx__file-field:hover { border-color: var(--dbx-accent); }
+
+.dbx__file-field:focus-within {
+  outline: 2px solid var(--dbx-accent);
+  outline-offset: 2px;
+}
+
+.dbx__file-label {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dbx-accent);
+}
+
+.dbx__file-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 11px;
+  color: var(--dbx-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* L'input resta nel flusso ma invisibile: cliccabile dalla label,
+   raggiungibile col tabulatore. */
+.dbx__file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Fascia centrale: l'unica che scorre. */
+.dbx__scroll {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  padding: 10px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* In un contenitore flex che scorre i figli restano comprimibili: finche'
+   il contenuto ha un'altezza minima propria non succede niente, ma basta una
+   sezione con dentro qualcosa di rimpicciolibile perche' venga schiacciata
+   invece di far scorrere il contenitore. Meglio toglierselo dai piedi. */
+.dbx__scroll > * { flex: 0 0 auto; }
+
+.dbx__group { display: flex; flex-direction: column; gap: 7px; }
+
+.dbx__group-title {
+  margin: 0;
+  padding-bottom: 5px;
   font-size: 10px;
-  letter-spacing: 0.14em;
+  font-weight: 600;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--dbx-muted);
+  border-bottom: 1px solid var(--dbx-border);
 }
 
-.dbx__preset {
+.dbx__controls { display: flex; flex-direction: column; gap: 7px; }
+
+.dbx__chips { display: flex; flex-wrap: wrap; gap: 5px; }
+
+.dbx__chip {
   padding: 4px 9px;
   font: inherit;
   font-size: 11px;
@@ -151,23 +280,122 @@
   border-radius: 999px;
 }
 
-.dbx__preset:hover { border-color: var(--dbx-accent); color: var(--dbx-accent); }
+.dbx__chip:hover { border-color: var(--dbx-accent); color: var(--dbx-accent); }
 
-.dbx__group { display: flex; flex-direction: column; gap: 7px; }
+/* ------------------------------------------------------------- palette */
 
-.dbx__group-title {
-  margin: 4px 0 0;
-  padding-bottom: 5px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  color: var(--dbx-muted);
-  border-bottom: 1px solid var(--dbx-border);
+/* Pastiglie che vanno a capo, non una griglia a celle alte: con diciotto
+   tavolozze una griglia si mangiava un terzo del pannello e spingeva i
+   cursori fuori vista. */
+.dbx__palettes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
+
+.dbx__palette {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  max-width: 100%;
+  padding: 3px 7px 3px 4px;
+  font: inherit;
+  color: var(--dbx-muted);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--dbx-border);
+  border-radius: 999px;
+  text-align: left;
+}
+
+.dbx__palette:hover { border-color: var(--dbx-accent); }
+
+.dbx__palette.is-active {
+  color: var(--dbx-fg);
+  border-color: var(--dbx-accent);
+  box-shadow: inset 0 0 0 1px var(--dbx-accent);
+}
+
+.dbx__swatch {
+  display: flex;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+}
+
+.dbx__swatch-dot { flex: 1 1 0; min-width: 0; }
+
+.dbx__palette-name {
+  overflow: hidden;
+  max-width: 15ch;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dbx__custom {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  gap: 4px;
+  align-items: center;
+  padding-top: 4px;
+}
+
+.dbx__custom-list { display: flex; flex-wrap: wrap; gap: 4px; }
+
+.dbx__custom-cell { position: relative; display: block; }
+
+.dbx__custom-color {
+  width: 30px;
+  height: 24px;
+  padding: 0;
+  cursor: pointer;
+  background: none;
+  border: 1px solid var(--dbx-border);
+  border-radius: 4px;
+}
+
+.dbx__custom-remove {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  font: inherit;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--dbx-bg);
+  cursor: pointer;
+  background: var(--dbx-muted);
+  border: 0;
+  border-radius: 50%;
+}
+
+.dbx__custom-add {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--dbx-muted);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--dbx-border);
+  border-radius: 4px;
+}
+
+.dbx__custom-add:hover { color: var(--dbx-accent); border-color: var(--dbx-accent); }
+
+/* ------------------------------------------------------------ controlli */
 
 .dbx__control {
   display: grid;
-  grid-template-columns: 82px minmax(0, 1fr) 48px;
+  grid-template-columns: 82px minmax(0, 1fr) 52px;
   gap: 8px;
   align-items: center;
 }
@@ -218,16 +446,11 @@
   background: transparent;
 }
 
-.dbx__file { display: none; }
-
-/* ------------------------------------------------------------- azioni */
-
+/* Fascia in fondo: ferma anche lei. */
 .dbx__actions {
   display: flex;
-  flex-wrap: wrap;
   gap: 6px;
-  margin-top: auto;
-  padding-top: 10px;
+  padding: 10px;
   border-top: 1px solid var(--dbx-border);
 }
 
@@ -251,10 +474,13 @@
   border-color: var(--dbx-accent);
 }
 
-.dbx__button--ghost { color: var(--dbx-muted); }
+.dbx__button--ghost { flex: 0 0 auto; color: var(--dbx-muted); }
+.dbx__button--camera { flex: 0 0 auto; }
 
 .dbx__button:focus-visible,
-.dbx__preset:focus-visible,
+.dbx__chip:focus-visible,
+.dbx__palette:focus-visible,
+.dbx__drop-button:focus-visible,
 .dbx__select:focus-visible,
 .dbx__range:focus-visible {
   outline: 2px solid var(--dbx-accent);
@@ -267,5 +493,7 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .dbx__preset, .dbx__button { transition: border-color 120ms, color 120ms; }
+  .dbx__chip,
+  .dbx__button,
+  .dbx__palette { transition: border-color 120ms, color 120ms; }
 }

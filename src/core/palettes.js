@@ -5,11 +5,17 @@
  * il colore piu' vicino in distanza euclidea pesata sulla percezione.
  */
 
-const hex = (s) => [
-  parseInt(s.slice(1, 3), 16),
-  parseInt(s.slice(3, 5), 16),
-  parseInt(s.slice(5, 7), 16),
-];
+/** Legge #rgb o #rrggbb (con o senza cancelletto) in una terna 0-255. */
+const hex = (s) => {
+  const body = s.startsWith('#') ? s.slice(1) : s;
+  // La forma corta raddoppia ogni cifra: #f0a diventa #ff00aa.
+  const full = body.length === 3 ? body.replace(/./g, (c) => c + c) : body;
+  return [
+    parseInt(full.slice(0, 2), 16),
+    parseInt(full.slice(2, 4), 16),
+    parseInt(full.slice(4, 6), 16),
+  ];
+};
 
 /** Costruisce una scala di grigi con `levels` livelli equispaziati. */
 export function grayRamp(levels) {
@@ -88,24 +94,88 @@ export const PALETTES = {
   },
   greenCrt: { ramp: true, label: 'CRT verde', colors: phosphor('#33ff66', 4) },
   amberCrt: { ramp: true, label: 'CRT ambra', colors: phosphor('#ffb000', 4) },
+
+  // Marathon (Bungie, 2025). L'art director la chiama "graphic realism":
+  // rosa e gialli iper-saturi che spiccano su blu acciaio freddi e neri
+  // profondi, senza sfumature. Regge bene il dithering proprio perche' i
+  // colori sono pochi e lontanissimi fra loro.
+  marathon: {
+    // Rampa, non palette a colori: i suoi otto colori, ordinati per
+    // luminanza, salgono regolari dal nero al bianco sporco. Mappandoci
+    // sopra la luminanza si ottengono le fasce piatte di colore del gioco;
+    // cercando invece il colore RGB piu' vicino si ottengono coriandoli.
+    ramp: true,
+    label: 'Marathon',
+    colors: [
+      '#0a0c10', '#29324f', '#01ffff', '#59b41d',
+      '#c2fe0b', '#ff2d95', '#ff0d1a', '#f4f1e8',
+    ].map(hex),
+  },
+  // Due sole tinte, per il taglio da manifesto.
+  marathonDuo: {
+    ramp: true,
+    label: 'Marathon duo',
+    colors: ['#0a0c10', '#c2fe0b'].map(hex),
+  },
+  // I terminali del Marathon del 1994: verde su nero, con quel filo di
+  // verde acceso sulle lettere.
+  marathonTerm: {
+    ramp: true,
+    label: 'Marathon 94',
+    colors: ['#04120a', '#0d3b1e', '#1f7a3d', '#3dff7a'].map(hex),
+  },
+  risograph: {
+    label: 'Risografia',
+    colors: ['#1d1a2e', '#0078bf', '#ff48b0', '#f5f1e6'].map(hex),
+  },
+  blueprint: {
+    ramp: true,
+    label: 'Cianografia',
+    colors: ['#0b2545', '#13315c', '#8da9c4', '#eef4ed'].map(hex),
+  },
 };
 
 export const PALETTE_KEYS = Object.keys(PALETTES);
 
+const HEX_RE = /^#?(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+/**
+ * Vero se la stringa e' un elenco di colori esadecimali separati da virgola,
+ * cioe' una palette scritta a mano: "#0a0c10,#c2fe0b".
+ *
+ * E' il formato che usiamo ovunque per le palette personalizzate: sta in un
+ * attributo data-*, in una riga di config.toml e in un argomento della riga
+ * di comando senza bisogno di trattamenti diversi.
+ */
+export function isCustomPalette(value) {
+  if (typeof value !== 'string') return false;
+  const parts = value.split(',').map((s) => s.trim()).filter(Boolean);
+  return parts.length >= 2 && parts.every((p) => HEX_RE.test(p));
+}
+
+/** Trasforma un elenco di colori in stringa: l'inverso di isCustomPalette. */
+export function stringifyPalette(colors) {
+  return colors.map((c) => (typeof c === 'string' ? c : rgbToHex(c))).join(',');
+}
+
+/** Legge una stringa "#aabbcc,#ddeeff" in un elenco di terne. */
+export function parseCustomPalette(value) {
+  return value.split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => hex(s));
+}
+
 /**
  * Risolve l'opzione `palette` in un array di colori.
- * Accetta la chiave di una palette predefinita oppure un array custom
- * di stringhe esadecimali / terne gia' pronte.
+ * Accetta la chiave di una palette predefinita, un elenco di esadecimali
+ * separati da virgola, oppure un array gia' pronto.
  */
-export function resolvePalette(palette, inkPaper) {
+export function resolvePalette(palette) {
   if (Array.isArray(palette)) {
     return palette.map((c) => (typeof c === 'string' ? hex(c) : c.slice(0, 3)));
   }
-  if (palette === 'custom' && inkPaper) {
-    return [inkPaper.ink, inkPaper.paper].map((c) =>
-      typeof c === 'string' ? hex(c) : c.slice(0, 3),
-    );
-  }
+  if (isCustomPalette(palette)) return parseCustomPalette(palette);
   const entry = PALETTES[palette];
   if (!entry) throw new Error(`Palette sconosciuta: ${palette}`);
   return entry.colors;
@@ -123,10 +193,44 @@ export function rgbToHex([r, g, b]) {
  * Come `resolvePalette`, ma restituisce anche se la palette e' una rampa
  * di luminanza (nel qual caso conviene quantizzare sul canale luma).
  */
-export function paletteInfo(palette, inkPaper) {
-  const colors = resolvePalette(palette, inkPaper);
+export function paletteInfo(palette) {
+  const colors = resolvePalette(palette);
   let ramp;
-  if (typeof palette === 'string' && PALETTES[palette]) ramp = !!PALETTES[palette].ramp;
-  else ramp = colors.length <= 2; // custom a due tinte: trattala come rampa
+  if (typeof palette === 'string' && PALETTES[palette]) {
+    ramp = !!PALETTES[palette].ramp;
+  } else {
+    // Una palette scritta a mano viene trattata come scala tonale quando i
+    // suoi colori stanno quasi in fila per luminanza: e' il caso del duotono
+    // e delle rampe, dove mappare sul grigio da' un risultato molto migliore
+    // che cercare il colore piu' vicino.
+    ramp = isMonotoneRamp(colors);
+  }
   return { colors, ramp };
+}
+
+/**
+ * Vero se i colori, ordinati per luminanza, stanno quasi su una retta nello
+ * spazio RGB: allora sono gradini di una stessa tinta, non colori distinti.
+ */
+function isMonotoneRamp(colors) {
+  if (colors.length <= 2) return true;
+  const byLuma = [...colors].sort(
+    (a, b) => (0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2])
+      - (0.2126 * b[0] + 0.7152 * b[1] + 0.0722 * b[2]),
+  );
+  const first = byLuma[0];
+  const last = byLuma[byLuma.length - 1];
+  const axis = [last[0] - first[0], last[1] - first[1], last[2] - first[2]];
+  const axisLen = Math.hypot(...axis) || 1;
+
+  for (const c of byLuma) {
+    const v = [c[0] - first[0], c[1] - first[1], c[2] - first[2]];
+    const t = (v[0] * axis[0] + v[1] * axis[1] + v[2] * axis[2]) / (axisLen * axisLen);
+    // Distanza dal segmento che unisce il colore piu' scuro al piu' chiaro.
+    const scarto = Math.hypot(
+      v[0] - t * axis[0], v[1] - t * axis[1], v[2] - t * axis[2],
+    );
+    if (scarto > axisLen * 0.16) return false;
+  }
+  return true;
 }
