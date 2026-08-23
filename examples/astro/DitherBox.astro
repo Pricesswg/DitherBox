@@ -1,0 +1,58 @@
+---
+/**
+ * Componente Astro pronto da incollare in src/components/.
+ *
+ * Uso:
+ *   ---
+ *   import DitherBox from '../components/DitherBox.astro';
+ *   ---
+ *   <DitherBox palette="gameboy" algorithm="bayer4" scale={4} />
+ *
+ * Lo script sta in un blocco <script> normale: Astro lo impacchetta e lo
+ * manda solo al browser, quindi il widget non viene mai eseguito sul server.
+ * I parametri passano dal frontmatter al client via attributi data-*, che e'
+ * esattamente quello che autoInit() si aspetta di trovare.
+ */
+export interface Props {
+  palette?: string;
+  algorithm?: string;
+  scale?: number;
+  strength?: number;
+  bias?: number;
+  noise?: number;
+  brightness?: number;
+  contrast?: number;
+  gamma?: number;
+  saturation?: number;
+  sharpen?: number;
+  invert?: boolean;
+  serpentine?: boolean;
+  maxSize?: number;
+  upscale?: boolean;
+  /** Immagine da caricare all'avvio, invece della schermata vuota. */
+  src?: string;
+  class?: string;
+}
+
+const { class: className, src, ...options } = Astro.props;
+
+// Solo i parametri davvero passati diventano attributi: gli altri
+// restano ai valori di partenza del widget.
+const dataset = Object.fromEntries(
+  Object.entries(options)
+    .filter(([, value]) => value !== undefined)
+    .map(([key, value]) => [`data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`, String(value)]),
+);
+---
+
+<div class={className} data-ditherbox data-src={src} {...dataset}></div>
+
+<script>
+  import { autoInit } from 'ditherbox/web';
+  import 'ditherbox/web/style.css';
+
+  // autoInit salta gli elementi gia' agganciati, quindi e' sicuro
+  // richiamarlo anche dopo una navigazione con le view transition.
+  autoInit();
+  document.addEventListener('astro:page-load', () => autoInit());
+</script>

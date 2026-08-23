@@ -1,0 +1,271 @@
+/*
+ * DitherBox - foglio di stile del widget.
+ * Tutto passa da custom property con prefisso --dbx-: per intonarlo al tuo
+ * sito basta ridefinirle su .dbx (o su :root) senza toccare questo file.
+ */
+
+.dbx {
+  --dbx-bg: #0e0f12;
+  --dbx-panel: #16181d;
+  --dbx-border: #2a2e37;
+  --dbx-fg: #e6e8ec;
+  --dbx-muted: #8b929f;
+  --dbx-accent: #7dd3a0;
+  --dbx-accent-fg: #08110c;
+  --dbx-radius: 10px;
+  --dbx-gap: 14px;
+  --dbx-font: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: var(--dbx-gap);
+  padding: var(--dbx-gap);
+  background: var(--dbx-bg);
+  border: 1px solid var(--dbx-border);
+  border-radius: var(--dbx-radius);
+  color: var(--dbx-fg);
+  font-family: var(--dbx-font);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+@media (prefers-color-scheme: light) {
+  .dbx {
+    --dbx-bg: #f6f7f9;
+    --dbx-panel: #ffffff;
+    --dbx-border: #d8dce3;
+    --dbx-fg: #16181d;
+    --dbx-muted: #656c78;
+    --dbx-accent: #1f7a4d;
+    --dbx-accent-fg: #ffffff;
+  }
+}
+
+@media (max-width: 720px) {
+  .dbx { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* --------------------------------------------------------------- palco */
+
+.dbx__stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 260px;
+  padding: 12px;
+  background:
+    /* scacchiera di fondo, cosi' si vede subito cosa e' immagine e cosa no */
+    repeating-conic-gradient(var(--dbx-border) 0% 25%, transparent 0% 50%)
+      0 0 / 16px 16px;
+  border: 1px solid var(--dbx-border);
+  border-radius: calc(var(--dbx-radius) - 2px);
+  overflow: hidden;
+}
+
+.dbx__canvas {
+  display: none;
+  max-width: 100%;
+  max-height: 68vh;
+  /* Il dithering va guardato a pixel netti: mai interpolare in upscaling. */
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.dbx.is-loaded .dbx__canvas { display: block; }
+.dbx.is-loaded .dbx__drop { display: none; }
+
+.dbx__drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 24px;
+  color: var(--dbx-muted);
+  text-align: center;
+  pointer-events: none;
+}
+
+.dbx__drop-icon { width: 44px; height: 44px; opacity: 0.7; }
+.dbx__drop-title { margin: 0; font-size: 14px; color: var(--dbx-fg); }
+.dbx__drop-sub { margin: 0; font-size: 12px; max-width: 34ch; }
+
+.dbx.is-dragging .dbx__stage {
+  border-color: var(--dbx-accent);
+  box-shadow: inset 0 0 0 2px var(--dbx-accent);
+}
+
+.dbx__status {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: var(--dbx-muted);
+  background: color-mix(in srgb, var(--dbx-bg) 82%, transparent);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.dbx__status:empty { display: none; }
+
+/* ------------------------------------------------------------ pannello */
+
+.dbx__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  max-height: 72vh;
+  padding: 12px;
+  overflow-y: auto;
+  background: var(--dbx-panel);
+  border: 1px solid var(--dbx-border);
+  border-radius: calc(var(--dbx-radius) - 2px);
+}
+
+.dbx__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.dbx__presets-label {
+  width: 100%;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dbx-muted);
+}
+
+.dbx__preset {
+  padding: 4px 9px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--dbx-fg);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--dbx-border);
+  border-radius: 999px;
+}
+
+.dbx__preset:hover { border-color: var(--dbx-accent); color: var(--dbx-accent); }
+
+.dbx__group { display: flex; flex-direction: column; gap: 7px; }
+
+.dbx__group-title {
+  margin: 4px 0 0;
+  padding-bottom: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--dbx-muted);
+  border-bottom: 1px solid var(--dbx-border);
+}
+
+.dbx__control {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr) 48px;
+  gap: 8px;
+  align-items: center;
+}
+
+.dbx__control--enum,
+.dbx__control--bool { grid-template-columns: 82px minmax(0, 1fr); }
+
+.dbx__label {
+  font-size: 11px;
+  color: var(--dbx-muted);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dbx__value {
+  font-size: 11px;
+  text-align: right;
+  color: var(--dbx-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.dbx__select {
+  min-width: 0;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--dbx-fg);
+  background: var(--dbx-bg);
+  border: 1px solid var(--dbx-border);
+  border-radius: 5px;
+}
+
+.dbx__checkbox {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--dbx-accent);
+  cursor: pointer;
+}
+
+.dbx__range {
+  width: 100%;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--dbx-accent);
+  cursor: ew-resize;
+  background: transparent;
+}
+
+.dbx__file { display: none; }
+
+/* ------------------------------------------------------------- azioni */
+
+.dbx__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--dbx-border);
+}
+
+.dbx__button {
+  flex: 1 1 auto;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--dbx-fg);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--dbx-border);
+  border-radius: 6px;
+}
+
+.dbx__button:hover { border-color: var(--dbx-accent); }
+
+.dbx__button--primary {
+  color: var(--dbx-accent-fg);
+  background: var(--dbx-accent);
+  border-color: var(--dbx-accent);
+}
+
+.dbx__button--ghost { color: var(--dbx-muted); }
+
+.dbx__button:focus-visible,
+.dbx__preset:focus-visible,
+.dbx__select:focus-visible,
+.dbx__range:focus-visible {
+  outline: 2px solid var(--dbx-accent);
+  outline-offset: 2px;
+}
+
+/* Il pulsante "Scatta" ha senso solo dove c'e' davvero una fotocamera. */
+@media (hover: hover) and (pointer: fine) {
+  .dbx__button--camera { display: none; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dbx__preset, .dbx__button { transition: border-color 120ms, color 120ms; }
+}
