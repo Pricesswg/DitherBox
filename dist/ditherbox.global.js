@@ -2376,6 +2376,38 @@ function stepIndex(param, value) {
   return best;
 }
 
+/**
+ * L'ultimo gradino dei megapixel che serva davvero a qualcosa.
+ *
+ * La riduzione non ingrandisce mai: chiedere piu' megapixel di quanti la
+ * foto ne abbia lascia le cose come stanno. Senza questo taglio meta'
+ * della corsa del cursore e' morta - su una foto da 0.76 MP i dodici
+ * gradini da 1 MP in su davano tutti lo stesso identico file - e chi lo
+ * trascina crede che il comando sia rotto.
+ *
+ * Restituisce l'indice del primo gradino che raggiunge o supera la misura
+ * della foto: quello e' "piena risoluzione", oltre non c'e' niente.
+ */
+function usefulStepCeiling(param, sourceMegapixels) {
+  const steps = paramSteps(param);
+  if (!steps || !Number.isFinite(sourceMegapixels) || sourceMegapixels <= 0) {
+    return steps ? steps.length - 1 : 0;
+  }
+  const i = steps.findIndex((v) => v >= sourceMegapixels);
+  return i < 0 ? steps.length - 1 : i;
+}
+
+/**
+ * I megapixel che si otterranno davvero, che non possono superare quelli
+ * della foto di partenza. E' il numero da mostrare accanto al cursore:
+ * scrivere "8 MP" sotto una foto da 0.76 sarebbe una bugia.
+ */
+function effectiveMegapixels(sourceWidth, sourceHeight, requested) {
+  const propri = (sourceWidth * sourceHeight) / 1e6;
+  if (!Number.isFinite(propri) || propri <= 0) return requested;
+  return Math.min(requested, propri);
+}
+
 /** Sposta un parametro di `delta` passi, restando dentro l'intervallo. */
 function stepBy(param, value, delta) {
   const steps = paramSteps(param);
@@ -2430,7 +2462,7 @@ function applyPreset(name, base = DEFAULTS) {
   return normalizeOptions({ ...base, ...preset.options });
 }
 
-  return { DEFAULTS, PARAMS, PARAM_BY_KEY, PRESETS, algorithmLabel, applyPreset, enumLabel, formatValue, groupLabel, normalizeOptions, paletteLabel, paramHint, paramLabel, paramSteps, presetLabel, stepBy, stepIndex };
+  return { DEFAULTS, PARAMS, PARAM_BY_KEY, PRESETS, algorithmLabel, applyPreset, effectiveMegapixels, enumLabel, formatValue, groupLabel, normalizeOptions, paletteLabel, paramHint, paramLabel, paramSteps, presetLabel, stepBy, stepIndex, usefulStepCeiling };
 })();
 
 const __m_src_core_process_js = (() => {
@@ -2520,7 +2552,7 @@ function targetSize(width, height, megapixels) {
 const __m_src_core_index_js = Object.assign({}, __m_src_core_i18n_js, __m_src_core_palettes_js, __m_src_core_matrices_js, __m_src_core_adjust_js, __m_src_core_dither_js, __m_src_core_textart_js, __m_src_core_options_js, __m_src_core_process_js);
 
 const __m_src_web_ditherbox_js = (() => {
-  const { PARAMS, PRESETS, DEFAULTS, PALETTES, normalizeOptions, formatValue, applyPreset, paramSteps, stepIndex, groupLabel, paramLabel, paramHint, presetLabel, paletteLabel, enumLabel, processImage, targetSize, resampleBox, fitWithin, paletteInfo, rgbToHex, stringifyPalette, isCustomPalette, imageToText, TEXT_MODES, createTranslator, detectLocale, normalizeLocale, LOCALES, LOCALE_NAMES } = __m_src_core_index_js;
+  const { PARAMS, PRESETS, DEFAULTS, PALETTES, normalizeOptions, formatValue, applyPreset, paramSteps, stepIndex, usefulStepCeiling, effectiveMegapixels, groupLabel, paramLabel, paramHint, presetLabel, paletteLabel, enumLabel, processImage, targetSize, resampleBox, fitWithin, paletteInfo, rgbToHex, stringifyPalette, isCustomPalette, imageToText, TEXT_MODES, createTranslator, detectLocale, normalizeLocale, LOCALES, LOCALE_NAMES } = __m_src_core_index_js;
 /**
  * DitherBox - widget per il browser.
  *
@@ -2711,6 +2743,9 @@ class DitherBox {
       this.sourceName = name || nomeDellaSorgente(source);
       this.root.classList.add('is-loaded');
       if (this.fileName) this.fileName.textContent = this.sourceName || t('ui.noFile');
+      // Il limite utile dei megapixel dipende dalla foto: cambiata la foto,
+      // vanno rifatti i conti sul cursore.
+      this.#syncControls();
       this.render();
       this.#emit('load', { width: this.source.width, height: this.source.height });
     } catch (err) {
@@ -3286,9 +3321,32 @@ class DitherBox {
   #syncControls() {
     for (const [key, { param, input, value }] of this.controls) {
       const v = this.options[key];
-      if (param.type === 'bool') input.checked = Boolean(v);
-      else if (param.type === 'range') input.value = stepIndex(param, v);
-      else input.value = v;
+      if (param.type === 'bool') {
+        input.checked = Boolean(v);
+      } else if (param.type === 'range') {
+        input.value = stepIndex(param, v);
+      } else {
+        input.value = v;
+      }
+
+      // I megapixel sono l'unico comando il cui limite utile dipende dalla
+      // foto caricata: chiederne piu' di quanti ne ha non fa niente. Il
+      // cursore si accorcia fino al primo gradino che copre la foto, cosi'
+      // ogni posizione cambia davvero qualcosa, e il numero accanto dice
+      // quello che si otterra' e non quello che si e' chiesto.
+      if (key === 'megapixels' && this.source) {
+        const propri = (this.source.width * this.source.height) / 1e6;
+        const tetto = usefulStepCeiling(param, propri);
+        input.max = String(tetto);
+        if (Number(input.value) > tetto) input.value = String(tetto);
+        if (value) {
+          value.textContent = formatValue(
+            param, effectiveMegapixels(this.source.width, this.source.height, v), this.t,
+          );
+        }
+        continue;
+      }
+
       if (value) value.textContent = formatValue(param, v, this.t);
     }
 
@@ -3546,6 +3604,7 @@ global.DitherBox = Object.assign(__m_src_web_ditherbox_js.DitherBox, {
   detectLocale: __m_src_core_index_js.detectLocale,
   ditherImage: __m_src_core_index_js.ditherImage,
   downscaleByFactor: __m_src_core_index_js.downscaleByFactor,
+  effectiveMegapixels: __m_src_core_index_js.effectiveMegapixels,
   enumLabel: __m_src_core_index_js.enumLabel,
   fitForText: __m_src_core_index_js.fitForText,
   fitWithin: __m_src_core_index_js.fitWithin,
@@ -3579,6 +3638,7 @@ global.DitherBox = Object.assign(__m_src_web_ditherbox_js.DitherBox, {
   textTarget: __m_src_core_index_js.textTarget,
   toText: __m_src_core_index_js.toText,
   upscaleByFactor: __m_src_core_index_js.upscaleByFactor,
+  usefulStepCeiling: __m_src_core_index_js.usefulStepCeiling,
   DEFAULTS: __m_src_web_ditherbox_js.DEFAULTS,
   DitherBox: __m_src_web_ditherbox_js.DitherBox,
   PALETTES: __m_src_web_ditherbox_js.PALETTES,

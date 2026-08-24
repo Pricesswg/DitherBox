@@ -286,6 +286,38 @@ export function stepIndex(param, value) {
   return best;
 }
 
+/**
+ * L'ultimo gradino dei megapixel che serva davvero a qualcosa.
+ *
+ * La riduzione non ingrandisce mai: chiedere piu' megapixel di quanti la
+ * foto ne abbia lascia le cose come stanno. Senza questo taglio meta'
+ * della corsa del cursore e' morta - su una foto da 0.76 MP i dodici
+ * gradini da 1 MP in su davano tutti lo stesso identico file - e chi lo
+ * trascina crede che il comando sia rotto.
+ *
+ * Restituisce l'indice del primo gradino che raggiunge o supera la misura
+ * della foto: quello e' "piena risoluzione", oltre non c'e' niente.
+ */
+export function usefulStepCeiling(param, sourceMegapixels) {
+  const steps = paramSteps(param);
+  if (!steps || !Number.isFinite(sourceMegapixels) || sourceMegapixels <= 0) {
+    return steps ? steps.length - 1 : 0;
+  }
+  const i = steps.findIndex((v) => v >= sourceMegapixels);
+  return i < 0 ? steps.length - 1 : i;
+}
+
+/**
+ * I megapixel che si otterranno davvero, che non possono superare quelli
+ * della foto di partenza. E' il numero da mostrare accanto al cursore:
+ * scrivere "8 MP" sotto una foto da 0.76 sarebbe una bugia.
+ */
+export function effectiveMegapixels(sourceWidth, sourceHeight, requested) {
+  const propri = (sourceWidth * sourceHeight) / 1e6;
+  if (!Number.isFinite(propri) || propri <= 0) return requested;
+  return Math.min(requested, propri);
+}
+
 /** Sposta un parametro di `delta` passi, restando dentro l'intervallo. */
 export function stepBy(param, value, delta) {
   const steps = paramSteps(param);

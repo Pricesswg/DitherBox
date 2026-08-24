@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import {
   PARAMS, PRESETS, DEFAULTS,
   normalizeOptions, formatValue, applyPreset, paramSteps, stepIndex, stepBy,
+  usefulStepCeiling, effectiveMegapixels,
   groupLabel, paramLabel, presetLabel, enumLabel,
   processImage, targetSize, resampleBox, isCustomPalette,
   createTranslator, normalizeLocale, LOCALES, LOCALE_NAMES,
@@ -337,6 +338,12 @@ export class DitherTui {
       });
   }
 
+  /** L'ultimo gradino dei megapixel che cambi ancora qualcosa. */
+  #megapixelCeiling(param) {
+    const propri = (this.source.width * this.source.height) / 1e6;
+    return usefulStepCeiling(param, propri);
+  }
+
   #move(delta) {
     if (this.focus === 'files') {
       if (!this.files.length) return;
@@ -389,7 +396,16 @@ export class DitherTui {
     }
     // Gli stessi gradini che usa il cursore del widget: cosi' un passo di
     // tastiera qui e uno di mouse la' portano allo stesso valore.
-    return this.#setOption(param.key, stepBy(param, current, steps));
+    let prossimo = stepBy(param, current, steps);
+
+    // Oltre la misura della foto i megapixel non fanno niente: il tasto
+    // continuerebbe a rispondere senza che cambi nulla sullo schermo.
+    if (param.key === 'megapixels' && this.source) {
+      const passi = paramSteps(param);
+      const tetto = passi[this.#megapixelCeiling(param)];
+      if (prossimo > tetto) prossimo = tetto;
+    }
+    return this.#setOption(param.key, prossimo);
   }
 
   #activate() {
@@ -993,15 +1009,29 @@ export class DitherTui {
     const marker = selected ? '>' : ' ';
     const labelW = 13;
     const valueW = 7;
-    const valueText = formatValue(param, value, this.tr);
+    // Il numero accanto e' quello che si otterra', non quello che si e'
+    // chiesto: su una foto da 0.76 MP scrivere "8 MP" sarebbe falso.
+    const mostrato = param.key === 'megapixels' && this.source
+      ? effectiveMegapixels(this.source.width, this.source.height, value)
+      : value;
+    const valueText = formatValue(param, mostrato, this.tr);
 
     let line;
     if (param.type === 'range') {
       // La posizione segue l'indice del passo, non il valore: su una scala a
       // gradini scelti a mano come i megapixel il rapporto grezzo
       // schiaccerebbe tutta la meta' bassa contro il bordo sinistro.
+      //
+      // E per i megapixel la barra si ferma dove la foto finisce: chiederne
+      // piu' di quanti ne ha non cambia niente, e una barra che continua a
+      // riempirsi senza che il risultato cambi e' una barra che mente.
       const passi = paramSteps(param);
-      const ratio = passi.length > 1 ? stepIndex(param, value) / (passi.length - 1) : 0;
+      const ultimo = param.key === 'megapixels' && this.source
+        ? this.#megapixelCeiling(param)
+        : passi.length - 1;
+      const ratio = ultimo > 0
+        ? Math.min(1, stepIndex(param, value) / ultimo)
+        : 0;
       const barW = Math.max(4, width - labelW - valueW - 4);
       line = `${marker} ${pad(paramLabel(param, this.tr), labelW)}`
         + `${fg(t.accent)}${bar(ratio, barW, '▰', '▱')}${RESET} `

@@ -11,7 +11,7 @@
 
 import {
   PARAMS, PRESETS, DEFAULTS, PALETTES,
-  normalizeOptions, formatValue, applyPreset, paramSteps, stepIndex,
+  normalizeOptions, formatValue, applyPreset, paramSteps, stepIndex, usefulStepCeiling, effectiveMegapixels,
   groupLabel, paramLabel, paramHint, presetLabel, paletteLabel, enumLabel,
   processImage, targetSize, resampleBox, fitWithin,
   paletteInfo, rgbToHex, stringifyPalette, isCustomPalette,
@@ -196,6 +196,9 @@ export class DitherBox {
       this.sourceName = name || nomeDellaSorgente(source);
       this.root.classList.add('is-loaded');
       if (this.fileName) this.fileName.textContent = this.sourceName || t('ui.noFile');
+      // Il limite utile dei megapixel dipende dalla foto: cambiata la foto,
+      // vanno rifatti i conti sul cursore.
+      this.#syncControls();
       this.render();
       this.#emit('load', { width: this.source.width, height: this.source.height });
     } catch (err) {
@@ -771,9 +774,32 @@ export class DitherBox {
   #syncControls() {
     for (const [key, { param, input, value }] of this.controls) {
       const v = this.options[key];
-      if (param.type === 'bool') input.checked = Boolean(v);
-      else if (param.type === 'range') input.value = stepIndex(param, v);
-      else input.value = v;
+      if (param.type === 'bool') {
+        input.checked = Boolean(v);
+      } else if (param.type === 'range') {
+        input.value = stepIndex(param, v);
+      } else {
+        input.value = v;
+      }
+
+      // I megapixel sono l'unico comando il cui limite utile dipende dalla
+      // foto caricata: chiederne piu' di quanti ne ha non fa niente. Il
+      // cursore si accorcia fino al primo gradino che copre la foto, cosi'
+      // ogni posizione cambia davvero qualcosa, e il numero accanto dice
+      // quello che si otterra' e non quello che si e' chiesto.
+      if (key === 'megapixels' && this.source) {
+        const propri = (this.source.width * this.source.height) / 1e6;
+        const tetto = usefulStepCeiling(param, propri);
+        input.max = String(tetto);
+        if (Number(input.value) > tetto) input.value = String(tetto);
+        if (value) {
+          value.textContent = formatValue(
+            param, effectiveMegapixels(this.source.width, this.source.height, v), this.t,
+          );
+        }
+        continue;
+      }
+
       if (value) value.textContent = formatValue(param, v, this.t);
     }
 

@@ -342,3 +342,80 @@ test('la pagina parte con la foto di prova gia caricata', async (t) => {
   assert.ok(esito.secondaCaricata, 'data-src non ha caricato niente');
   assert.deepEqual(errori, []);
 });
+
+test('il cursore dei megapixel si ferma alla misura della foto', async (t) => {
+  const sessione = await apri();
+  if (!sessione) return t.skip('Chromium non disponibile');
+  const { browser, page, errori } = sessione;
+  t.after(() => browser.close());
+
+  const esito = await page.evaluate(async () => {
+    const attesa = () => new Promise((r) => requestAnimationFrame(r));
+    const b = window.__boxes[0];
+
+    const carica = async (w, h) => {
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const g = c.getContext('2d');
+      const gr = g.createLinearGradient(0, 0, w, h);
+      gr.addColorStop(0, '#fff'); gr.addColorStop(1, '#000');
+      g.fillStyle = gr; g.fillRect(0, 0, w, h);
+      const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+      await b.load(new File([blob], 'p.png', { type: 'image/png' }));
+      await attesa();
+    };
+
+    const slider = () => [...document.querySelectorAll('.dbx__range')]
+      .find((i) => /megapixels/i.test(i.id));
+    const etichetta = () => document.querySelector(`output[for="${slider().id}"]`)?.textContent.trim();
+
+    // Ogni posizione del cursore deve dare una misura diversa dalla
+    // precedente: se ce ne sono due uguali, quel tratto di corsa e' morto.
+    const misureDistinte = async () => {
+      const s = slider();
+      const viste = [];
+      for (let i = 0; i <= Number(s.max); i++) {
+        s.value = String(i);
+        s.dispatchEvent(new Event('input', { bubbles: true }));
+        await attesa();
+        const blob = await b.toBlob();
+        const bmp = await createImageBitmap(blob);
+        viste.push(`${bmp.width}x${bmp.height}`);
+        bmp.close();
+      }
+      return viste;
+    };
+
+    // Foto piccola: meta' dei gradini era inerte.
+    await carica(760, 1000);
+    const piccola = {
+      max: Number(slider().max),
+      etichettaInCima: (() => {
+        const s = slider();
+        s.value = s.max;
+        s.dispatchEvent(new Event('input', { bubbles: true }));
+        return etichetta();
+      })(),
+      misure: await misureDistinte(),
+    };
+
+    // Foto grande: il cursore deve riaprirsi.
+    await carica(4000, 3000);
+    const grande = { max: Number(slider().max) };
+
+    return { piccola, grande };
+  });
+
+  const { piccola, grande } = esito;
+
+  // Nessuna misura ripetuta: ogni posizione del cursore fa qualcosa.
+  const doppioni = piccola.misure.filter((v, i) => piccola.misure.indexOf(v) !== i);
+  assert.deepEqual(doppioni, [], `posizioni che non cambiano niente: ${doppioni.join(', ')}`);
+
+  // In cima il numero e quello della foto, non quello chiesto.
+  assert.match(piccola.etichettaInCima || '', /0\.76 MP/, 'in cima deve dire i megapixel veri della foto');
+
+  // Una foto piu' grande riapre la corsa.
+  assert.ok(grande.max > piccola.max, `il tetto non si e alzato: ${piccola.max} -> ${grande.max}`);
+  assert.deepEqual(errori, []);
+});
