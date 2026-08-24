@@ -41,14 +41,14 @@ test('sotto la misura minima avvisa invece di disegnare a caso', async (t) => {
   const dir = tempDir(t);
   const path = await writeSample(dir, 'foto.png', 200, 200);
   const { render } = await mountTui(DitherTui, { width: 20, height: 6, path, dir });
-  assert.match(testo(render()), /troppo piccola/);
+  assert.match(testo(render()), /too small/);
 });
 
 test('senza immagine mostra un invito invece di rompersi', async () => {
   const { render } = await mountTui(DitherTui, { width: 90, height: 30 });
   const t = testo(render());
-  assert.match(t, /nessuna immagine/);
-  assert.match(t, /aprire un percorso/);
+  assert.match(t, /No image loaded/);
+  assert.match(t, /open a path/);
 });
 
 test('la riga di stato sta in una riga e riporta l essenziale', async (t) => {
@@ -59,12 +59,12 @@ test('la riga di stato sta in una riga e riporta l essenziale', async (t) => {
 
   const prima = senzaColori(frame[0]);
   assert.match(prima, /ritratto\.png/);
-  assert.match(prima, /1-bit B\/N/i);
+  assert.match(prima, /1-bit B\/W/i);
   assert.match(prima, /640×480 → \d+×\d+/);
-  assert.match(prima, /ant\. \d+×\d+/);
+  assert.match(prima, /prev\. \d+×\d+/);
 
   // Una riga sola: la seconda deve essere gia' il bordo dell'anteprima.
-  assert.match(senzaColori(frame[1]), /ANTEPRIMA/);
+  assert.match(senzaColori(frame[1]), /PREVIEW/);
 
   // E niente istogramma ne nome del tema, che occupavano quattro righe.
   const tutto = testo(frame);
@@ -83,7 +83,7 @@ test('il riquadro dell anteprima si stringe sull immagine', async (t) => {
   render();
 
   const righe = frame.map(senzaColori);
-  const bordo = righe.find((l) => l.includes('ANTEPRIMA'));
+  const bordo = righe.find((l) => l.includes('PREVIEW'));
   const largoRiquadro = bordo.indexOf('╮') - bordo.indexOf('╭') + 1;
 
   // Quante colonne occupa davvero il disegno dentro il riquadro.
@@ -112,13 +112,13 @@ test('con una sola immagine la lista file non ruba righe all anteprima', async (
   soloUno.tui.files = [uno];
   soloUno.tui.fileIndex = 0;
   const testoUno = testo(soloUno.render());
-  assert.doesNotMatch(testoUno, /FILE \d/, 'con un file solo la lista non serve');
+  assert.doesNotMatch(testoUno, /FILES \d/, 'con un file solo la lista non serve');
 
   const due = await writeSample(dir, 'due.png', 600, 900);
   const conDue = await mountTui(DitherTui, { width: 120, height: 34, path: uno, dir });
   conDue.tui.files = [uno, due];
   conDue.tui.fileIndex = 0;
-  assert.match(testo(conDue.render()), /FILE 1\/2/, 'con due file la lista deve comparire');
+  assert.match(testo(conDue.render()), /FILES 1\/2/, 'con due file la lista deve comparire');
 
   // E l'anteprima deve essere piu' alta quando la lista non c'e'.
   const alto = (f) => f.filter((l) => /[⠀-⣿▀▄█░▒▓]/.test(senzaColori(l))).length;
@@ -142,7 +142,7 @@ test('caricare e salvare mostrano una barra di avanzamento', async (t) => {
 
   const conBarra = viste.filter((r) => /[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/.test(r) && /%/.test(r));
   assert.ok(conBarra.length >= 2, `nessuna barra durante il caricamento: ${JSON.stringify(viste)}`);
-  assert.ok(conBarra.some((r) => /Leggo/.test(r)), 'manca la fase di lettura');
+  assert.ok(conBarra.some((r) => /Reading/.test(r)), 'manca la fase di lettura');
 
   // A operazione finita la riga torna a raccontare l immagine.
   tui.toast = null;
@@ -225,7 +225,7 @@ test('v gira fra i modi di anteprima, t apre e chiude i temi', async (t) => {
   const iniziale = tui.themeName;
   press(tui, 't');
   assert.ok(tui.overlay, 't deve aprire il selettore');
-  assert.match(testo(render()), /TEMA/);
+  assert.match(testo(render()), /THEME/);
   press(tui, '\x1b[B');                       // freccia giu: anteprima dal vivo
   assert.notEqual(tui.themeName, iniziale);
   press(tui, '\x1b');                         // esc: deve rimettere quello di prima
@@ -260,7 +260,7 @@ test('i? mostra i tasti e si richiude', async (t) => {
   const path = await writeSample(dir, 'foto.png', 100, 100);
   const { tui, render } = await mountTui(DitherTui, { width: 96, height: 30, path, dir });
   press(tui, '?');
-  assert.match(testo(render()), /TASTI/);
+  assert.match(testo(render()), /KEYS/);
   press(tui, '\x1b');
   assert.equal(tui.overlay, null);
 
@@ -310,7 +310,7 @@ test('il campo di testo accetta scrittura, cancellazione e annullamento', async 
 
   press(tui, 's');
   assert.ok(tui.overlay);
-  assert.match(testo(render()), /SALVA/);
+  assert.match(testo(render()), /SAVE/);
   for (const ch of '\x7f'.repeat(4)) press(tui, ch);   // toglie ".png"
   for (const ch of 'X.png') press(tui, ch);
   assert.match(testo(render()), /X\.png/);
@@ -349,7 +349,7 @@ test('salvare con un estensione sbagliata avvisa senza scrivere', async (t) => {
   for (const ch of join(dir, 'esito.gif')) press(tui, ch);
   press(tui, '\r');
   await new Promise((r) => setTimeout(r, 200));
-  assert.match(tui.toast.text, /png o \.jpg/);
+  assert.match(tui.toast.text, /\.png or \.jpg/);
 });
 
 test('ogni tema si disegna senza sfondare la riga', async (t) => {
@@ -368,4 +368,54 @@ test('un tasto sconosciuto non fa niente e non solleva errori', async (t) => {
   const prima = JSON.stringify(tui.options);
   for (const ch of ['z', 'Q', '@', '\x1b[200~', '~']) press(tui, ch);
   assert.equal(JSON.stringify(tui.options), prima);
+});
+
+test('ctrl+l apre il selettore di lingua e cambia l interfaccia dal vivo', async (t) => {
+  const dir = tempDir(t);
+  const path = await writeSample(dir, 'foto.png', 400, 300);
+  const { tui, render } = await mountTui(DitherTui, { width: 100, height: 32, path, dir });
+
+  assert.equal(tui.locale, 'en');
+  assert.match(testo(render()), /CONTROLS/);
+
+  press(tui, '\x0c');                                  // ctrl+l
+  assert.ok(tui.overlay, 'ctrl+l non apre niente');
+  assert.match(testo(render()), /LANGUAGE/);
+  assert.match(testo(render()), /Italiano/);
+
+  // Scorrendo l elenco l interfaccia dietro cambia subito.
+  press(tui, 'j');
+  assert.equal(tui.locale, 'it');
+  assert.match(testo(render()), /CONTROLLI/);
+
+  // Esc rimette la lingua di prima.
+  press(tui, '\x1b');
+  assert.equal(tui.overlay, null);
+  assert.equal(tui.locale, 'en');
+  assert.match(testo(render()), /CONTROLS/);
+
+  // Invio invece la conferma.
+  press(tui, '\x0c');
+  press(tui, 'j'); press(tui, 'j'); press(tui, 'j');    // it, es, fr
+  press(tui, '\r');
+  assert.equal(tui.locale, 'fr');
+  assert.match(testo(render()), /APER[ÇC]U/);
+  assert.match(tui.toast.text, /Fran[çc]ais/);
+});
+
+test('la TUI parte nella lingua chiesta e traduce etichette e tasti', async (t) => {
+  const dir = tempDir(t);
+  const path = await writeSample(dir, 'foto.png', 400, 300);
+  const { tui, render } = await mountTui(DitherTui, {
+    width: 100, height: 32, path, dir, lang: 'de',
+  });
+
+  const schermo = testo(render());
+  assert.match(schermo, /VORSCHAU/, 'titolo dell anteprima non tradotto');
+  assert.match(schermo, /Algorithmus/, 'etichette dei parametri non tradotte');
+
+  press(tui, '?');
+  const aiuto = testo(render());
+  assert.match(aiuto, /TASTEN/);
+  assert.match(aiuto, /Sprache/, 'la voce della lingua manca dall aiuto');
 });

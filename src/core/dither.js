@@ -15,29 +15,6 @@ import { createImage, luma } from './adjust.js';
 export const ORDERED_ALGORITHMS = Object.keys(ORDERED_MATRICES);
 export const DIFFUSION_ALGORITHMS = Object.keys(DIFFUSION_KERNELS);
 
-/** Etichette leggibili, condivise da interfaccia web e TUI. */
-export const ALGORITHM_LABELS = {
-  none: 'Nessuno (soglia)',
-  random: 'Rumore casuale',
-  bayer2: 'Bayer 2x2',
-  bayer4: 'Bayer 4x4',
-  bayer8: 'Bayer 8x8',
-  bayer16: 'Bayer 16x16',
-  cluster4: 'Retino 4x4',
-  cluster8: 'Retino 8x8',
-  lines4: 'Linee diagonali',
-  floydSteinberg: 'Floyd-Steinberg',
-  falseFloydSteinberg: 'Floyd-Steinberg light',
-  atkinson: 'Atkinson',
-  jarvis: 'Jarvis-Judice-Ninke',
-  stucki: 'Stucki',
-  burkes: 'Burkes',
-  sierra: 'Sierra',
-  sierra2: 'Sierra 2 righe',
-  sierraLite: 'Sierra lite',
-  stevensonArce: 'Stevenson-Arce',
-};
-
 export const ALGORITHMS = [
   'none',
   'random',

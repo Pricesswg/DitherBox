@@ -9,16 +9,18 @@ import { basename, dirname, resolve, join } from 'node:path';
 import { statSync } from 'node:fs';
 
 import {
-  PARAMS, GROUP_LABELS, PRESETS, DEFAULTS,
+  PARAMS, PRESETS, DEFAULTS,
   normalizeOptions, formatValue, applyPreset, paramSteps, stepIndex, stepBy,
+  groupLabel, paramLabel, presetLabel, enumLabel,
   processImage, targetSize, resampleBox, isCustomPalette,
+  createTranslator, normalizeLocale, LOCALES, LOCALE_NAMES,
 } from '../core/index.js';
 
 import {
   Screen, parseKey, panel, pad, padStart, center, truncate, visibleLength,
   bar, BLOCKS_V, fg, RESET, BOLD, DIM, REVERSE,
 } from './term.js';
-import { MODES, MODE_KEYS, cellTarget, renderImage } from './preview.js';
+import { MODES, MODE_KEYS, modeLabel, cellTarget, renderImage } from './preview.js';
 import { loadThemes, loadConfig, DEFAULT_THEME } from './theme.js';
 import { loadImage, saveImage, listImages, isSupported } from './imageio.js';
 
@@ -31,13 +33,15 @@ const NARROW_WIDTH = 78;
 /** Rotellina in braille: gira mentre un'operazione e' in corso. */
 const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
+const PARAM_BY_KEY_LOCAL = Object.fromEntries(PARAMS.map((p) => [p.key, p]));
+
 /** Elenco piatto dei parametri, con le intestazioni di gruppo intercalate. */
 function buildRows() {
   const rows = [];
   let lastGroup = null;
   for (const param of PARAMS) {
     if (param.group !== lastGroup) {
-      rows.push({ kind: 'group', label: GROUP_LABELS[param.group] || param.group });
+      rows.push({ kind: 'group', group: param.group });
       lastGroup = param.group;
     }
     rows.push({ kind: 'param', param });
@@ -52,6 +56,11 @@ export class DitherTui {
     this.themes = loadThemes();
     this.themeName = opts.theme || config.theme || DEFAULT_THEME;
     if (!this.themes[this.themeName]) this.themeName = DEFAULT_THEME;
+
+    // `tr` e non `t`: qui `t` e' gia' il tema dei colori in mezza dozzina
+    // di metodi di disegno, e sovrapporre i due nomi sarebbe una trappola.
+    this.locale = normalizeLocale(opts.lang || config.lang);
+    this.tr = createTranslator(this.locale);
 
     this.options = normalizeOptions({ ...DEFAULTS, ...pickOptions(config), ...opts.options });
     // Predefinito i mezzi blocchi, non il braille: '▀' e' un blocco, largo
@@ -99,7 +108,7 @@ export class DitherTui {
     } else {
       await this.#scanDir();
       if (this.files.length) await this.openImage(this.files[0]);
-      else this.#say('Nessuna immagine qui. Premi o per aprire un percorso.', 'yellow');
+      else this.#say(this.tr('tui.noImageHere'), 'yellow');
     }
 
     this.render();
@@ -128,7 +137,7 @@ export class DitherTui {
       try {
         this.#handleKey(parseKey(data));
       } catch (err) {
-        this.#say(`Errore: ${err.message}`, 'red');
+        this.#say(this.tr('ui.error', { msg: err.message }), 'red');
         this.render();
       }
     };
@@ -185,12 +194,12 @@ export class DitherTui {
 
   async openImage(path) {
     const nome = basename(path);
-    this.#startJob(`Apro ${nome}`);
+    this.#startJob(this.tr('tui.jobOpen', { name: nome }));
     try {
-      await this.#jobStep(`Leggo ${nome}`, 0.2);
+      await this.#jobStep(this.tr('tui.jobRead', { name: nome }), 0.2);
       const img = await loadImage(path);
 
-      await this.#jobStep(`Preparo l’anteprima`, 0.75);
+      await this.#jobStep(this.tr('tui.jobPreview'), 0.75);
       this.source = { width: img.width, height: img.height, data: img.data };
       this.imagePath = path;
       this.sourceInfo = {
@@ -204,7 +213,10 @@ export class DitherTui {
     } finally {
       this.#endJob();
     }
-    this.#say(`${nome} · ${this.source.width}×${this.source.height}`, 'green');
+    this.#say(this.tr('tui.loaded', {
+      name: nome,
+      size: `${this.source.width}×${this.source.height}`,
+    }), 'green');
   }
 
   // ------------------------------------------------------------- input
@@ -227,6 +239,7 @@ export class DitherTui {
     if (name === '?' || (ctrl && name === 'k')) return this.#openHelp();
     if (name === 't') return this.#openThemePicker();
     if (name === 'p') return this.#openPresetPicker();
+    if (ctrl && name === 'l') return this.#openLanguagePicker();
     if (name === 'o') return this.#openPathPrompt();
     if (name === 's' || (ctrl && name === 's')) return this.#openSavePrompt();
 
@@ -234,7 +247,7 @@ export class DitherTui {
       const i = MODE_KEYS.indexOf(this.previewMode);
       this.previewMode = MODE_KEYS[(i + 1) % MODE_KEYS.length];
       this.cache = null;
-      this.#say(`Anteprima: ${MODES[this.previewMode].label}`, 'accent');
+      this.#say(this.tr('tui.previewMode', { name: modeLabel(this.previewMode, this.tr) }), 'accent');
       return this.render();
     }
 
@@ -248,7 +261,7 @@ export class DitherTui {
     if (name === 'r') {
       this.options = normalizeOptions({ ...DEFAULTS });
       this.cache = null;
-      this.#say('Parametri azzerati', 'yellow');
+      this.#say(this.tr('tui.reset'), 'yellow');
       return this.render();
     }
 
@@ -378,26 +391,27 @@ export class DitherTui {
 
   #openHelp() {
     const lines = [
-      ['↑ ↓  j k', 'Scorri i parametri o i file'],
-      ['← →  h l', 'Regola il valore selezionato'],
-      ['H L  shift+← →', 'Regola a passi di cinque'],
-      ['invio  spazio', 'Attiva: carica il file, gira l’interruttore'],
-      ['tab', 'Sposta il fuoco fra controlli e file'],
-      ['n  N', 'Immagine successiva / precedente'],
-      ['g  G  home  fine', 'Vai in cima / in fondo'],
-      ['v', 'Cambia modo di anteprima'],
-      ['t', 'Scegli il tema'],
-      ['p', 'Applica un preset'],
-      ['i', 'Inverti (scorciatoia)'],
-      ['r', 'Azzera tutti i parametri'],
-      ['o', 'Apri un percorso'],
-      ['s  ctrl+s', 'Salva il risultato'],
-      ['ctrl+x', 'Mostra o nascondi la lista dei file'],
-      ['?  ctrl+k', 'Questa schermata'],
-      ['q  ctrl+c', 'Esci'],
-    ];
+      ['↑ ↓  j k', 'move'],
+      ['← →  h l', 'adjust'],
+      ['H L  shift+← →', 'adjustBig'],
+      ['enter  space', 'activate'],
+      ['tab', 'focus'],
+      ['n  N', 'step'],
+      ['g  G  home  end', 'ends'],
+      ['v', 'mode'],
+      ['t', 'theme'],
+      ['p', 'preset'],
+      ['ctrl+l', 'lang'],
+      ['i', 'invert'],
+      ['r', 'reset'],
+      ['o', 'openPath'],
+      ['s  ctrl+s', 'save'],
+      ['ctrl+x', 'files'],
+      ['?  ctrl+k', 'help'],
+      ['q  ctrl+c', 'quit'],
+    ].map(([k, id]) => [k, this.tr(`key.${id}`)]);
     this.overlay = {
-      title: 'TASTI',
+      title: this.tr('tui.keys'),
       render: (w) => lines.map(([k, d]) => `${fg(this.theme.accent)}${pad(k, 17)}${RESET}${fg(this.theme.bright_fg)}${truncate(d, w - 18)}${RESET}`),
       onKey: (key) => {
         if (['escape', 'q', 'enter', '?'].includes(key.name) || (key.ctrl && key.name === 'k')) {
@@ -451,13 +465,13 @@ export class DitherTui {
     const names = Object.keys(this.themes);
     const original = this.themeName;
     this.#listOverlay({
-      title: 'TEMA',
+      title: this.tr('tui.theme'),
       items: names.map((n) => ({ label: n, value: n })),
       initialIndex: names.indexOf(this.themeName),
       onPreview: (item) => { this.themeName = item.value; },
       onConfirm: (item) => {
         this.themeName = item.value;
-        this.#say(`Tema: ${item.value}`, 'accent');
+        this.#say(this.tr('tui.themeSet', { name: item.value }), 'accent');
       },
       onCancel: () => { this.themeName = original; },
     });
@@ -466,15 +480,39 @@ export class DitherTui {
   #openPresetPicker() {
     const keys = Object.keys(PRESETS);
     this.#listOverlay({
-      title: 'PRESET',
-      items: keys.map((k) => ({ label: PRESETS[k].label, value: k })),
+      title: this.tr('tui.preset'),
+      items: keys.map((k) => ({ label: presetLabel(k, this.tr), value: k })),
       initialIndex: 0,
       onConfirm: (item) => {
         this.options = applyPreset(item.value, this.options);
         this.cache = null;
-        this.#say(`Preset: ${item.label}`, 'green');
+        this.#say(this.tr('tui.presetSet', { name: item.label }), 'green');
       },
     });
+  }
+
+  #openLanguagePicker() {
+    const original = this.locale;
+    this.#listOverlay({
+      title: this.tr('tui.language'),
+      items: LOCALES.map((code) => ({ label: LOCALE_NAMES[code], value: code })),
+      initialIndex: LOCALES.indexOf(this.locale),
+      // Anteprima dal vivo: scorrendo l'elenco l'interfaccia dietro cambia
+      // lingua subito, cosi' si sceglie vedendo il risultato.
+      onPreview: (item) => this.setLocale(item.value),
+      onConfirm: (item) => {
+        this.setLocale(item.value);
+        this.#say(this.tr('tui.languageSet', { name: item.label }), 'accent');
+      },
+      onCancel: () => this.setLocale(original),
+    });
+  }
+
+  /** Cambia la lingua dell'interfaccia. Pubblico: lo usano i test. */
+  setLocale(code) {
+    this.locale = normalizeLocale(code);
+    this.tr = createTranslator(this.locale);
+    return this.locale;
   }
 
   /** Campo di testo su una riga, con i tasti di editing essenziali. */
@@ -501,7 +539,7 @@ export class DitherTui {
           `${ellipsis}${fg(this.theme.bright_fg)}${before}${REVERSE}${at}${RESET}`
             + `${fg(this.theme.bright_fg)}${truncate(after, Math.max(0, w - local - 2))}${RESET}`,
           '',
-          `${fg(this.theme.fg)}invio conferma · esc annulla${RESET}`,
+          `${fg(this.theme.fg)}${truncate(this.tr('tui.confirm'), w)}${RESET}`,
         ];
       },
       onKey: (key) => {
@@ -547,8 +585,8 @@ export class DitherTui {
 
   #openPathPrompt() {
     this.#promptOverlay({
-      title: 'APRI',
-      hint: 'Percorso di un’immagine o di una cartella',
+      title: this.tr('tui.open'),
+      hint: this.tr('tui.openHint'),
       initial: this.imagePath ? dirname(this.imagePath) + '/' : `${this.dir}/`,
       onConfirm: async (input) => {
         if (!input) return;
@@ -559,7 +597,7 @@ export class DitherTui {
             this.dir = path;
             await this.#scanDir();
             if (this.files.length) await this.openImage(this.files[0]);
-            else this.#say('Cartella senza immagini', 'yellow');
+            else this.#say(this.tr('tui.emptyFolder'), 'yellow');
           } else {
             this.dir = dirname(path);
             await this.#scanDir();
@@ -574,7 +612,7 @@ export class DitherTui {
   }
 
   #openSavePrompt() {
-    if (!this.source) return this.#say('Nessuna immagine caricata', 'red');
+    if (!this.source) return this.#say(this.tr('tui.noImageLoaded'), 'red');
     const base = basename(this.imagePath || 'ditherbox').replace(/\.[^.]+$/, '');
     const palette = isCustomPalette(this.options.palette) ? 'custom' : this.options.palette;
     const suggested = join(
@@ -582,30 +620,31 @@ export class DitherTui {
       `${base}-${palette}-${this.options.algorithm}.png`,
     );
     this.#promptOverlay({
-      title: 'SALVA',
-      hint: 'File di destinazione (.png o .jpg) — elaboro a piena risoluzione',
+      title: this.tr('tui.save'),
+      hint: this.tr('tui.saveHint'),
       initial: suggested,
       onConfirm: async (input) => {
         if (!input) return;
         const path = resolve(input.replace(/^~/, process.env.HOME || '~'));
         if (!isSupported(path)) {
-          this.#say('Uso solo .png o .jpg', 'red');
+          this.#say(this.tr('tui.onlyPngJpg'), 'red');
           return this.render();
         }
-        this.#startJob(`Salvo ${basename(path)}`);
+        this.#startJob(this.tr('tui.jobSave', { name: basename(path) }));
         try {
-          await this.#jobStep('Elaboro a piena risoluzione', 0.25);
+          await this.#jobStep(this.tr('tui.jobProcess'), 0.25);
           const { image } = processImage(this.source, this.options);
 
-          await this.#jobStep(`Scrivo ${image.width}×${image.height}`, 0.8);
+          const size = `${image.width}×${image.height}`;
+          await this.#jobStep(this.tr('tui.jobWrite', { size }), 0.8);
           await saveImage(path, image);
 
-          await this.#jobStep('Fatto', 1);
+          await this.#jobStep(this.tr('tui.jobDone'), 1);
           this.#endJob();
-          this.#say(`Salvato: ${basename(path)} (${image.width}×${image.height})`, 'green');
+          this.#say(this.tr('tui.savedAs', { name: basename(path), size }), 'green');
         } catch (err) {
           this.#endJob();
-          this.#say(`Salvataggio fallito: ${err.message}`, 'red');
+          this.#say(this.tr('tui.saveFailed', { msg: err.message }), 'red');
         }
         this.render();
       },
@@ -657,7 +696,7 @@ export class DitherTui {
     const W = this.screen.width;
     const H = this.screen.height;
     if (W < 40 || H < 12) {
-      this.screen.draw([`${fg(this.theme.red)}Finestra troppo piccola (serve almeno 40x12)${RESET}`]);
+      this.screen.draw([`${fg(this.theme.red)}${this.tr('tui.tooSmall')}${RESET}`]);
       return;
     }
 
@@ -739,13 +778,13 @@ export class DitherTui {
     }
 
     if (!this.source) {
-      return pad(`${fg(t.fg)}${truncate('nessuna immagine · o per aprire un percorso · ? per i tasti', W - 1)}${RESET}`, W);
+      return pad(`${fg(t.fg)}${truncate(this.tr('tui.noImageHint'), W - 1)}${RESET}`, W);
     }
 
     const nome = basename(this.imagePath);
     const catena = [
-      labelOf('palette', this.options.palette),
-      labelOf('algorithm', this.options.algorithm),
+      formatValue(PARAM_BY_KEY_LOCAL.palette, this.options.palette, this.tr),
+      formatValue(PARAM_BY_KEY_LOCAL.algorithm, this.options.algorithm, this.tr),
       `${this.options.scale}x`,
     ].join(' · ');
 
@@ -756,8 +795,10 @@ export class DitherTui {
     // fino a troncarlo a meta' parola.
     const facoltative = [
       `${this.source.width}×${this.source.height} → ${this.#exportSize()}`,
-      anteprima ? `ant. ${anteprima.image.width}×${anteprima.image.height}` : null,
-      MODES[this.previewMode].label.toLowerCase(),
+      anteprima
+        ? this.tr('tui.previewShort', { size: `${anteprima.image.width}×${anteprima.image.height}` })
+        : null,
+      modeLabel(this.previewMode, this.tr).toLowerCase(),
     ].filter(Boolean);
 
     const NOME_MINIMO = 18;
@@ -859,9 +900,10 @@ export class DitherTui {
     if (!this.source) {
       body = [
         '',
-        center(`${fg(t.fg)}nessuna immagine caricata${RESET}`, inner),
+        center(`${fg(t.fg)}${this.tr('tui.noImageLoaded')}${RESET}`, inner),
         '',
-        center(`${fg(t.accent)}o${RESET}${fg(t.fg)} apri un percorso · ${RESET}${fg(t.accent)}?${RESET}${fg(t.fg)} tasti${RESET}`, inner),
+        center(`${fg(t.accent)}o${RESET}${fg(t.fg)} ${this.tr('bar.open')} · ${RESET}`
+          + `${fg(t.accent)}?${RESET}${fg(t.fg)} ${this.tr('bar.keys')}${RESET}`, inner),
       ];
     } else {
       const result = this.#previewResult(inner, innerH);
@@ -875,7 +917,7 @@ export class DitherTui {
     }
 
     return panel({
-      title: 'ANTEPRIMA',
+      title: this.tr('tui.preview'),
       lines: body,
       width: W,
       height: H,
@@ -892,7 +934,7 @@ export class DitherTui {
 
     const rendered = this.rows.map((row, i) => {
       if (row.kind === 'group') {
-        return `${fg(t.fg)}${DIM}${pad(row.label, inner)}${RESET}`;
+        return `${fg(t.fg)}${DIM}${pad(groupLabel(row.group, this.tr), inner)}${RESET}`;
       }
       return this.#controlRow(row.param, inner, i === this.cursor && active);
     });
@@ -905,7 +947,7 @@ export class DitherTui {
     const body = rendered.slice(start, start + innerH);
 
     return panel({
-      title: `CONTROLLI${rendered.length > innerH ? ` ${start + 1}/${rendered.length}` : ''}`,
+      title: `${this.tr('tui.controls')}${rendered.length > innerH ? ` ${start + 1}/${rendered.length}` : ''}`,
       lines: body,
       width: W,
       height: H,
@@ -925,7 +967,7 @@ export class DitherTui {
     const marker = selected ? '>' : ' ';
     const labelW = 13;
     const valueW = 7;
-    const valueText = formatValue(param, value);
+    const valueText = formatValue(param, value, this.tr);
 
     let line;
     if (param.type === 'range') {
@@ -935,17 +977,17 @@ export class DitherTui {
       const passi = paramSteps(param);
       const ratio = passi.length > 1 ? stepIndex(param, value) / (passi.length - 1) : 0;
       const barW = Math.max(4, width - labelW - valueW - 4);
-      line = `${marker} ${pad(param.label, labelW)}`
+      line = `${marker} ${pad(paramLabel(param, this.tr), labelW)}`
         + `${fg(t.accent)}${bar(ratio, barW, '▰', '▱')}${RESET} `
         + `${fg(t.accent)}${padStart(valueText, valueW)}${RESET}`;
     } else if (param.type === 'bool') {
       // Il riquadro da' il colpo d'occhio, ON/OFF resta leggibile anche
       // su un terminale che non fa colori.
       const box = value ? `${fg(t.green)}[■]${RESET}` : `${fg(t.fg)}[ ]${RESET}`;
-      line = `${marker} ${pad(param.label, labelW)}${box} ${fg(t.accent)}${valueText}${RESET}`;
+      line = `${marker} ${pad(paramLabel(param, this.tr), labelW)}${box} ${fg(t.accent)}${valueText}${RESET}`;
     } else {
       const room = width - labelW - 7;
-      line = `${marker} ${pad(param.label, labelW)}${fg(t.fg)}◄${RESET} `
+      line = `${marker} ${pad(paramLabel(param, this.tr), labelW)}${fg(t.fg)}◄${RESET} `
         + `${fg(t.accent)}${pad(truncate(valueText, room), room)}${RESET}${fg(t.fg)}►${RESET}`;
     }
 
@@ -982,7 +1024,8 @@ export class DitherTui {
     }
 
     return panel({
-      title: `FILE ${this.files.length ? this.fileIndex + 1 : 0}/${this.files.length} · ${truncate(basename(this.dir) || this.dir, 18)}`,
+      title: `${this.tr('tui.files')} ${this.files.length ? this.fileIndex + 1 : 0}/${this.files.length}`
+        + ` · ${truncate(basename(this.dir) || this.dir, 18)}`,
       lines: body,
       width: W,
       height: H,
@@ -994,10 +1037,10 @@ export class DitherTui {
   #helpBar(W) {
     const t = this.theme;
     const pairs = [
-      ['jk', 'scorri'], ['hl', 'regola'], ['tab', 'fuoco'],
-      ['v', 'anteprima'], ['p', 'preset'], ['t', 'tema'],
-      ['s', 'salva'], ['?', 'tasti'], ['q', 'esci'],
-    ];
+      ['jk', 'move'], ['hl', 'adjust'], ['tab', 'focus'],
+      ['v', 'preview'], ['p', 'preset'], ['t', 'theme'],
+      ['s', 'save'], ['?', 'keys'], ['q', 'quit'],
+    ].map(([k, id]) => [k, this.tr(`bar.${id}`)]);
     const text = pairs
       .map(([k, d]) => `${fg(t.accent)}${k}${RESET}${fg(t.fg)} ${d}${RESET}`)
       .join(`${fg(t.fg)}  ${RESET}`);
@@ -1049,11 +1092,6 @@ function marquee(text, width, offset) {
   const loop = `${text}   `;
   const shifted = loop.slice(offset % loop.length) + loop.slice(0, offset % loop.length);
   return shifted.slice(0, width);
-}
-
-function labelOf(key, value) {
-  const param = PARAMS.find((p) => p.key === key);
-  return param ? formatValue(param, value) : String(value);
 }
 
 /** Legge dalla configurazione solo le chiavi che sono davvero parametri. */

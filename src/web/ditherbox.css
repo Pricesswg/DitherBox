@@ -152,11 +152,10 @@
 .dbx__stage {
   position: relative;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
-  padding: 12px;
+  padding: 10px 12px 12px;
   background:
     /* scacchiera di fondo, cosi' si vede subito cosa e' immagine e cosa no */
     repeating-conic-gradient(var(--dbx-border) 0% 25%, transparent 0% 50%)
@@ -164,6 +163,118 @@
   border: 1px solid var(--dbx-border);
   border-radius: max(0px, calc(var(--dbx-radius) - 2px));
   overflow: hidden;
+}
+
+/* Barra delle viste: sta sopra il contenuto, non sovrapposta, cosi' non
+   copre mai un angolo dell'immagine. */
+.dbx__viewbar {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+}
+
+.dbx__views { display: flex; gap: 3px; }
+
+.dbx__view {
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--dbx-muted);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--dbx-border);
+  border-radius: var(--dbx-radius-small);
+}
+
+.dbx__view:hover { color: var(--dbx-fg); border-color: var(--dbx-muted); }
+
+.dbx__view.is-active {
+  color: var(--dbx-accent-fg);
+  background: var(--dbx-accent);
+  border-color: var(--dbx-accent);
+}
+
+.dbx__texttools {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.dbx__texttools[hidden] { display: none; }
+
+.dbx__viewlabel {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--dbx-muted);
+}
+
+.dbx__cols {
+  width: 96px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--dbx-accent);
+  cursor: ew-resize;
+  background: transparent;
+}
+
+.dbx__viewvalue {
+  min-width: 3ch;
+  font-size: 11px;
+  color: var(--dbx-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.dbx__button--copy { flex: 0 0 auto; padding: 3px 12px; }
+.dbx__button--copy.is-done { color: var(--dbx-accent); border-color: var(--dbx-accent); }
+
+/* Area del contenuto: ci sta dentro il canvas oppure il testo. */
+.dbx__area {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* La foto scritta coi caratteri. La dimensione del carattere la calcola il
+   widget perche' le colonne ci stiano tutte; qui si fissa solo il resto. */
+.dbx__text {
+  width: 100%;
+  max-height: 100%;
+  margin: 0;
+  padding: 8px;
+  overflow: auto;
+  font-family: var(--dbx-font);
+  font-size: 8px;
+  line-height: 1.05;
+  color: var(--dbx-fg);
+  white-space: pre;
+  tab-size: 1;
+  user-select: text;
+}
+
+.dbx__text[hidden] { display: none; }
+
+.dbx__text:focus-visible { outline: 2px solid var(--dbx-accent); outline-offset: -2px; }
+
+.dbx__lang {
+  flex: 0 0 auto;
+  max-width: 108px;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--dbx-fg);
+  background: var(--dbx-bg);
+  border: 1px solid var(--dbx-border);
+  border-radius: var(--dbx-radius-small);
 }
 
 .dbx__canvas {
@@ -181,11 +292,18 @@
 }
 
 .dbx.is-loaded .dbx__canvas { display: block; }
+.dbx.is-loaded .dbx__canvas[hidden] { display: none; }
 .dbx.is-loaded .dbx__drop { display: none; }
+
+/* Finche' non c'e' una foto la barra delle viste non serve a niente. */
+.dbx:not(.is-loaded) .dbx__viewbar { display: none; }
 
 .dbx__drop {
   display: flex;
+  position: absolute;
+  inset: 0;
   flex-direction: column;
+  justify-content: center;
   align-items: center;
   gap: 10px;
   padding: 24px;
@@ -557,6 +675,10 @@
 /* Il pulsante "Scatta" ha senso solo dove c'e' davvero una fotocamera. */
 @media (hover: hover) and (pointer: fine) {
   .dbx__button--camera { display: none; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dbx__view { transition: color 120ms, background 120ms, border-color 120ms; }
 }
 
 @media (prefers-reduced-motion: no-preference) {

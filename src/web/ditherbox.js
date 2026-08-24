@@ -10,10 +10,13 @@
  */
 
 import {
-  PARAMS, GROUP_LABELS, PRESETS, DEFAULTS, PALETTES,
+  PARAMS, PRESETS, DEFAULTS, PALETTES,
   normalizeOptions, formatValue, applyPreset, paramSteps, stepIndex,
+  groupLabel, paramLabel, paramHint, presetLabel, paletteLabel, enumLabel,
   processImage, targetSize, resampleBox, fitWithin,
   paletteInfo, rgbToHex, stringifyPalette, isCustomPalette,
+  imageToText, TEXT_MODES,
+  createTranslator, detectLocale, normalizeLocale, LOCALES, LOCALE_NAMES,
 } from '../core/index.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -51,12 +54,40 @@ async function decodeSource(source) {
     img.decoding = 'async';
     await new Promise((resolve, reject) => {
       img.onload = resolve;
-      img.onerror = () => reject(new Error('Immagine non leggibile'));
+      img.onerror = () => reject(new Error('unreadable'));
       img.src = url;
     });
     return img;
   } finally {
     if (source instanceof Blob) URL.revokeObjectURL(url);
+  }
+}
+
+/**
+ * Scrive negli appunti. L'API moderna esiste solo in contesto sicuro
+ * (https o localhost); altrove si ripiega sulla selezione di un campo
+ * nascosto, che e' brutta ma funziona da vent'anni.
+ */
+async function scriviNegliAppunti(testo) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(testo);
+      return true;
+    }
+  } catch { /* si prova il ripiego */ }
+
+  try {
+    const area = document.createElement('textarea');
+    area.value = testo;
+    area.setAttribute('readonly', '');
+    area.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+    document.body.appendChild(area);
+    area.select();
+    const esito = document.execCommand('copy');
+    area.remove();
+    return esito;
+  } catch {
+    return false;
   }
 }
 
@@ -84,6 +115,10 @@ export class DitherBox {
    * @param {'dark'|'light'} [config.theme]  impone lo schema invece di
    *   seguire le preferenze del sistema: serve ai siti che vivono di un
    *   solo schema e non devono ribaltarsi addosso al visitatore.
+   * @param {string} [config.lang]  lingua dell'interfaccia (en, it, es, fr,
+   *   de). Senza indicazione si guarda quella del browser, e se non e' fra
+   *   queste si parla inglese.
+   * @param {boolean} [config.languagePicker=true] mostra il selettore.
    */
   constructor(target, config = {}) {
     const root = typeof target === 'string' ? document.querySelector(target) : target;
@@ -93,9 +128,14 @@ export class DitherBox {
     this.config = {
       previewMaxSize: 900,
       presets: true,
+      languagePicker: true,
       downloadName: 'ditherbox.png',
       ...config,
     };
+    this.locale = config.lang ? normalizeLocale(config.lang) : detectLocale();
+    this.t = createTranslator(this.locale);
+    this.view = 'image';           // image | ascii | braille
+    this.textCols = 100;
     this.options = normalizeOptions(config.options);
     this.source = null;        // ImageData a piena risoluzione
     this.previewBase = null;   // copia ridotta, base di tutte le anteprime
@@ -114,7 +154,8 @@ export class DitherBox {
 
   /** Carica un File, un Blob o un URL. */
   async load(source, name) {
-    this.#status('Carico…');
+    const t = this.t;
+    this.#status(t('ui.loading'));
     try {
       const drawable = await decodeSource(source);
       this.source = toImageData(drawable);
@@ -127,7 +168,7 @@ export class DitherBox {
       this.previewCache = null;
       this.sourceName = name || (source instanceof File ? source.name : null);
       this.root.classList.add('is-loaded');
-      if (this.fileName) this.fileName.textContent = this.sourceName || 'immagine caricata';
+      if (this.fileName) this.fileName.textContent = this.sourceName || t('ui.noFile');
       this.render();
       this.#emit('load', { width: this.source.width, height: this.source.height });
     } catch (err) {
@@ -148,6 +189,61 @@ export class DitherBox {
     return { ...this.options };
   }
 
+  /** Cambia la lingua dell'interfaccia e ridisegna i controlli. */
+  setLocale(locale) {
+    const nuova = normalizeLocale(locale);
+    if (nuova === this.locale) return;
+    this.locale = nuova;
+    this.t = createTranslator(nuova);
+    // I controlli portano il testo dentro: si ricostruiscono invece di
+    // rincorrere ogni etichetta. Lo stato sta tutto in this.options.
+    this.controls.clear();
+    this.#build();
+    this.render();
+    this.#emit('change', this.getOptions());
+  }
+
+  getLocale() {
+    return this.locale;
+  }
+
+  /** Passa fra immagine, ASCII e braille. */
+  setView(view) {
+    this.view = ['ascii', 'braille'].includes(view) ? view : 'image';
+    this.#syncView();
+    this.render();
+  }
+
+  getView() {
+    return this.view;
+  }
+
+  /** Il testo della vista corrente, anche senza cambiare vista. */
+  toText(mode = this.view === 'image' ? 'ascii' : this.view) {
+    if (!this.source) throw new Error(this.t('ui.noImage'));
+    return imageToText(this.source, { ...this.options, mode, cols: this.textCols });
+  }
+
+  /**
+   * Copia negli appunti il testo della vista.
+   *
+   * `navigator.clipboard` non c'e' fuori dai contesti sicuri e in qualche
+   * browser vecchio: in quel caso si ripiega sulla vecchia selezione di un
+   * campo nascosto, che funziona ovunque.
+   */
+  async copyText() {
+    let testo;
+    try {
+      testo = this.toText();
+    } catch (err) {
+      this.#fail(err);
+      return false;
+    }
+    const riuscito = await scriviNegliAppunti(testo);
+    this.#flashCopy(riuscito);
+    return riuscito;
+  }
+
   /** Torna ai valori di partenza. */
   reset() {
     this.set({ ...DEFAULTS, ...(this.config.options || {}) });
@@ -155,7 +251,7 @@ export class DitherBox {
 
   /** Ricalcola l anteprima. Debounced: gli slider sparano decine di eventi. */
   render() {
-    if (!this.previewBase) return;
+    if (!this.source) return;
     if (this._pending) cancelAnimationFrame(this._pending);
     this._pending = requestAnimationFrame(() => {
       this._pending = null;
@@ -168,7 +264,7 @@ export class DitherBox {
    * L anteprima lavora ridotta; l export no.
    */
   renderFull() {
-    if (!this.source) throw new Error('Nessuna immagine caricata');
+    if (!this.source) throw new Error(this.t('ui.noImage'));
     const { image } = processImage(this.source, this.options);
     return this.#toCanvas(image);
   }
@@ -178,7 +274,7 @@ export class DitherBox {
     const canvas = this.renderFull();
     return new Promise((resolve, reject) => {
       canvas.toBlob(
-        (blob) => (blob ? resolve(blob) : reject(new Error('Export fallito'))),
+        (blob) => (blob ? resolve(blob) : reject(new Error(this.t('ui.exportFailed')))),
         type,
         quality,
       );
@@ -187,7 +283,7 @@ export class DitherBox {
 
   /** Scarica il risultato come PNG. */
   async download(filename) {
-    this.#status('Preparo il PNG…');
+    this.#status(this.t('ui.preparing'));
     const blob = await this.toBlob();
     const url = URL.createObjectURL(blob);
     const a = el('a');
@@ -227,32 +323,89 @@ export class DitherBox {
     root.append(this.#buildStage(), this.#buildPanel());
     this.#wireDropZone();
     this.#syncControls();
+    this.#syncView();
   }
 
   #buildStage() {
+    const t = this.t;
     const stage = el('div', 'dbx__stage');
+
+    // Barra delle viste: immagine, oppure la stessa foto scritta coi
+    // caratteri. Sta sopra il contenuto invece che sovrapposta, cosi' non
+    // copre mai un angolo dell'immagine.
+    stage.appendChild(this.#buildViewBar());
+
+    const area = el('div', 'dbx__area');
     this.canvas = el('canvas', 'dbx__canvas');
     this.ctx = this.canvas.getContext('2d');
-    stage.appendChild(this.canvas);
+    this.textPane = el('pre', 'dbx__text', { tabindex: '0', 'aria-label': t('ui.textHint') });
+    this.textPane.hidden = true;
+    area.append(this.canvas, this.textPane);
 
     const drop = el('div', 'dbx__drop');
     const invito = el('button', 'dbx__drop-button', {
-      type: 'button', text: 'Scegli una foto',
+      type: 'button', text: t('ui.dropButton'),
     });
     invito.addEventListener('click', () => this.fileInput.click());
     drop.append(
       this.#cameraIcon(),
-      el('p', 'dbx__drop-title', { text: 'Trascina qui una foto' }),
+      el('p', 'dbx__drop-title', { text: t('ui.dropTitle') }),
       invito,
-      el('p', 'dbx__drop-sub', {
-        text: 'oppure incollala con Ctrl+V — l’immagine non lascia il tuo browser',
-      }),
+      el('p', 'dbx__drop-sub', { text: t('ui.dropHint') }),
     );
-    stage.appendChild(drop);
+    area.appendChild(drop);
+    stage.appendChild(area);
 
     this.statusEl = el('div', 'dbx__status', { role: 'status', 'aria-live': 'polite' });
     stage.appendChild(this.statusEl);
     return stage;
+  }
+
+  /** Le tre viste, piu' i comandi che servono solo a quelle testuali. */
+  #buildViewBar() {
+    const t = this.t;
+    const bar = el('div', 'dbx__viewbar');
+
+    this.viewButtons = new Map();
+    const viste = [
+      ['image', t('ui.viewImage')],
+      ['ascii', t('mode.ascii')],
+      ['braille', t('mode.braille')],
+    ];
+    const gruppo = el('div', 'dbx__views', { role: 'tablist', 'aria-label': t('ui.view') });
+    for (const [chiave, etichetta] of viste) {
+      const b = el('button', 'dbx__view', {
+        type: 'button', role: 'tab', text: etichetta,
+      });
+      b.addEventListener('click', () => this.setView(chiave));
+      gruppo.appendChild(b);
+      this.viewButtons.set(chiave, b);
+    }
+    bar.appendChild(gruppo);
+
+    // Comandi della vista testo: quante colonne, e il pulsante per copiare.
+    this.textTools = el('div', 'dbx__texttools');
+
+    const etichettaCol = el('label', 'dbx__viewlabel', { text: t('ui.columns') });
+    this.colsInput = el('input', 'dbx__cols', {
+      type: 'range', min: 20, max: 200, step: 4, value: String(this.textCols),
+    });
+    this.colsValue = el('output', 'dbx__viewvalue', { text: String(this.textCols) });
+    this.colsInput.addEventListener('input', () => {
+      this.textCols = Number(this.colsInput.value);
+      this.colsValue.textContent = String(this.textCols);
+      this.render();
+    });
+    etichettaCol.appendChild(this.colsInput);
+
+    this.copyButton = el('button', 'dbx__button dbx__button--copy', {
+      type: 'button', text: t('ui.copy'),
+    });
+    this.copyButton.addEventListener('click', () => this.copyText());
+
+    this.textTools.append(etichettaCol, this.colsValue, this.copyButton);
+    bar.appendChild(this.textTools);
+    return bar;
   }
 
   /**
@@ -268,6 +421,7 @@ export class DitherBox {
   }
 
   #buildSourceBar() {
+    const t = this.t;
     const bar = el('div', 'dbx__source');
 
     // Il campo file vero, dentro una label: cosi' il clic funziona su tutta
@@ -279,10 +433,10 @@ export class DitherBox {
       if (file) this.load(file).catch(() => {});
       this.fileInput.value = '';
     });
-    this.fileName = el('span', 'dbx__file-name', { text: 'nessun file scelto' });
+    this.fileName = el('span', 'dbx__file-name', { text: t('ui.noFile') });
     field.append(
       this.fileInput,
-      el('span', 'dbx__file-label', { text: 'Apri foto' }),
+      el('span', 'dbx__file-label', { text: t('ui.open') }),
       this.fileName,
     );
     bar.appendChild(field);
@@ -296,21 +450,32 @@ export class DitherBox {
       this.cameraInput.value = '';
     });
     const shoot = el('button', 'dbx__button dbx__button--camera', {
-      type: 'button', text: 'Scatta', title: 'Scatta una foto con la fotocamera',
+      type: 'button', text: t('ui.shoot'), title: t('ui.shoot'),
     });
     shoot.addEventListener('click', () => this.cameraInput.click());
     bar.append(shoot, this.cameraInput);
+
+    if (this.config.languagePicker) {
+      const scelta = el('select', 'dbx__lang', { 'aria-label': t('ui.language'), title: t('ui.language') });
+      for (const l of LOCALES) {
+        scelta.appendChild(el('option', null, { value: l, text: LOCALE_NAMES[l] }));
+      }
+      scelta.value = this.locale;
+      scelta.addEventListener('change', () => this.setLocale(scelta.value));
+      bar.appendChild(scelta);
+    }
 
     return bar;
   }
 
   #buildScroller() {
+    const t = this.t;
     const scroller = el('div', 'dbx__scroll');
 
     if (this.config.presets) {
-      scroller.appendChild(this.#buildSection('Preset', this.#buildPresetChips()));
+      scroller.appendChild(this.#buildSection(t('ui.presets'), this.#buildPresetChips()));
     }
-    scroller.appendChild(this.#buildSection('Colori', this.#buildPaletteChips()));
+    scroller.appendChild(this.#buildSection(t('ui.colours'), this.#buildPaletteChips()));
 
     const groups = new Map();
     for (const param of PARAMS) {
@@ -319,7 +484,7 @@ export class DitherBox {
       if (!groups.has(param.group)) {
         const body = el('div', 'dbx__controls');
         groups.set(param.group, body);
-        scroller.appendChild(this.#buildSection(GROUP_LABELS[param.group] || param.group, body));
+        scroller.appendChild(this.#buildSection(groupLabel(param.group, t), body));
       }
       groups.get(param.group).appendChild(this.#buildControl(param));
     }
@@ -333,9 +498,10 @@ export class DitherBox {
   }
 
   #buildPresetChips() {
+    const t = this.t;
     const bar = el('div', 'dbx__chips');
-    for (const [key, preset] of Object.entries(PRESETS)) {
-      const b = el('button', 'dbx__chip', { type: 'button', text: preset.label });
+    for (const key of Object.keys(PRESETS)) {
+      const b = el('button', 'dbx__chip', { type: 'button', text: presetLabel(key, t) });
       b.addEventListener('click', () => this.set(applyPreset(key, this.options)));
       bar.appendChild(b);
     }
@@ -347,6 +513,7 @@ export class DitherBox {
    * dice niente, mentre qui si sceglie guardando le tinte.
    */
   #buildPaletteChips() {
+    const t = this.t;
     const wrap = el('div', 'dbx__palettes');
     this.paletteButtons = new Map();
 
@@ -366,11 +533,11 @@ export class DitherBox {
     };
 
     for (const [key, entry] of Object.entries(PALETTES)) {
-      aggiungi(key, entry.label, entry.colors);
+      aggiungi(key, paletteLabel(key, t), entry.colors);
     }
 
     // Voce personalizzata: si aggiorna insieme all'editor qui sotto.
-    this.customButton = aggiungi('__custom__', 'Su misura', this.customColors);
+    this.customButton = aggiungi('__custom__', t('palette.custom'), this.customColors);
     this.customButton.addEventListener('click', () => {
       this.set({ palette: stringifyPalette(this.customColors) });
     });
@@ -381,6 +548,7 @@ export class DitherBox {
 
   /** Editor della palette personalizzata: una fila di selettori colore. */
   #buildCustomEditor() {
+    const t = this.t;
     const editor = el('div', 'dbx__custom');
     this.customList = el('div', 'dbx__custom-list');
 
@@ -398,7 +566,7 @@ export class DitherBox {
 
         if (this.customColors.length > 2) {
           const togli = el('button', 'dbx__custom-remove', {
-            type: 'button', text: '×', title: 'Togli questo colore',
+            type: 'button', text: '×', title: t('ui.removeColour'),
           });
           togli.addEventListener('click', () => {
             this.customColors.splice(i, 1);
@@ -413,7 +581,7 @@ export class DitherBox {
     };
 
     const aggiungi = el('button', 'dbx__custom-add', {
-      type: 'button', text: '+', title: 'Aggiungi un colore',
+      type: 'button', text: '+', title: t('ui.addColour'),
     });
     aggiungi.addEventListener('click', () => {
       if (this.customColors.length >= 16) return;
@@ -426,7 +594,7 @@ export class DitherBox {
     // Riempie l'editor coi colori della palette selezionata: e' il modo piu'
     // naturale di partire da una predefinita e poi ritoccarla.
     const copia = el('button', 'dbx__custom-add', {
-      type: 'button', text: '⧉', title: 'Copia qui i colori della palette scelta',
+      type: 'button', text: '⧉', title: t('ui.copyPalette'),
     });
     copia.addEventListener('click', () => {
       const { colors } = paletteInfo(this.options.palette);
@@ -454,10 +622,12 @@ export class DitherBox {
   }
 
   #buildControl(param) {
+    const t = this.t;
     const id = `dbx-${param.key}-${Math.random().toString(36).slice(2, 7)}`;
     const wrap = el('div', `dbx__control dbx__control--${param.type}`);
-    const label = el('label', 'dbx__label', { for: id, text: param.label });
-    if (param.hint) label.title = param.hint;
+    const label = el('label', 'dbx__label', { for: id, text: paramLabel(param, t) });
+    const hint = paramHint(param, t);
+    if (hint) label.title = hint;
     wrap.appendChild(label);
 
     let input;
@@ -466,9 +636,7 @@ export class DitherBox {
     if (param.type === 'enum') {
       input = el('select', 'dbx__select', { id });
       for (const v of param.values) {
-        input.appendChild(el('option', null, {
-          value: v, text: (param.labels && param.labels[v]) || v,
-        }));
+        input.appendChild(el('option', null, { value: v, text: enumLabel(param, v, t) }));
       }
       input.addEventListener('change', () => this.set({ [param.key]: input.value }));
     } else if (param.type === 'bool') {
@@ -489,7 +657,7 @@ export class DitherBox {
       label.addEventListener('dblclick', () => this.set({ [param.key]: param.default }));
     }
 
-    if (param.hint) input.title = param.hint;
+    if (hint) input.title = hint;
     wrap.appendChild(input);
     if (value) wrap.appendChild(value);
 
@@ -498,15 +666,16 @@ export class DitherBox {
   }
 
   #buildActions() {
+    const t = this.t;
     const actions = el('div', 'dbx__actions');
 
     const save = el('button', 'dbx__button dbx__button--primary', {
-      type: 'button', text: 'Scarica PNG',
+      type: 'button', text: t('ui.download'),
     });
     save.addEventListener('click', () => this.download().catch((e) => this.#fail(e)));
 
     const reset = el('button', 'dbx__button dbx__button--ghost', {
-      type: 'button', text: 'Azzera',
+      type: 'button', text: t('ui.reset'),
     });
     reset.addEventListener('click', () => this.reset());
 
@@ -555,7 +724,7 @@ export class DitherBox {
         const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
         if (!file) return;
         if (!file.type.startsWith('image/')) {
-          this.#fail(new Error('Quel file non è un’immagine'));
+          this.#fail(new Error(this.t('ui.notAnImage')));
           return;
         }
         this.load(file).catch(() => {});
@@ -578,7 +747,7 @@ export class DitherBox {
       if (param.type === 'bool') input.checked = Boolean(v);
       else if (param.type === 'range') input.value = stepIndex(param, v);
       else input.value = v;
-      if (value) value.textContent = formatValue(param, v);
+      if (value) value.textContent = formatValue(param, v, this.t);
     }
 
     if (this.paletteButtons) {
@@ -619,6 +788,7 @@ export class DitherBox {
   }
 
   #draw() {
+    if (this.view !== 'image') return this.#drawText();
     const started = performance.now();
     const source = this.#previewSource();
     // I megapixel li ha gia' applicati #previewSource: qui si dice al motore
@@ -636,6 +806,64 @@ export class DitherBox {
     this.#status(
       `${this.source.width}×${this.source.height} → ${out.width}×${out.height} (${mp} MP) · ${ms} ms`,
     );
+  }
+
+  /** Rende la foto come testo e la mette nel riquadro, con la misura del
+   *  carattere calcolata perche' le colonne ci stiano tutte. */
+  #drawText() {
+    const started = performance.now();
+    const testo = imageToText(this.source, {
+      ...this.options, mode: this.view, cols: this.textCols,
+    });
+    this.textPane.textContent = testo;
+    this.#fitText();
+
+    const righe = testo.split('\n').length;
+    const ms = Math.round(performance.now() - started);
+    this.#status(`${this.textCols}×${righe} · ${testo.length} ${this.t('ui.copy').toLowerCase() === 'copy' ? 'chars' : 'car.'} · ${ms} ms`);
+  }
+
+  /** La larghezza di un carattere non e' nota a priori: la si misura una
+   *  volta e da li' si ricava la dimensione che fa entrare le colonne. */
+  #fitText() {
+    const pane = this.textPane;
+    const utile = pane.clientWidth - 16;
+    if (utile <= 0) return;
+    pane.style.fontSize = '20px';
+    const prima = pane.scrollWidth;
+    const perCarattere = prima / this.textCols / 20;
+    pane.style.fontSize = '';
+    if (!perCarattere) return;
+    const dimensione = Math.max(3, Math.min(16, utile / this.textCols / perCarattere));
+    pane.style.fontSize = `${dimensione.toFixed(2)}px`;
+  }
+
+  /** Accende la vista scelta e spegne le altre. */
+  #syncView() {
+    const testuale = this.view !== 'image';
+    if (this.canvas) this.canvas.hidden = testuale;
+    if (this.textPane) this.textPane.hidden = !testuale;
+    if (this.textTools) this.textTools.hidden = !testuale;
+    if (this.viewButtons) {
+      for (const [chiave, b] of this.viewButtons) {
+        const attiva = chiave === this.view;
+        b.classList.toggle('is-active', attiva);
+        b.setAttribute('aria-selected', String(attiva));
+      }
+    }
+  }
+
+  /** Conferma visiva sul pulsante, senza aprire finestre. */
+  #flashCopy(riuscito) {
+    if (!this.copyButton) return;
+    const t = this.t;
+    this.copyButton.textContent = t(riuscito ? 'ui.copied' : 'ui.copyFailed');
+    this.copyButton.classList.toggle('is-done', riuscito);
+    clearTimeout(this._copyTimer);
+    this._copyTimer = setTimeout(() => {
+      this.copyButton.textContent = t('ui.copy');
+      this.copyButton.classList.remove('is-done');
+    }, 1600);
   }
 
   #showCanvas(image) {
@@ -669,7 +897,7 @@ export class DitherBox {
   }
 
   #fail(err) {
-    this.#status(`Errore: ${err.message}`);
+    this.#status(this.t('ui.error', { msg: err.message }));
     this.#emit('error', err);
   }
 

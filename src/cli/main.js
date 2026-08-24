@@ -9,26 +9,38 @@ import { resolve, basename, extname, join, dirname } from 'node:path';
 import { statSync, mkdirSync } from 'node:fs';
 
 import {
-  PARAMS, PRESETS, PALETTES, ALGORITHM_LABELS, ALGORITHMS,
+  PARAMS, PRESETS, PALETTES, ALGORITHMS,
   DEFAULTS, normalizeOptions, applyPreset, processImage, resampleBox,
   isCustomPalette,
+  paramLabel, paletteLabel, algorithmLabel, presetLabel,
+  createTranslator, detectLocale, LOCALES,
 } from '../core/index.js';
 import { loadImage, saveImage, listImages, isSupported } from './imageio.js';
-import { cellTarget, renderImage, MODES, MODE_KEYS } from './preview.js';
+import { cellTarget, renderImage, modeLabel, MODES, MODE_KEYS } from './preview.js';
 import { loadThemes, loadConfig, DEFAULT_THEME } from './theme.js';
 import { DitherTui } from './tui.js';
 
 const VERSION = '0.1.0';
 
+/**
+ * Traduttore predefinito per le funzioni che non ne ricevono uno.
+ * `parseArgs` puo' essere chiamata prima ancora di sapere che lingua
+ * vuole chi la usa, quindi deve avere sempre qualcosa sottomano.
+ */
+const inglese = createTranslator('en');
+
 /** camelCase -> kebab-case, per i nomi delle opzioni. */
 const kebab = (s) => s.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
 const camel = (s) => s.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+
+/** "it_IT.UTF-8" -> "it": la radice di un codice di lingua. */
+const shortLocale = (s) => String(s).toLowerCase().split(/[-_.]/)[0];
 
 /**
  * Analizza gli argomenti. Ogni parametro del motore diventa
  * automaticamente un'opzione, cosi' i due non possono divergere.
  */
-export function parseArgs(argv) {
+export function parseArgs(argv, t = inglese) {
   const flags = {};
   const positional = [];
   const paramNames = new Set(PARAMS.map((p) => kebab(p.key)));
@@ -37,7 +49,7 @@ export function parseArgs(argv) {
 
   const aliases = {
     o: 'out', d: 'out-dir', p: 'preset', m: 'mode', t: 'theme',
-    h: 'help', v: 'version', q: 'quiet',
+    l: 'lang', h: 'help', v: 'version', q: 'quiet',
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -71,7 +83,7 @@ export function parseArgs(argv) {
       continue;
     }
     const value = inlineValue !== undefined ? inlineValue : argv[++i];
-    if (value === undefined) throw new Error(`Manca il valore per --${name}`);
+    if (value === undefined) throw new Error(t('cli.missingValue', { name }));
     flags[name] = value;
   }
 
@@ -79,7 +91,7 @@ export function parseArgs(argv) {
 }
 
 /** Estrae dalle opzioni della riga di comando quelle che sono parametri del motore. */
-function optionsFromFlags(flags) {
+function optionsFromFlags(flags, t = inglese) {
   const out = {};
   for (const param of PARAMS) {
     const key = kebab(param.key);
@@ -87,7 +99,7 @@ function optionsFromFlags(flags) {
     const raw = flags[key];
     if (param.type === 'range') {
       const n = Number(raw);
-      if (!Number.isFinite(n)) throw new Error(`--${key} vuole un numero, non "${raw}"`);
+      if (!Number.isFinite(n)) throw new Error(t('cli.wantsNumber', { name: key, value: raw }));
       out[param.key] = n;
     } else if (param.type === 'bool') {
       out[param.key] = raw === true || raw === 'true' || raw === '1';
@@ -99,7 +111,9 @@ function optionsFromFlags(flags) {
         continue;
       }
       if (!param.values.includes(raw)) {
-        throw new Error(`--${key}: "${raw}" non esiste. Valori: ${param.values.join(', ')}`);
+        throw new Error(t('cli.noSuchValue', {
+          name: key, value: raw, list: param.values.join(', '),
+        }));
       }
       out[param.key] = raw;
     }
@@ -107,70 +121,88 @@ function optionsFromFlags(flags) {
   return out;
 }
 
-export function helpText() {
+/**
+ * La schermata di aiuto.
+ *
+ * Il testo di riferimento resta in inglese: descrive opzioni che si
+ * scrivono in inglese, e mescolare le due lingue in una tabella di
+ * comandi non aiuta nessuno. Quello che invece segue la lingua scelta
+ * sono le etichette dei parametri, perche' sono le stesse che si leggono
+ * nell'interfaccia.
+ */
+export function helpText(t = inglese) {
   const paramLines = PARAMS.map((p) => {
     const name = `--${kebab(p.key)}`;
     const spec = p.type === 'range'
       ? `<${p.min}..${p.max}>`
-      : p.type === 'bool' ? '' : '<nome>';
-    return `  ${`${name} ${spec}`.padEnd(26)}${p.label}${p.type === 'bool' ? ` (--no-${kebab(p.key)} per spegnerlo)` : ''}`;
+      : p.type === 'bool' ? '' : '<name>';
+    const off = p.type === 'bool' ? ` ${t('cli.offSwitch', { name: kebab(p.key) })}` : '';
+    return `  ${`${name} ${spec}`.padEnd(26)}${paramLabel(p, t)}${off}`;
   }).join('\n');
 
-  return `ditherbox ${VERSION} — dithering regolabile per le tue foto
+  return `ditherbox ${VERSION} — ${t('cli.tagline')}
 
-USO
-  ditherbox [immagine|cartella]              apre l'interfaccia a schermo intero
-  ditherbox foto.jpg -o esito.png [opzioni]  elabora e salva, senza interfaccia
-  ditherbox *.jpg --out-dir ./esiti          elabora in blocco
-  ditherbox foto.jpg --print                 stampa il risultato nel terminale
+USAGE
+  ditherbox [image|folder]                   open the full-screen interface
+  ditherbox photo.jpg -o out.png [options]   process and save, no interface
+  ditherbox *.jpg --out-dir ./results        process in bulk
+  ditherbox photo.jpg --print                print the result in the terminal
 
-OPZIONI GENERALI
-  -o, --out <file>        file di destinazione (.png o .jpg)
-  -d, --out-dir <cart.>   cartella di destinazione per l'elaborazione in blocco
-  -p, --preset <nome>     applica un preset prima delle altre opzioni
-  -m, --mode <nome>       modo di anteprima: ${MODE_KEYS.join(', ')}
-  -t, --theme <nome>      tema dell'interfaccia
-      --print             stampa nel terminale invece di aprire l'interfaccia
-      --list              elenca palette, algoritmi, preset e temi
-  -q, --quiet             nessun messaggio sullo standard output
-  -h, --help              questa schermata
-  -v, --version           versione
+GENERAL OPTIONS
+  -o, --out <file>        destination file (.png or .jpg)
+  -d, --out-dir <folder>  destination folder for bulk processing
+  -p, --preset <name>     apply a preset before the other options
+  -m, --mode <name>       preview mode: ${MODE_KEYS.join(', ')}
+  -t, --theme <name>      interface theme
+  -l, --lang <code>       interface language: ${LOCALES.join(', ')}
+      --print             print in the terminal instead of opening the interface
+      --list              list palettes, algorithms, presets and themes
+  -q, --quiet             no messages on standard output
+  -h, --help              this screen
+  -v, --version           version
 
-PARAMETRI DI ELABORAZIONE
+PROCESSING PARAMETERS
 ${paramLines}
 
-CONFIGURAZIONE
-  ~/.config/ditherbox/config.toml     valori di partenza e tema
-  ~/.config/ditherbox/themes/*.toml   temi personali (stesso schema di cliamp)
+CONFIGURATION
+  ~/.config/ditherbox/config.toml     starting values, theme and language
+  ~/.config/ditherbox/themes/*.toml   personal themes (same schema as cliamp)
 
-PALETTE PERSONALIZZATE
-  Al posto di un nome puoi passare un elenco di colori:
-    ditherbox foto.jpg --palette "#0a0c10,#c2fe0b" -o out.png
-  Vale ovunque: qui, in config.toml e nell'attributo data-palette del widget.
+CUSTOM PALETTES
+  Instead of a name you can pass a list of colours:
+    ditherbox photo.jpg --palette "#0a0c10,#c2fe0b" -o out.png
+  It works everywhere: here, in config.toml and in the widget's data-palette.
 
-ESEMPI
-  ditherbox ~/Foto                                  sfoglia una cartella
-  ditherbox ritratto.jpg -p macintosh -o out.png    il classico Mac del 1984
-  ditherbox foto.jpg --palette gameboy --scale 4 -o gb.png
-  ditherbox foto.jpg --algorithm bayer8 --contrast 40 --print
+EXAMPLES
+  ditherbox ~/Photos                                 browse a folder
+  ditherbox portrait.jpg -p macintosh -o out.png     the 1984 Mac classic
+  ditherbox photo.jpg --palette gameboy --scale 4 -o gb.png
+  ditherbox photo.jpg --algorithm bayer8 --contrast 40 --print
 `;
 }
 
-function listText() {
+function listText(t = inglese) {
   const section = (title, rows) => `${title}\n${rows.map((r) => `  ${r}`).join('\n')}\n`;
   return [
-    section('PALETTE', Object.entries(PALETTES).map(
-      ([k, v]) => `${k.padEnd(16)}${v.label} (${v.colors.length} colori)`,
+    section(t('cli.listPalettes'), Object.keys(PALETTES).map(
+      (k) => `${k.padEnd(16)}${paletteLabel(k, t)}`
+        + ` (${t('cli.colourCount', { n: PALETTES[k].colors.length })})`,
     )),
-    section('ALGORITMI', ALGORITHMS.map((a) => `${a.padEnd(22)}${ALGORITHM_LABELS[a]}`)),
-    section('PRESET', Object.entries(PRESETS).map(([k, v]) => `${k.padEnd(16)}${v.label}`)),
-    section('TEMI', Object.keys(loadThemes())),
-    section('ANTEPRIME', MODE_KEYS.map((k) => `${k.padEnd(16)}${MODES[k].label}`)),
+    section(t('cli.listAlgorithms'), ALGORITHMS.map(
+      (a) => `${a.padEnd(22)}${algorithmLabel(a, t)}`,
+    )),
+    section(t('cli.listPresets'), Object.keys(PRESETS).map(
+      (k) => `${k.padEnd(16)}${presetLabel(k, t)}`,
+    )),
+    section(t('cli.listThemes'), Object.keys(loadThemes())),
+    section(t('cli.listModes'), MODE_KEYS.map(
+      (k) => `${k.padEnd(16)}${modeLabel(k, t)}`,
+    )),
   ].join('\n');
 }
 
 /** Espande una cartella nella lista delle immagini che contiene. */
-async function expandInputs(paths) {
+async function expandInputs(paths, t = inglese) {
   const out = [];
   for (const p of paths) {
     const full = resolve(p);
@@ -178,11 +210,11 @@ async function expandInputs(paths) {
     try {
       st = statSync(full);
     } catch {
-      throw new Error(`Non trovo ${p}`);
+      throw new Error(t('cli.notFound', { name: p }));
     }
     if (st.isDirectory()) out.push(...(await listImages(full)));
     else if (isSupported(full)) out.push(full);
-    else throw new Error(`${basename(p)}: accetto solo PNG e JPEG`);
+    else throw new Error(t('cli.onlyPngJpeg', { name: basename(p) }));
   }
   return out;
 }
@@ -213,10 +245,23 @@ async function printToTerminal(path, options, mode, themeName) {
 }
 
 export async function run(argv = process.argv.slice(2)) {
-  const { flags, positional } = parseArgs(argv);
+  // Due passaggi: il primo serve solo a sapere in che lingua parlare,
+  // il secondo rifa' il lavoro potendo gia' scrivere gli errori giusti.
+  const primo = parseArgs(argv);
+  const config = loadConfig();
+  // Una lingua sbagliata sulla riga di comando e' un errore, non un
+  // silenzioso ritorno all'inglese: se scrivo --lang pt voglio saperlo.
+  if (primo.flags.lang && !LOCALES.includes(shortLocale(primo.flags.lang))) {
+    throw new Error(inglese('cli.noSuchLang', {
+      name: primo.flags.lang, list: LOCALES.join(', '),
+    }));
+  }
+  const t = createTranslator(primo.flags.lang || config.lang
+    || detectLocale([process.env.LC_ALL, process.env.LC_MESSAGES, process.env.LANG]));
+  const { flags, positional } = parseArgs(argv, t);
 
   if (flags.help) {
-    process.stdout.write(helpText());
+    process.stdout.write(helpText(t));
     return 0;
   }
   if (flags.version) {
@@ -224,33 +269,36 @@ export async function run(argv = process.argv.slice(2)) {
     return 0;
   }
   if (flags.list) {
-    process.stdout.write(listText());
+    process.stdout.write(listText(t));
     return 0;
   }
 
-  const config = loadConfig();
   let base = { ...DEFAULTS };
   for (const param of PARAMS) {
     if (config[param.key] !== undefined) base[param.key] = config[param.key];
   }
   if (flags.preset) {
     if (!PRESETS[flags.preset]) {
-      throw new Error(`Preset "${flags.preset}" inesistente. Disponibili: ${Object.keys(PRESETS).join(', ')}`);
+      throw new Error(t('cli.noSuchPreset', {
+        name: flags.preset, list: Object.keys(PRESETS).join(', '),
+      }));
     }
     base = applyPreset(flags.preset, base);
   }
-  const options = normalizeOptions({ ...base, ...optionsFromFlags(flags) });
+  const options = normalizeOptions({ ...base, ...optionsFromFlags(flags, t) });
 
   const mode = flags.mode || config.mode || 'halfblock';
-  if (!MODES[mode]) throw new Error(`Modo "${mode}" inesistente. Disponibili: ${MODE_KEYS.join(', ')}`);
+  if (!MODES[mode]) {
+    throw new Error(t('cli.noSuchMode', { name: mode, list: MODE_KEYS.join(', ') }));
+  }
   const theme = flags.theme || config.theme || DEFAULT_THEME;
 
-  const inputs = positional.length ? await expandInputs(positional) : [];
+  const inputs = positional.length ? await expandInputs(positional, t) : [];
   const log = (msg) => { if (!flags.quiet) process.stdout.write(`${msg}\n`); };
 
   // --- stampa nel terminale ---------------------------------------
   if (flags.print) {
-    if (!inputs.length) throw new Error('Serve almeno un file da stampare');
+    if (!inputs.length) throw new Error(t('cli.needPrintFile'));
     for (const path of inputs) {
       if (inputs.length > 1) log(`\n${basename(path)}`);
       await printToTerminal(path, options, mode, theme);
@@ -260,9 +308,9 @@ export async function run(argv = process.argv.slice(2)) {
 
   // --- elaborazione senza interfaccia ------------------------------
   if (flags.out || flags['out-dir']) {
-    if (!inputs.length) throw new Error('Serve almeno un file da elaborare');
+    if (!inputs.length) throw new Error(t('cli.needProcessFile'));
     if (flags.out && inputs.length > 1) {
-      throw new Error('Con più file usa --out-dir al posto di --out');
+      throw new Error(t('cli.manyFiles'));
     }
     if (flags['out-dir']) mkdirSync(resolve(flags['out-dir']), { recursive: true });
 
@@ -280,13 +328,14 @@ export async function run(argv = process.argv.slice(2)) {
 
   // --- interfaccia a schermo intero --------------------------------
   if (!process.stdout.isTTY) {
-    throw new Error("Non sono su un terminale interattivo: usa -o per salvare o --print per stampare");
+    throw new Error(t('cli.notATty'));
   }
 
   const tui = new DitherTui({
     options,
     mode,
     theme,
+    lang: t.locale,
     dir: inputs.length ? dirname(inputs[0]) : process.cwd(),
   });
   await tui.start(inputs[0]);

@@ -8,6 +8,7 @@
  */
 
 import { resampleBox, luma } from '../core/adjust.js';
+import { asciiChar, brailleThreshold, brailleCell } from '../core/textart.js';
 import { fg, bg, RESET } from './term.js';
 
 /**
@@ -16,16 +17,18 @@ import { fg, bg, RESET } from './term.js';
  *          a schermo abbia le proporzioni giuste (cella alta il doppio).
  */
 export const MODES = {
-  braille: { label: 'Braille', cx: 2, cy: 4, ratio: 1 },
-  halfblock: { label: 'Mezzi blocchi', cx: 1, cy: 2, ratio: 1 },
-  quadrant: { label: 'Quadranti', cx: 2, cy: 2, ratio: 2 },
-  ascii: { label: 'ASCII', cx: 1, cy: 1, ratio: 2 },
+  braille: { cx: 2, cy: 4, ratio: 1 },
+  halfblock: { cx: 1, cy: 2, ratio: 1 },
+  quadrant: { cx: 2, cy: 2, ratio: 2 },
+  ascii: { cx: 1, cy: 1, ratio: 2 },
 };
 
-export const MODE_KEYS = Object.keys(MODES);
+/** Il nome leggibile di un modo, nella lingua scelta. */
+export function modeLabel(mode, t) {
+  return t ? t(`mode.${mode}`) : mode;
+}
 
-/** Rampa ASCII dal buio al pieno: pensata per terminale a fondo scuro. */
-const ASCII_RAMP = ' .·:;+=xX$&@█';
+export const MODE_KEYS = Object.keys(MODES);
 
 /** Blocchi a quadranti, indicizzati da 4 bit: alto-sx, alto-dx, basso-sx, basso-dx. */
 const QUADRANTS = [
@@ -127,44 +130,19 @@ function renderHalfblock(img) {
  * che un terminale possa dare, ed e' perfetta per il bianco e nero.
  */
 function renderBraille(img) {
-  // Soglia adattiva: la meta' fra il pixel piu' scuro e il piu' chiaro.
-  let min = 255;
-  let max = 0;
-  for (let i = 0; i < img.data.length; i += 4) {
-    const l = luma(img.data[i], img.data[i + 1], img.data[i + 2]);
-    if (l < min) min = l;
-    if (l > max) max = l;
-  }
-  const threshold = (min + max) / 2;
-
+  const soglia = brailleThreshold(img);
   const lines = [];
   for (let y = 0; y < img.height; y += 4) {
     let line = '';
     let lastColor = null;
     for (let x = 0; x < img.width; x += 2) {
-      let bits = 0;
-      let r = 0, g = 0, b = 0, lit = 0;
-      for (let dy = 0; dy < 4; dy++) {
-        for (let dx = 0; dx < 2; dx++) {
-          const sx = x + dx;
-          const sy = y + dy;
-          if (sx >= img.width || sy >= img.height) continue;
-          const c = px(img, sx, sy);
-          if (luma(c[0], c[1], c[2]) <= threshold) continue;
-          // Numerazione dei punti braille: i primi tre di ogni colonna
-          // sono contigui, il quarto sta nei due bit alti.
-          bits |= dy < 3 ? 1 << (dy + 3 * dx) : 0x40 << dx;
-          r += c[0]; g += c[1]; b += c[2];
-          lit++;
-        }
+      const { char, colour } = brailleCell(img, x, y, soglia);
+      if (colour && (!lastColor || Math.abs(colour[0] - lastColor[0]) > 2
+        || Math.abs(colour[1] - lastColor[1]) > 2 || Math.abs(colour[2] - lastColor[2]) > 2)) {
+        line += fg(colour);
+        lastColor = colour;
       }
-      const color = lit ? [r / lit, g / lit, b / lit] : null;
-      if (color && (!lastColor || Math.abs(color[0] - lastColor[0]) > 2
-        || Math.abs(color[1] - lastColor[1]) > 2 || Math.abs(color[2] - lastColor[2]) > 2)) {
-        line += fg(color);
-        lastColor = color;
-      }
-      line += String.fromCharCode(0x2800 + bits);
+      line += char;
     }
     lines.push(line + RESET);
   }
@@ -206,13 +184,11 @@ function renderQuadrant(img) {
 function renderAscii(img, theme) {
   const color = theme ? fg(theme.bright_fg) : '';
   const lines = [];
-  const last = ASCII_RAMP.length - 1;
   for (let y = 0; y < img.height; y++) {
     let line = color;
     for (let x = 0; x < img.width; x++) {
-      const c = px(img, x, y);
-      const l = luma(c[0], c[1], c[2]) / 255;
-      line += ASCII_RAMP[Math.min(last, Math.round(l * last))];
+      const i = (y * img.width + x) * 4;
+      line += asciiChar(luma(img.data[i], img.data[i + 1], img.data[i + 2]));
     }
     lines.push(line + RESET);
   }

@@ -9,6 +9,7 @@ import {
   PARAMS, PRESETS, DEFAULTS, normalizeOptions, formatValue, applyPreset,
   paramSteps, stepIndex, stepBy, processImage, targetSize,
   isCustomPalette, parseCustomPalette, stringifyPalette,
+  paramLabel,
 } from '../src/core/index.js';
 
 /** Sfumatura orizzontale in scala di grigi. */
@@ -248,7 +249,13 @@ test('una palette custom passa indenne dalla normalizzazione', () => {
 
 test('ogni parametro ha uno schema coerente', () => {
   for (const p of PARAMS) {
-    assert.ok(p.key && p.label && p.group, `parametro incompleto: ${p.key}`);
+    assert.ok(p.key && p.group, `parametro incompleto: ${p.key}`);
+    // L'etichetta non sta piu' nello schema: la da' il traduttore, e se
+    // manca la chiave torna indietro la chiave stessa.
+    assert.ok(
+      paramLabel(p) && !paramLabel(p).startsWith('param.'),
+      `${p.key}: senza etichetta tradotta`,
+    );
     if (p.type === 'range') {
       assert.ok(p.min < p.max, `${p.key}: intervallo assurdo`);
       assert.ok(p.default >= p.min && p.default <= p.max, `${p.key}: default fuori scala`);

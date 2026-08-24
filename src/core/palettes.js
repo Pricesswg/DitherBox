@@ -41,32 +41,26 @@ function phosphor(color, levels) {
 export const PALETTES = {
   bw: {
     ramp: true,
-    label: '1-bit B/N',
     colors: [[0, 0, 0], [255, 255, 255]],
   },
-  gray4: { ramp: true, label: 'Grigi 4', colors: grayRamp(4) },
-  gray8: { ramp: true, label: 'Grigi 8', colors: grayRamp(8) },
-  gray16: { ramp: true, label: 'Grigi 16', colors: grayRamp(16) },
+  gray4: { ramp: true, colors: grayRamp(4) },
+  gray8: { ramp: true, colors: grayRamp(8) },
+  gray16: { ramp: true, colors: grayRamp(16) },
   gameboy: {
     ramp: true,
-    label: 'Game Boy',
     colors: ['#0f380f', '#306230', '#8bac0f', '#9bbc0f'].map(hex),
   },
   gameboyPocket: {
     ramp: true,
-    label: 'GB Pocket',
     colors: ['#181818', '#4a4a4a', '#8c8c8c', '#c5c5c5'].map(hex),
   },
   cgaCyan: {
-    label: 'CGA ciano',
     colors: ['#000000', '#55ffff', '#ff55ff', '#ffffff'].map(hex),
   },
   cgaGreen: {
-    label: 'CGA verde',
     colors: ['#000000', '#55ff55', '#ff5555', '#ffff55'].map(hex),
   },
   pico8: {
-    label: 'PICO-8',
     colors: [
       '#000000', '#1d2b53', '#7e2553', '#008751',
       '#ab5236', '#5f574f', '#c2c3c7', '#fff1e8',
@@ -75,7 +69,6 @@ export const PALETTES = {
     ].map(hex),
   },
   c64: {
-    label: 'C64',
     colors: [
       '#000000', '#ffffff', '#880000', '#aaffee',
       '#cc44cc', '#00cc55', '#0000aa', '#eeee77',
@@ -84,7 +77,6 @@ export const PALETTES = {
     ].map(hex),
   },
   zx: {
-    label: 'ZX Spectrum',
     colors: [
       '#000000', '#0000d7', '#d70000', '#d700d7',
       '#00d700', '#00d7d7', '#d7d700', '#d7d7d7',
@@ -92,8 +84,8 @@ export const PALETTES = {
       '#00ffff', '#ffff00', '#ffffff',
     ].map(hex),
   },
-  greenCrt: { ramp: true, label: 'CRT verde', colors: phosphor('#33ff66', 4) },
-  amberCrt: { ramp: true, label: 'CRT ambra', colors: phosphor('#ffb000', 4) },
+  greenCrt: { ramp: true, colors: phosphor('#33ff66', 4) },
+  amberCrt: { ramp: true, colors: phosphor('#ffb000', 4) },
 
   // Marathon (Bungie, 2025). L'art director la chiama "graphic realism":
   // rosa e gialli iper-saturi che spiccano su blu acciaio freddi e neri
@@ -105,7 +97,6 @@ export const PALETTES = {
     // sopra la luminanza si ottengono le fasce piatte di colore del gioco;
     // cercando invece il colore RGB piu' vicino si ottengono coriandoli.
     ramp: true,
-    label: 'Marathon',
     colors: [
       '#0a0c10', '#29324f', '#01ffff', '#59b41d',
       '#c2fe0b', '#ff2d95', '#ff0d1a', '#f4f1e8',
@@ -114,23 +105,19 @@ export const PALETTES = {
   // Due sole tinte, per il taglio da manifesto.
   marathonDuo: {
     ramp: true,
-    label: 'Marathon duo',
     colors: ['#0a0c10', '#c2fe0b'].map(hex),
   },
   // I terminali del Marathon del 1994: verde su nero, con quel filo di
   // verde acceso sulle lettere.
   marathonTerm: {
     ramp: true,
-    label: 'Marathon 94',
     colors: ['#04120a', '#0d3b1e', '#1f7a3d', '#3dff7a'].map(hex),
   },
   risograph: {
-    label: 'Risografia',
     colors: ['#1d1a2e', '#0078bf', '#ff48b0', '#f5f1e6'].map(hex),
   },
   blueprint: {
     ramp: true,
-    label: 'Cianografia',
     colors: ['#0b2545', '#13315c', '#8da9c4', '#eef4ed'].map(hex),
   },
 };

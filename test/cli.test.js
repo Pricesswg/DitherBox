@@ -41,7 +41,7 @@ test('parseArgs tratta tutto dopo -- come nomi di file', () => {
 });
 
 test('parseArgs protesta se manca il valore', () => {
-  assert.throws(() => parseArgs(['--palette']), /Manca il valore/);
+  assert.throws(() => parseArgs(['--palette']), /Missing value/);
 });
 
 test('l aiuto elenca tutte le opzioni di elaborazione', () => {
@@ -65,8 +65,22 @@ test('parseSimpleToml legge tipi, commenti e cancelletti fra virgolette', () => 
 
 test('--version e --help escono con successo', async () => {
   assert.match((await cli(['--version'])).stdout.trim(), /^\d+\.\d+\.\d+$/);
-  assert.ok((await cli(['--help'])).stdout.includes('USO'));
-  assert.ok((await cli(['--list'])).stdout.includes('PALETTE'));
+  assert.ok((await cli(['--help'])).stdout.includes('USAGE'));
+  assert.ok((await cli(['--list'])).stdout.includes('PALETTES'));
+});
+
+test('--lang traduce aiuto, elenco e messaggi di errore', async () => {
+  const aiuto = (await cli(['--lang', 'de', '--help'])).stdout;
+  // Le opzioni restano in inglese: sono nomi di comandi, non prosa.
+  assert.ok(aiuto.includes('--palette'), 'le opzioni restano scritte uguali');
+  assert.ok(aiuto.includes('Dithering'), `tagline non tradotta:\n${aiuto.slice(0, 120)}`);
+
+  const elenco = (await cli(['--lang', 'de', '--list'])).stdout;
+  assert.ok(elenco.includes('PALETTEN'), 'intestazioni di --list non tradotte');
+  assert.ok(elenco.includes('Farben'), 'conteggio colori non tradotto');
+
+  const francese = (await cli(['--lang', 'fr', '--list'])).stdout;
+  assert.ok(francese.includes('ALGORITHMES'), 'francese non applicato');
 });
 
 test('elabora un file e ne salva un altro', async (t) => {
@@ -117,7 +131,7 @@ test('accetta una palette scritta a mano', async (t) => {
   // Una palette scritta male resta un errore comprensibile.
   await assert.rejects(
     () => cli([input, '--palette', 'rosso,verde', '-o', join(dir, 'x.png')]),
-    /non esiste/,
+    /does not exist/,
   );
 });
 
@@ -153,13 +167,14 @@ test('gli errori sono comprensibili e escono con codice 1', async (t) => {
   const dir = tempDir(t);
   const input = await writeSample(dir, 'in.png', 40, 40);
   const casi = [
-    [[input, '--palette', 'inesistente', '-o', join(dir, 'x.png')], /non esiste/],
-    [[join(dir, 'manca.png'), '-o', join(dir, 'x.png')], /Non trovo/],
-    [[input, '--scale', 'abc', '-o', join(dir, 'x.png')], /vuole un numero/],
-    [[input, '--preset', 'inventato', '-o', join(dir, 'x.png')], /inesistente/],
-    [[input, '--mode', 'inventato', '--print'], /inesistente/],
+    [[input, '--palette', 'inesistente', '-o', join(dir, 'x.png')], /does not exist/],
+    [[join(dir, 'manca.png'), '-o', join(dir, 'x.png')], /Cannot find/],
+    [[input, '--scale', 'abc', '-o', join(dir, 'x.png')], /wants a number/],
+    [[input, '--preset', 'inventato', '-o', join(dir, 'x.png')], /does not exist/],
+    [[input, '--mode', 'inventato', '--print'], /does not exist/],
+    [[input, '--lang', 'pt'], /Language "pt" does not exist/],
     [[input, input, '-o', join(dir, 'x.png')], /--out-dir/],
-    [[input], /terminale interattivo/],
+    [[input], /interactive terminal/],
   ];
   for (const [args, atteso] of casi) {
     await assert.rejects(

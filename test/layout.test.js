@@ -211,6 +211,6 @@ test('scegliere una palette la segna come attiva', async (t) => {
 
   assert.equal(esito.quanteAttive, 1, 'ne deve risultare attiva una sola');
   assert.equal(esito.nomeAttiva, 'Marathon');
-  assert.equal(esito.nomeDopo, 'Su misura', 'una palette scritta a mano accende "Su misura"');
+  assert.equal(esito.nomeDopo, 'Custom', 'una palette scritta a mano accende "Custom"');
   assert.ok(esito.quantePastiglie >= 19, `solo ${esito.quantePastiglie} tavolozze`);
 });

@@ -47,32 +47,26 @@ function phosphor(color, levels) {
 const PALETTES = {
   bw: {
     ramp: true,
-    label: '1-bit B/N',
     colors: [[0, 0, 0], [255, 255, 255]],
   },
-  gray4: { ramp: true, label: 'Grigi 4', colors: grayRamp(4) },
-  gray8: { ramp: true, label: 'Grigi 8', colors: grayRamp(8) },
-  gray16: { ramp: true, label: 'Grigi 16', colors: grayRamp(16) },
+  gray4: { ramp: true, colors: grayRamp(4) },
+  gray8: { ramp: true, colors: grayRamp(8) },
+  gray16: { ramp: true, colors: grayRamp(16) },
   gameboy: {
     ramp: true,
-    label: 'Game Boy',
     colors: ['#0f380f', '#306230', '#8bac0f', '#9bbc0f'].map(hex),
   },
   gameboyPocket: {
     ramp: true,
-    label: 'GB Pocket',
     colors: ['#181818', '#4a4a4a', '#8c8c8c', '#c5c5c5'].map(hex),
   },
   cgaCyan: {
-    label: 'CGA ciano',
     colors: ['#000000', '#55ffff', '#ff55ff', '#ffffff'].map(hex),
   },
   cgaGreen: {
-    label: 'CGA verde',
     colors: ['#000000', '#55ff55', '#ff5555', '#ffff55'].map(hex),
   },
   pico8: {
-    label: 'PICO-8',
     colors: [
       '#000000', '#1d2b53', '#7e2553', '#008751',
       '#ab5236', '#5f574f', '#c2c3c7', '#fff1e8',
@@ -81,7 +75,6 @@ const PALETTES = {
     ].map(hex),
   },
   c64: {
-    label: 'C64',
     colors: [
       '#000000', '#ffffff', '#880000', '#aaffee',
       '#cc44cc', '#00cc55', '#0000aa', '#eeee77',
@@ -90,7 +83,6 @@ const PALETTES = {
     ].map(hex),
   },
   zx: {
-    label: 'ZX Spectrum',
     colors: [
       '#000000', '#0000d7', '#d70000', '#d700d7',
       '#00d700', '#00d7d7', '#d7d700', '#d7d7d7',
@@ -98,8 +90,8 @@ const PALETTES = {
       '#00ffff', '#ffff00', '#ffffff',
     ].map(hex),
   },
-  greenCrt: { ramp: true, label: 'CRT verde', colors: phosphor('#33ff66', 4) },
-  amberCrt: { ramp: true, label: 'CRT ambra', colors: phosphor('#ffb000', 4) },
+  greenCrt: { ramp: true, colors: phosphor('#33ff66', 4) },
+  amberCrt: { ramp: true, colors: phosphor('#ffb000', 4) },
 
   // Marathon (Bungie, 2025). L'art director la chiama "graphic realism":
   // rosa e gialli iper-saturi che spiccano su blu acciaio freddi e neri
@@ -111,7 +103,6 @@ const PALETTES = {
     // sopra la luminanza si ottengono le fasce piatte di colore del gioco;
     // cercando invece il colore RGB piu' vicino si ottengono coriandoli.
     ramp: true,
-    label: 'Marathon',
     colors: [
       '#0a0c10', '#29324f', '#01ffff', '#59b41d',
       '#c2fe0b', '#ff2d95', '#ff0d1a', '#f4f1e8',
@@ -120,23 +111,19 @@ const PALETTES = {
   // Due sole tinte, per il taglio da manifesto.
   marathonDuo: {
     ramp: true,
-    label: 'Marathon duo',
     colors: ['#0a0c10', '#c2fe0b'].map(hex),
   },
   // I terminali del Marathon del 1994: verde su nero, con quel filo di
   // verde acceso sulle lettere.
   marathonTerm: {
     ramp: true,
-    label: 'Marathon 94',
     colors: ['#04120a', '#0d3b1e', '#1f7a3d', '#3dff7a'].map(hex),
   },
   risograph: {
-    label: 'Risografia',
     colors: ['#1d1a2e', '#0078bf', '#ff48b0', '#f5f1e6'].map(hex),
   },
   blueprint: {
     ramp: true,
-    label: 'Cianografia',
     colors: ['#0b2545', '#13315c', '#8da9c4', '#eef4ed'].map(hex),
   },
 };
@@ -653,29 +640,6 @@ const __m_src_core_dither_js = (() => {
 const ORDERED_ALGORITHMS = Object.keys(ORDERED_MATRICES);
 const DIFFUSION_ALGORITHMS = Object.keys(DIFFUSION_KERNELS);
 
-/** Etichette leggibili, condivise da interfaccia web e TUI. */
-const ALGORITHM_LABELS = {
-  none: 'Nessuno (soglia)',
-  random: 'Rumore casuale',
-  bayer2: 'Bayer 2x2',
-  bayer4: 'Bayer 4x4',
-  bayer8: 'Bayer 8x8',
-  bayer16: 'Bayer 16x16',
-  cluster4: 'Retino 4x4',
-  cluster8: 'Retino 8x8',
-  lines4: 'Linee diagonali',
-  floydSteinberg: 'Floyd-Steinberg',
-  falseFloydSteinberg: 'Floyd-Steinberg light',
-  atkinson: 'Atkinson',
-  jarvis: 'Jarvis-Judice-Ninke',
-  stucki: 'Stucki',
-  burkes: 'Burkes',
-  sierra: 'Sierra',
-  sierra2: 'Sierra 2 righe',
-  sierraLite: 'Sierra lite',
-  stevensonArce: 'Stevenson-Arce',
-};
-
 const ALGORITHMS = [
   'none',
   'random',
@@ -924,12 +888,1196 @@ function diffuse(img, out, q, kernel, { strength, biasValue, noiseAmp, serpentin
   }
 }
 
-  return { ALGORITHMS, ALGORITHM_LABELS, DIFFUSION_ALGORITHMS, ORDERED_ALGORITHMS, buildQuantizer, ditherImage };
+  return { ALGORITHMS, DIFFUSION_ALGORITHMS, ORDERED_ALGORITHMS, buildQuantizer, ditherImage };
+})();
+
+const __m_src_core_i18n_js = (() => {
+
+/**
+ * Traduzioni dell'interfaccia.
+ *
+ * Le chiavi sono in inglese e l'inglese e' la lingua di riferimento: se una
+ * traduzione manca si ricade su quella, invece di mostrare la chiave nuda.
+ * Widget, applicazione da terminale e riga di comando pescano tutti da qui,
+ * cosi' una stringa si traduce una volta sola.
+ *
+ * Le etichette dei parametri restano corte di proposito (dodici caratteri al
+ * massimo in ogni lingua): nella TUI la colonna e' larga tredici, e una
+ * parola tedesca lunga sfonderebbe la cornice.
+ */
+
+const LOCALES = ['en', 'it', 'es', 'fr', 'de'];
+
+const LOCALE_NAMES = {
+  en: 'English',
+  it: 'Italiano',
+  es: 'Español',
+  fr: 'Français',
+  de: 'Deutsch',
+};
+
+const DEFAULT_LOCALE = 'en';
+
+const en = {
+  'group.dither': 'DITHER',
+  'group.tone': 'TONE',
+  'group.output': 'OUTPUT',
+  'group.text': 'TEXT',
+
+  'param.palette.label': 'Palette',
+  'param.algorithm.label': 'Algorithm',
+  'param.scale.label': 'Pixel',
+  'param.scale.hint': 'Shrinks before dithering: 1 keeps full detail, 8 gives chunky 8-bit blocks',
+  'param.strength.label': 'Strength',
+  'param.strength.hint': 'How much of the error (or of the ordered noise) gets applied',
+  'param.bias.label': 'Threshold',
+  'param.bias.hint': 'Moves the cut-off point: negative darkens, positive lightens',
+  'param.noise.label': 'Grain',
+  'param.noise.hint': 'Random noise before the threshold: breaks up patterns that look too regular',
+  'param.serpentine.label': 'Serpentine',
+  'param.serpentine.hint': 'Alternating scan direction row by row: removes diagonal streaks',
+  'param.brightness.label': 'Brightness',
+  'param.contrast.label': 'Contrast',
+  'param.gamma.label': 'Gamma',
+  'param.saturation.label': 'Saturation',
+  'param.sharpen.label': 'Sharpen',
+  'param.sharpen.hint': 'Unsharp mask: brings back the fine detail that dithering eats',
+  'param.invert.label': 'Invert',
+  'param.megapixels.label': 'Megapixels',
+  'param.megapixels.hint': 'Output resolution: lower it to coarsen the photo on purpose',
+  'param.upscale.label': 'Upscale',
+  'param.upscale.hint': 'Blows the result back up to its former size with hard pixels',
+
+  'palette.bw': '1-bit B/W',
+  'palette.gray4': 'Grays 4',
+  'palette.gray8': 'Grays 8',
+  'palette.gray16': 'Grays 16',
+  'palette.gameboy': 'Game Boy',
+  'palette.gameboyPocket': 'GB Pocket',
+  'palette.cgaCyan': 'CGA cyan',
+  'palette.cgaGreen': 'CGA green',
+  'palette.pico8': 'PICO-8',
+  'palette.c64': 'C64',
+  'palette.zx': 'ZX Spectrum',
+  'palette.greenCrt': 'Green CRT',
+  'palette.amberCrt': 'Amber CRT',
+  'palette.marathon': 'Marathon',
+  'palette.marathonDuo': 'Marathon duo',
+  'palette.marathonTerm': 'Marathon 94',
+  'palette.risograph': 'Risograph',
+  'palette.blueprint': 'Blueprint',
+  'palette.custom': 'Custom',
+
+  'algorithm.none': 'None (threshold)',
+  'algorithm.random': 'Random noise',
+  'algorithm.bayer2': 'Bayer 2x2',
+  'algorithm.bayer4': 'Bayer 4x4',
+  'algorithm.bayer8': 'Bayer 8x8',
+  'algorithm.bayer16': 'Bayer 16x16',
+  'algorithm.cluster4': 'Halftone 4x4',
+  'algorithm.cluster8': 'Halftone 8x8',
+  'algorithm.lines4': 'Diagonal lines',
+  'algorithm.floydSteinberg': 'Floyd-Steinberg',
+  'algorithm.falseFloydSteinberg': 'Floyd-Steinberg light',
+  'algorithm.atkinson': 'Atkinson',
+  'algorithm.jarvis': 'Jarvis-Judice-Ninke',
+  'algorithm.stucki': 'Stucki',
+  'algorithm.burkes': 'Burkes',
+  'algorithm.sierra': 'Sierra',
+  'algorithm.sierra2': 'Sierra two-row',
+  'algorithm.sierraLite': 'Sierra lite',
+  'algorithm.stevensonArce': 'Stevenson-Arce',
+
+  'preset.macintosh': 'Macintosh 1984',
+  'preset.giornale': 'Newsprint',
+  'preset.gameboy': 'Game Boy',
+  'preset.fanzine': 'Photocopied zine',
+  'preset.terminale': 'Phosphor terminal',
+  'preset.arcade': 'Arcade 16 colours',
+  'preset.cga': 'CGA 1981',
+  'preset.incisione': 'Engraving',
+
+  'mode.braille': 'Braille',
+  'mode.halfblock': 'Half blocks',
+  'mode.quadrant': 'Quadrants',
+  'mode.ascii': 'ASCII',
+
+  'ui.presets': 'Presets',
+  'ui.colours': 'Colours',
+  'ui.open': 'Open photo',
+  'ui.noFile': 'no file chosen',
+  'ui.shoot': 'Shoot',
+  'ui.download': 'Download PNG',
+  'ui.reset': 'Reset',
+  'ui.dropTitle': 'Drag a photo here',
+  'ui.dropButton': 'Choose a photo',
+  'ui.dropHint': 'or paste one with Ctrl+V — the image never leaves your browser',
+  'ui.noImage': 'no image loaded',
+  'ui.addColour': 'Add a colour',
+  'ui.removeColour': 'Remove this colour',
+  'ui.copyPalette': 'Copy the selected palette in here',
+  'ui.loading': 'Loading…',
+  'ui.preparing': 'Preparing the PNG…',
+  'ui.language': 'Language',
+  'ui.view': 'View',
+  'ui.viewImage': 'Image',
+  'ui.copy': 'Copy',
+  'ui.copied': 'Copied',
+  'ui.copyFailed': 'Could not copy',
+  'ui.columns': 'Columns',
+  'ui.textHint': 'Text art of the photo. Copy it and paste it wherever you like.',
+  'ui.error': 'Error: {msg}',
+  'ui.notAnImage': 'That file is not an image',
+  'ui.unreadable': 'Image cannot be read',
+  'ui.exportFailed': 'Export failed',
+  'ui.saved': 'Saved: {name}',
+  'ui.cancelled': 'Save cancelled',
+  'ui.tooLarge': 'The PNG is too large: lower the megapixels',
+
+  'tui.preview': 'PREVIEW',
+  'tui.controls': 'CONTROLS',
+  'tui.files': 'FILES',
+  'tui.keys': 'KEYS',
+  'tui.theme': 'THEME',
+  'tui.preset': 'PRESET',
+  'tui.language': 'LANGUAGE',
+  'tui.open': 'OPEN',
+  'tui.save': 'SAVE',
+  'tui.tooSmall': 'Window too small (needs at least 40x12)',
+  'tui.noImageHint': 'no image · o to open a path · ? for the keys',
+  'tui.noImageHere': 'No image here. Press o to open a path.',
+  'tui.openHint': 'Path to an image or a folder',
+  'tui.saveHint': 'Destination file (.png or .jpg) — processed at full resolution',
+  'tui.confirm': 'enter confirms · esc cancels',
+  'tui.onlyPngJpg': 'Only .png or .jpg',
+  'tui.noImageLoaded': 'No image loaded',
+  'tui.emptyFolder': 'Folder has no images',
+  'tui.reset': 'Parameters reset',
+  'tui.previewMode': 'Preview: {name}',
+  'tui.previewShort': 'prev. {size}',
+  'tui.themeSet': 'Theme: {name}',
+  'tui.presetSet': 'Preset: {name}',
+  'tui.languageSet': 'Language: {name}',
+  'tui.jobOpen': 'Opening {name}',
+  'tui.jobRead': 'Reading {name}',
+  'tui.jobPreview': 'Preparing the preview',
+  'tui.jobSave': 'Saving {name}',
+  'tui.jobProcess': 'Processing at full resolution',
+  'tui.jobWrite': 'Writing {size}',
+  'tui.jobDone': 'Done',
+  'tui.savedAs': 'Saved: {name} ({size})',
+  'tui.saveFailed': 'Save failed: {msg}',
+  'tui.loaded': '{name} · {size}',
+
+  'key.move': 'Scroll the parameters or the files',
+  'key.adjust': 'Adjust the selected value',
+  'key.adjustBig': 'Adjust in steps of five',
+  'key.activate': 'Activate: load the file, flip the switch',
+  'key.focus': 'Move focus between controls and files',
+  'key.step': 'Next and previous image',
+  'key.ends': 'Jump to the top / bottom',
+  'key.mode': 'Change preview mode',
+  'key.theme': 'Pick the theme',
+  'key.preset': 'Apply a preset',
+  'key.lang': 'Pick the language',
+  'key.invert': 'Invert (shortcut)',
+  'key.reset': 'Reset every parameter',
+  'key.openPath': 'Open a path',
+  'key.save': 'Save at full resolution',
+  'key.files': 'Show or hide the file list',
+  'key.help': 'This screen',
+  'key.quit': 'Quit',
+
+  'bar.move': 'move',
+  'bar.adjust': 'adjust',
+  'bar.focus': 'focus',
+  'bar.preview': 'preview',
+  'bar.preset': 'preset',
+  'bar.theme': 'theme',
+  'bar.save': 'save',
+  'bar.keys': 'keys',
+  'bar.open': 'open a path',
+  'bar.quit': 'quit',
+
+  'cli.tagline': 'adjustable dithering for your photos',
+  'cli.missingValue': 'Missing value for --{name}',
+  'cli.wantsNumber': '--{name} wants a number, not "{value}"',
+  'cli.noSuchValue': '--{name}: "{value}" does not exist. Values: {list}',
+  'cli.noSuchPreset': 'Preset "{name}" does not exist. Available: {list}',
+  'cli.noSuchMode': 'Mode "{name}" does not exist. Available: {list}',
+  'cli.noSuchLang': 'Language "{name}" does not exist. Available: {list}',
+  'cli.notFound': 'Cannot find {name}',
+  'cli.onlyPngJpeg': '{name}: only PNG and JPEG are accepted',
+  'cli.needPrintFile': 'Need at least one file to print',
+  'cli.needProcessFile': 'Need at least one file to process',
+  'cli.manyFiles': 'With more than one file use --out-dir instead of --out',
+  'cli.notATty': 'Not an interactive terminal: use -o to save or --print to print',
+  'cli.offSwitch': '(--no-{name} turns it off)',
+  'cli.colourCount': '{n} colours',
+  'cli.listPalettes': 'PALETTES',
+  'cli.listAlgorithms': 'ALGORITHMS',
+  'cli.listPresets': 'PRESETS',
+  'cli.listThemes': 'THEMES',
+  'cli.listModes': 'PREVIEWS',
+};
+
+const it = {
+  'group.dither': 'DITHER',
+  'group.tone': 'TONO',
+  'group.output': 'OUTPUT',
+  'group.text': 'TESTO',
+
+  'param.palette.label': 'Palette',
+  'param.algorithm.label': 'Algoritmo',
+  'param.scale.label': 'Pixel',
+  'param.scale.hint': 'Riduce prima di ditherare: 1 tiene il dettaglio pieno, 8 fa il pixelone da 8 bit',
+  'param.strength.label': 'Intensità',
+  'param.strength.hint': 'Quanta parte dell’errore (o del rumore ordinato) viene applicata',
+  'param.bias.label': 'Soglia',
+  'param.bias.hint': 'Sposta il punto di taglio: negativo scurisce, positivo schiarisce',
+  'param.noise.label': 'Grana',
+  'param.noise.hint': 'Rumore casuale prima della soglia: rompe le trame troppo regolari',
+  'param.serpentine.label': 'Serpentina',
+  'param.serpentine.hint': 'Scansione alternata riga per riga: elimina le strisciate diagonali',
+  'param.brightness.label': 'Luminosità',
+  'param.contrast.label': 'Contrasto',
+  'param.gamma.label': 'Gamma',
+  'param.saturation.label': 'Saturazione',
+  'param.sharpen.label': 'Nitidezza',
+  'param.sharpen.hint': 'Maschera di contrasto: recupera i dettagli fini che il dithering mangia',
+  'param.invert.label': 'Inverti',
+  'param.megapixels.label': 'Megapixel',
+  'param.megapixels.hint': 'Risoluzione del risultato: abbassala per sgranare di proposito la foto',
+  'param.upscale.label': 'Ingrandisci',
+  'param.upscale.hint': 'Riporta il risultato alla dimensione di prima con pixel netti',
+
+  'palette.bw': '1-bit B/N',
+  'palette.gray4': 'Grigi 4',
+  'palette.gray8': 'Grigi 8',
+  'palette.gray16': 'Grigi 16',
+  'palette.gameboyPocket': 'GB Pocket',
+  'palette.cgaCyan': 'CGA ciano',
+  'palette.cgaGreen': 'CGA verde',
+  'palette.greenCrt': 'CRT verde',
+  'palette.amberCrt': 'CRT ambra',
+  'palette.risograph': 'Risografia',
+  'palette.blueprint': 'Cianografia',
+  'palette.custom': 'Su misura',
+
+  'algorithm.none': 'Nessuno (soglia)',
+  'algorithm.random': 'Rumore casuale',
+  'algorithm.cluster4': 'Retino 4x4',
+  'algorithm.cluster8': 'Retino 8x8',
+  'algorithm.lines4': 'Linee diagonali',
+  'algorithm.falseFloydSteinberg': 'Floyd-Steinberg light',
+  'algorithm.sierra2': 'Sierra 2 righe',
+
+  'preset.giornale': 'Giornale',
+  'preset.fanzine': 'Fanzine fotocopiata',
+  'preset.terminale': 'Terminale a fosfori',
+  'preset.arcade': 'Arcade 16 colori',
+  'preset.incisione': 'Incisione',
+
+  'mode.halfblock': 'Mezzi blocchi',
+  'mode.quadrant': 'Quadranti',
+
+  'ui.presets': 'Preset',
+  'ui.colours': 'Colori',
+  'ui.open': 'Apri foto',
+  'ui.noFile': 'nessun file scelto',
+  'ui.shoot': 'Scatta',
+  'ui.download': 'Scarica PNG',
+  'ui.reset': 'Azzera',
+  'ui.dropTitle': 'Trascina qui una foto',
+  'ui.dropButton': 'Scegli una foto',
+  'ui.dropHint': 'oppure incollala con Ctrl+V — l’immagine non lascia il tuo browser',
+  'ui.noImage': 'nessuna immagine caricata',
+  'ui.addColour': 'Aggiungi un colore',
+  'ui.removeColour': 'Togli questo colore',
+  'ui.copyPalette': 'Copia qui i colori della palette scelta',
+  'ui.loading': 'Carico…',
+  'ui.preparing': 'Preparo il PNG…',
+  'ui.language': 'Lingua',
+  'ui.view': 'Vista',
+  'ui.viewImage': 'Immagine',
+  'ui.copy': 'Copia',
+  'ui.copied': 'Copiato',
+  'ui.copyFailed': 'Non riesco a copiare',
+  'ui.columns': 'Colonne',
+  'ui.textHint': 'La foto scritta con i caratteri. Copiala e incollala dove vuoi.',
+  'ui.error': 'Errore: {msg}',
+  'ui.notAnImage': 'Quel file non è un’immagine',
+  'ui.unreadable': 'Immagine non leggibile',
+  'ui.exportFailed': 'Export fallito',
+  'ui.saved': 'Salvato: {name}',
+  'ui.cancelled': 'Salvataggio annullato',
+  'ui.tooLarge': 'Il PNG è troppo grande: abbassa i megapixel',
+
+  'tui.preview': 'ANTEPRIMA',
+  'tui.controls': 'CONTROLLI',
+  'tui.files': 'FILE',
+  'tui.keys': 'TASTI',
+  'tui.theme': 'TEMA',
+  'tui.preset': 'PRESET',
+  'tui.language': 'LINGUA',
+  'tui.open': 'APRI',
+  'tui.save': 'SALVA',
+  'tui.tooSmall': 'Finestra troppo piccola (serve almeno 40x12)',
+  'tui.noImageHint': 'nessuna immagine · o per aprire un percorso · ? per i tasti',
+  'tui.noImageHere': 'Nessuna immagine qui. Premi o per aprire un percorso.',
+  'tui.openHint': 'Percorso di un’immagine o di una cartella',
+  'tui.saveHint': 'File di destinazione (.png o .jpg) — elaboro a piena risoluzione',
+  'tui.confirm': 'invio conferma · esc annulla',
+  'tui.onlyPngJpg': 'Uso solo .png o .jpg',
+  'tui.noImageLoaded': 'Nessuna immagine caricata',
+  'tui.emptyFolder': 'Cartella senza immagini',
+  'tui.reset': 'Parametri azzerati',
+  'tui.previewMode': 'Anteprima: {name}',
+  'tui.previewShort': 'ant. {size}',
+  'tui.themeSet': 'Tema: {name}',
+  'tui.presetSet': 'Preset: {name}',
+  'tui.languageSet': 'Lingua: {name}',
+  'tui.jobOpen': 'Apro {name}',
+  'tui.jobRead': 'Leggo {name}',
+  'tui.jobPreview': 'Preparo l’anteprima',
+  'tui.jobSave': 'Salvo {name}',
+  'tui.jobProcess': 'Elaboro a piena risoluzione',
+  'tui.jobWrite': 'Scrivo {size}',
+  'tui.jobDone': 'Fatto',
+  'tui.savedAs': 'Salvato: {name} ({size})',
+  'tui.saveFailed': 'Salvataggio fallito: {msg}',
+  'tui.loaded': '{name} · {size}',
+
+  'key.move': 'Scorri i parametri o i file',
+  'key.adjust': 'Regola il valore selezionato',
+  'key.adjustBig': 'Regola a passi di cinque',
+  'key.activate': 'Attiva: carica il file, gira l’interruttore',
+  'key.focus': 'Sposta il fuoco fra controlli e file',
+  'key.step': 'Immagine successiva e precedente',
+  'key.ends': 'Vai in cima / in fondo',
+  'key.mode': 'Cambia modo di anteprima',
+  'key.theme': 'Scegli il tema',
+  'key.preset': 'Applica un preset',
+  'key.lang': 'Scegli la lingua',
+  'key.invert': 'Inverti (scorciatoia)',
+  'key.reset': 'Azzera tutti i parametri',
+  'key.openPath': 'Apri un percorso',
+  'key.save': 'Salva a piena risoluzione',
+  'key.files': 'Mostra o nascondi la lista dei file',
+  'key.help': 'Questa schermata',
+  'key.quit': 'Esci',
+
+  'bar.move': 'scorri',
+  'bar.adjust': 'regola',
+  'bar.focus': 'fuoco',
+  'bar.preview': 'anteprima',
+  'bar.preset': 'preset',
+  'bar.theme': 'tema',
+  'bar.save': 'salva',
+  'bar.keys': 'tasti',
+  'bar.open': 'apri un percorso',
+  'bar.quit': 'esci',
+
+  'cli.tagline': 'dithering regolabile per le tue foto',
+  'cli.missingValue': 'Manca il valore per --{name}',
+  'cli.wantsNumber': '--{name} vuole un numero, non "{value}"',
+  'cli.noSuchValue': '--{name}: "{value}" non esiste. Valori: {list}',
+  'cli.noSuchPreset': 'Preset "{name}" inesistente. Disponibili: {list}',
+  'cli.noSuchMode': 'Modo "{name}" inesistente. Disponibili: {list}',
+  'cli.noSuchLang': 'Lingua "{name}" inesistente. Disponibili: {list}',
+  'cli.notFound': 'Non trovo {name}',
+  'cli.onlyPngJpeg': '{name}: accetto solo PNG e JPEG',
+  'cli.needPrintFile': 'Serve almeno un file da stampare',
+  'cli.needProcessFile': 'Serve almeno un file da elaborare',
+  'cli.manyFiles': 'Con piu’ file usa --out-dir al posto di --out',
+  'cli.notATty': 'Non sono su un terminale interattivo: usa -o per salvare o --print per stampare',
+  'cli.offSwitch': '(--no-{name} per spegnerlo)',
+  'cli.colourCount': '{n} colori',
+  'cli.listPalettes': 'PALETTE',
+  'cli.listAlgorithms': 'ALGORITMI',
+  'cli.listPresets': 'PRESET',
+  'cli.listThemes': 'TEMI',
+  'cli.listModes': 'ANTEPRIME',
+};
+
+const es = {
+  'group.dither': 'TRAMADO',
+  'group.tone': 'TONO',
+  'group.output': 'SALIDA',
+  'group.text': 'TEXTO',
+
+  'param.palette.label': 'Paleta',
+  'param.algorithm.label': 'Algoritmo',
+  'param.scale.label': 'Píxel',
+  'param.scale.hint': 'Reduce antes de tramar: 1 mantiene el detalle, 8 da bloques gordos de 8 bits',
+  'param.strength.label': 'Intensidad',
+  'param.strength.hint': 'Qué parte del error (o del ruido ordenado) se aplica',
+  'param.bias.label': 'Umbral',
+  'param.bias.hint': 'Mueve el punto de corte: negativo oscurece, positivo aclara',
+  'param.noise.label': 'Grano',
+  'param.noise.hint': 'Ruido aleatorio antes del umbral: rompe las tramas demasiado regulares',
+  'param.serpentine.label': 'Serpentina',
+  'param.serpentine.hint': 'Barrido alterno fila a fila: elimina las rayas diagonales',
+  'param.brightness.label': 'Brillo',
+  'param.contrast.label': 'Contraste',
+  'param.gamma.label': 'Gamma',
+  'param.saturation.label': 'Saturación',
+  'param.sharpen.label': 'Nitidez',
+  'param.sharpen.hint': 'Máscara de enfoque: recupera el detalle fino que se come el tramado',
+  'param.invert.label': 'Invertir',
+  'param.megapixels.label': 'Megapíxeles',
+  'param.megapixels.hint': 'Resolución del resultado: bájala para pixelar la foto a propósito',
+  'param.upscale.label': 'Ampliar',
+  'param.upscale.hint': 'Devuelve el resultado a su tamaño anterior con píxeles duros',
+
+  'palette.bw': '1 bit B/N',
+  'palette.gray4': 'Grises 4',
+  'palette.gray8': 'Grises 8',
+  'palette.gray16': 'Grises 16',
+  'palette.cgaCyan': 'CGA cian',
+  'palette.cgaGreen': 'CGA verde',
+  'palette.greenCrt': 'CRT verde',
+  'palette.amberCrt': 'CRT ámbar',
+  'palette.risograph': 'Risografía',
+  'palette.blueprint': 'Cianotipo',
+  'palette.custom': 'A medida',
+
+  'algorithm.none': 'Ninguno (umbral)',
+  'algorithm.random': 'Ruido aleatorio',
+  'algorithm.cluster4': 'Semitono 4x4',
+  'algorithm.cluster8': 'Semitono 8x8',
+  'algorithm.lines4': 'Líneas diagonales',
+  'algorithm.sierra2': 'Sierra 2 filas',
+
+  'preset.giornale': 'Prensa',
+  'preset.fanzine': 'Fanzine fotocopiado',
+  'preset.terminale': 'Terminal de fósforo',
+  'preset.arcade': 'Arcade 16 colores',
+  'preset.incisione': 'Grabado',
+
+  'mode.halfblock': 'Medios bloques',
+  'mode.quadrant': 'Cuadrantes',
+
+  'ui.presets': 'Ajustes',
+  'ui.colours': 'Colores',
+  'ui.open': 'Abrir foto',
+  'ui.noFile': 'ningún archivo elegido',
+  'ui.shoot': 'Disparar',
+  'ui.download': 'Descargar PNG',
+  'ui.reset': 'Reiniciar',
+  'ui.dropTitle': 'Arrastra aquí una foto',
+  'ui.dropButton': 'Elige una foto',
+  'ui.dropHint': 'o pégala con Ctrl+V — la imagen nunca sale de tu navegador',
+  'ui.noImage': 'ninguna imagen cargada',
+  'ui.addColour': 'Añadir un color',
+  'ui.removeColour': 'Quitar este color',
+  'ui.copyPalette': 'Copiar aquí la paleta elegida',
+  'ui.loading': 'Cargando…',
+  'ui.preparing': 'Preparando el PNG…',
+  'ui.language': 'Idioma',
+  'ui.view': 'Vista',
+  'ui.viewImage': 'Imagen',
+  'ui.copy': 'Copiar',
+  'ui.copied': 'Copiado',
+  'ui.copyFailed': 'No se pudo copiar',
+  'ui.columns': 'Columnas',
+  'ui.textHint': 'La foto escrita con caracteres. Cópiala y pégala donde quieras.',
+  'ui.error': 'Error: {msg}',
+  'ui.notAnImage': 'Ese archivo no es una imagen',
+  'ui.unreadable': 'No se puede leer la imagen',
+  'ui.exportFailed': 'Exportación fallida',
+  'ui.saved': 'Guardado: {name}',
+  'ui.cancelled': 'Guardado cancelado',
+  'ui.tooLarge': 'El PNG es demasiado grande: baja los megapíxeles',
+
+  'tui.preview': 'VISTA PREVIA',
+  'tui.controls': 'CONTROLES',
+  'tui.files': 'ARCHIVOS',
+  'tui.keys': 'TECLAS',
+  'tui.theme': 'TEMA',
+  'tui.preset': 'AJUSTE',
+  'tui.language': 'IDIOMA',
+  'tui.open': 'ABRIR',
+  'tui.save': 'GUARDAR',
+  'tui.tooSmall': 'Ventana demasiado pequeña (mínimo 40x12)',
+  'tui.noImageHint': 'ninguna imagen · o para abrir una ruta · ? para las teclas',
+  'tui.noImageHere': 'Aquí no hay imágenes. Pulsa o para abrir una ruta.',
+  'tui.openHint': 'Ruta de una imagen o de una carpeta',
+  'tui.saveHint': 'Archivo de destino (.png o .jpg) — se procesa a resolución completa',
+  'tui.confirm': 'intro confirma · esc cancela',
+  'tui.onlyPngJpg': 'Solo .png o .jpg',
+  'tui.noImageLoaded': 'Ninguna imagen cargada',
+  'tui.emptyFolder': 'La carpeta no tiene imágenes',
+  'tui.reset': 'Parámetros reiniciados',
+  'tui.previewMode': 'Vista previa: {name}',
+  'tui.previewShort': 'prev. {size}',
+  'tui.themeSet': 'Tema: {name}',
+  'tui.presetSet': 'Ajuste: {name}',
+  'tui.languageSet': 'Idioma: {name}',
+  'tui.jobOpen': 'Abriendo {name}',
+  'tui.jobRead': 'Leyendo {name}',
+  'tui.jobPreview': 'Preparando la vista previa',
+  'tui.jobSave': 'Guardando {name}',
+  'tui.jobProcess': 'Procesando a resolución completa',
+  'tui.jobWrite': 'Escribiendo {size}',
+  'tui.jobDone': 'Hecho',
+  'tui.savedAs': 'Guardado: {name} ({size})',
+  'tui.saveFailed': 'Fallo al guardar: {msg}',
+  'tui.loaded': '{name} · {size}',
+
+  'key.move': 'Recorre los parámetros o los archivos',
+  'key.adjust': 'Ajusta el valor seleccionado',
+  'key.adjustBig': 'Ajusta de cinco en cinco',
+  'key.activate': 'Activa: carga el archivo, cambia el interruptor',
+  'key.focus': 'Mueve el foco entre controles y archivos',
+  'key.step': 'Imagen siguiente y anterior',
+  'key.ends': 'Ir al principio / al final',
+  'key.mode': 'Cambia el modo de vista previa',
+  'key.theme': 'Elige el tema',
+  'key.preset': 'Aplica un ajuste',
+  'key.lang': 'Elige el idioma',
+  'key.invert': 'Invertir (atajo)',
+  'key.reset': 'Reinicia todos los parámetros',
+  'key.openPath': 'Abre una ruta',
+  'key.save': 'Guarda a resolución completa',
+  'key.files': 'Muestra u oculta la lista de archivos',
+  'key.help': 'Esta pantalla',
+  'key.quit': 'Salir',
+
+  'bar.move': 'mover',
+  'bar.adjust': 'ajustar',
+  'bar.focus': 'foco',
+  'bar.preview': 'vista',
+  'bar.preset': 'ajuste',
+  'bar.theme': 'tema',
+  'bar.save': 'guardar',
+  'bar.keys': 'teclas',
+  'bar.open': 'abrir una ruta',
+  'bar.quit': 'salir',
+
+  'cli.tagline': 'tramado ajustable para tus fotos',
+  'cli.missingValue': 'Falta el valor de --{name}',
+  'cli.wantsNumber': '--{name} espera un número, no "{value}"',
+  'cli.noSuchValue': '--{name}: "{value}" no existe. Valores: {list}',
+  'cli.noSuchPreset': 'El ajuste "{name}" no existe. Disponibles: {list}',
+  'cli.noSuchMode': 'El modo "{name}" no existe. Disponibles: {list}',
+  'cli.noSuchLang': 'El idioma "{name}" no existe. Disponibles: {list}',
+  'cli.notFound': 'No encuentro {name}',
+  'cli.onlyPngJpeg': '{name}: solo se aceptan PNG y JPEG',
+  'cli.needPrintFile': 'Hace falta al menos un archivo para imprimir',
+  'cli.needProcessFile': 'Hace falta al menos un archivo para procesar',
+  'cli.manyFiles': 'Con varios archivos usa --out-dir en lugar de --out',
+  'cli.notATty': 'No es una terminal interactiva: usa -o para guardar o --print para imprimir',
+  'cli.offSwitch': '(--no-{name} lo desactiva)',
+  'cli.colourCount': '{n} colores',
+  'cli.listPalettes': 'PALETAS',
+  'cli.listAlgorithms': 'ALGORITMOS',
+  'cli.listPresets': 'AJUSTES',
+  'cli.listThemes': 'TEMAS',
+  'cli.listModes': 'VISTAS PREVIAS',
+};
+
+const fr = {
+  'group.dither': 'TRAMAGE',
+  'group.tone': 'TONALITÉ',
+  'group.output': 'SORTIE',
+  'group.text': 'TEXTE',
+
+  'param.palette.label': 'Palette',
+  'param.algorithm.label': 'Algorithme',
+  'param.scale.label': 'Pixel',
+  'param.scale.hint': 'Réduit avant de tramer : 1 garde tout le détail, 8 donne de gros blocs 8 bits',
+  'param.strength.label': 'Intensité',
+  'param.strength.hint': 'Quelle part de l’erreur (ou du bruit ordonné) est appliquée',
+  'param.bias.label': 'Seuil',
+  'param.bias.hint': 'Déplace le point de coupe : négatif assombrit, positif éclaircit',
+  'param.noise.label': 'Grain',
+  'param.noise.hint': 'Bruit aléatoire avant le seuil : casse les trames trop régulières',
+  'param.serpentine.label': 'Serpentin',
+  'param.serpentine.hint': 'Balayage alterné ligne par ligne : supprime les traînées diagonales',
+  'param.brightness.label': 'Luminosité',
+  'param.contrast.label': 'Contraste',
+  'param.gamma.label': 'Gamma',
+  'param.saturation.label': 'Saturation',
+  'param.sharpen.label': 'Netteté',
+  'param.sharpen.hint': 'Masque de netteté : récupère le détail fin que le tramage mange',
+  'param.invert.label': 'Inverser',
+  'param.megapixels.label': 'Mégapixels',
+  'param.megapixels.hint': 'Résolution du résultat : baissez-la pour pixeliser la photo exprès',
+  'param.upscale.label': 'Agrandir',
+  'param.upscale.hint': 'Ramène le résultat à sa taille d’origine avec des pixels nets',
+
+  'palette.bw': '1 bit N/B',
+  'palette.gray4': 'Gris 4',
+  'palette.gray8': 'Gris 8',
+  'palette.gray16': 'Gris 16',
+  'palette.cgaCyan': 'CGA cyan',
+  'palette.cgaGreen': 'CGA vert',
+  'palette.greenCrt': 'CRT vert',
+  'palette.amberCrt': 'CRT ambre',
+  'palette.risograph': 'Risographie',
+  'palette.blueprint': 'Cyanotype',
+  'palette.custom': 'Sur mesure',
+
+  'algorithm.none': 'Aucun (seuil)',
+  'algorithm.random': 'Bruit aléatoire',
+  'algorithm.cluster4': 'Similigravure 4x4',
+  'algorithm.cluster8': 'Similigravure 8x8',
+  'algorithm.lines4': 'Lignes diagonales',
+  'algorithm.sierra2': 'Sierra 2 lignes',
+
+  'preset.giornale': 'Presse',
+  'preset.fanzine': 'Fanzine photocopié',
+  'preset.terminale': 'Terminal à phosphore',
+  'preset.arcade': 'Arcade 16 couleurs',
+  'preset.incisione': 'Gravure',
+
+  'mode.halfblock': 'Demi-blocs',
+  'mode.quadrant': 'Quadrants',
+
+  'ui.presets': 'Préréglages',
+  'ui.colours': 'Couleurs',
+  'ui.open': 'Ouvrir une photo',
+  'ui.noFile': 'aucun fichier choisi',
+  'ui.shoot': 'Photographier',
+  'ui.download': 'Télécharger le PNG',
+  'ui.reset': 'Réinitialiser',
+  'ui.dropTitle': 'Déposez une photo ici',
+  'ui.dropButton': 'Choisir une photo',
+  'ui.dropHint': 'ou collez-la avec Ctrl+V — l’image ne quitte jamais votre navigateur',
+  'ui.noImage': 'aucune image chargée',
+  'ui.addColour': 'Ajouter une couleur',
+  'ui.removeColour': 'Retirer cette couleur',
+  'ui.copyPalette': 'Copier ici la palette choisie',
+  'ui.loading': 'Chargement…',
+  'ui.preparing': 'Préparation du PNG…',
+  'ui.language': 'Langue',
+  'ui.view': 'Vue',
+  'ui.viewImage': 'Image',
+  'ui.copy': 'Copier',
+  'ui.copied': 'Copié',
+  'ui.copyFailed': 'Copie impossible',
+  'ui.columns': 'Colonnes',
+  'ui.textHint': 'La photo écrite en caractères. Copiez-la et collez-la où vous voulez.',
+  'ui.error': 'Erreur : {msg}',
+  'ui.notAnImage': 'Ce fichier n’est pas une image',
+  'ui.unreadable': 'Image illisible',
+  'ui.exportFailed': 'Échec de l’export',
+  'ui.saved': 'Enregistré : {name}',
+  'ui.cancelled': 'Enregistrement annulé',
+  'ui.tooLarge': 'Le PNG est trop gros : baissez les mégapixels',
+
+  'tui.preview': 'APERÇU',
+  'tui.controls': 'CONTRÔLES',
+  'tui.files': 'FICHIERS',
+  'tui.keys': 'TOUCHES',
+  'tui.theme': 'THÈME',
+  'tui.preset': 'PRÉRÉGLAGE',
+  'tui.language': 'LANGUE',
+  'tui.open': 'OUVRIR',
+  'tui.save': 'ENREGISTRER',
+  'tui.tooSmall': 'Fenêtre trop petite (40x12 minimum)',
+  'tui.noImageHint': 'aucune image · o pour ouvrir un chemin · ? pour les touches',
+  'tui.noImageHere': 'Aucune image ici. Appuyez sur o pour ouvrir un chemin.',
+  'tui.openHint': 'Chemin d’une image ou d’un dossier',
+  'tui.saveHint': 'Fichier de destination (.png ou .jpg) — traité en pleine résolution',
+  'tui.confirm': 'entrée valide · échap annule',
+  'tui.onlyPngJpg': 'Uniquement .png ou .jpg',
+  'tui.noImageLoaded': 'Aucune image chargée',
+  'tui.emptyFolder': 'Le dossier ne contient pas d’images',
+  'tui.reset': 'Paramètres réinitialisés',
+  'tui.previewMode': 'Aperçu : {name}',
+  'tui.previewShort': 'aper. {size}',
+  'tui.themeSet': 'Thème : {name}',
+  'tui.presetSet': 'Préréglage : {name}',
+  'tui.languageSet': 'Langue : {name}',
+  'tui.jobOpen': 'Ouverture de {name}',
+  'tui.jobRead': 'Lecture de {name}',
+  'tui.jobPreview': 'Préparation de l’aperçu',
+  'tui.jobSave': 'Enregistrement de {name}',
+  'tui.jobProcess': 'Traitement en pleine résolution',
+  'tui.jobWrite': 'Écriture de {size}',
+  'tui.jobDone': 'Terminé',
+  'tui.savedAs': 'Enregistré : {name} ({size})',
+  'tui.saveFailed': 'Échec de l’enregistrement : {msg}',
+  'tui.loaded': '{name} · {size}',
+
+  'key.move': 'Parcourir les paramètres ou les fichiers',
+  'key.adjust': 'Régler la valeur sélectionnée',
+  'key.adjustBig': 'Régler par pas de cinq',
+  'key.activate': 'Activer : charger le fichier, basculer l’interrupteur',
+  'key.focus': 'Déplacer le focus entre contrôles et fichiers',
+  'key.step': 'Image suivante et précédente',
+  'key.ends': 'Aller au début / à la fin',
+  'key.mode': 'Changer de mode d’aperçu',
+  'key.theme': 'Choisir le thème',
+  'key.preset': 'Appliquer un préréglage',
+  'key.lang': 'Choisir la langue',
+  'key.invert': 'Inverser (raccourci)',
+  'key.reset': 'Réinitialiser tous les paramètres',
+  'key.openPath': 'Ouvrir un chemin',
+  'key.save': 'Enregistrer en pleine résolution',
+  'key.files': 'Afficher ou masquer la liste des fichiers',
+  'key.help': 'Cet écran',
+  'key.quit': 'Quitter',
+
+  'bar.move': 'parcourir',
+  'bar.adjust': 'régler',
+  'bar.focus': 'focus',
+  'bar.preview': 'aperçu',
+  'bar.preset': 'préréglage',
+  'bar.theme': 'thème',
+  'bar.save': 'enreg.',
+  'bar.keys': 'touches',
+  'bar.open': 'ouvrir un chemin',
+  'bar.quit': 'quitter',
+
+  'cli.tagline': 'tramage réglable pour vos photos',
+  'cli.missingValue': 'Valeur manquante pour --{name}',
+  'cli.wantsNumber': '--{name} attend un nombre, pas « {value} »',
+  'cli.noSuchValue': '--{name} : « {value} » n’existe pas. Valeurs : {list}',
+  'cli.noSuchPreset': 'Le préréglage « {name} » n’existe pas. Disponibles : {list}',
+  'cli.noSuchMode': 'Le mode « {name} » n’existe pas. Disponibles : {list}',
+  'cli.noSuchLang': 'La langue « {name} » n’existe pas. Disponibles : {list}',
+  'cli.notFound': 'Introuvable : {name}',
+  'cli.onlyPngJpeg': '{name} : seuls PNG et JPEG sont acceptés',
+  'cli.needPrintFile': 'Il faut au moins un fichier à afficher',
+  'cli.needProcessFile': 'Il faut au moins un fichier à traiter',
+  'cli.manyFiles': 'Avec plusieurs fichiers, utilisez --out-dir au lieu de --out',
+  'cli.notATty': 'Pas un terminal interactif : utilisez -o pour enregistrer ou --print pour afficher',
+  'cli.offSwitch': '(--no-{name} le désactive)',
+  'cli.colourCount': '{n} couleurs',
+  'cli.listPalettes': 'PALETTES',
+  'cli.listAlgorithms': 'ALGORITHMES',
+  'cli.listPresets': 'PRÉRÉGLAGES',
+  'cli.listThemes': 'THÈMES',
+  'cli.listModes': 'APERÇUS',
+};
+
+const de = {
+  'group.dither': 'DITHERING',
+  'group.tone': 'TONWERT',
+  'group.output': 'AUSGABE',
+  'group.text': 'TEXT',
+
+  'param.palette.label': 'Palette',
+  'param.algorithm.label': 'Algorithmus',
+  'param.scale.label': 'Pixel',
+  'param.scale.hint': 'Verkleinert vor dem Dithern: 1 behält alle Details, 8 gibt grobe 8-Bit-Blöcke',
+  'param.strength.label': 'Stärke',
+  'param.strength.hint': 'Wie viel des Fehlers (oder des geordneten Rauschens) angewendet wird',
+  'param.bias.label': 'Schwelle',
+  'param.bias.hint': 'Verschiebt den Schnittpunkt: negativ dunkelt ab, positiv hellt auf',
+  'param.noise.label': 'Körnung',
+  'param.noise.hint': 'Zufälliges Rauschen vor der Schwelle: bricht zu regelmäßige Muster auf',
+  'param.serpentine.label': 'Serpentine',
+  'param.serpentine.hint': 'Zeilenweise wechselnde Laufrichtung: beseitigt diagonale Streifen',
+  'param.brightness.label': 'Helligkeit',
+  'param.contrast.label': 'Kontrast',
+  'param.gamma.label': 'Gamma',
+  'param.saturation.label': 'Sättigung',
+  'param.sharpen.label': 'Schärfe',
+  'param.sharpen.hint': 'Unscharfmaskierung: holt die feinen Details zurück, die das Dithering frisst',
+  'param.invert.label': 'Umkehren',
+  'param.megapixels.label': 'Megapixel',
+  'param.megapixels.hint': 'Auflösung des Ergebnisses: absenken, um das Foto absichtlich zu vergröbern',
+  'param.upscale.label': 'Vergrößern',
+  'param.upscale.hint': 'Bringt das Ergebnis mit harten Pixeln auf die alte Größe zurück',
+
+  'palette.bw': '1 Bit S/W',
+  'palette.gray4': 'Grau 4',
+  'palette.gray8': 'Grau 8',
+  'palette.gray16': 'Grau 16',
+  'palette.cgaCyan': 'CGA Cyan',
+  'palette.cgaGreen': 'CGA Grün',
+  'palette.greenCrt': 'CRT grün',
+  'palette.amberCrt': 'CRT bernstein',
+  'palette.risograph': 'Risografie',
+  'palette.blueprint': 'Blaupause',
+  'palette.custom': 'Eigene',
+
+  'algorithm.none': 'Keiner (Schwelle)',
+  'algorithm.random': 'Zufallsrauschen',
+  'algorithm.cluster4': 'Raster 4x4',
+  'algorithm.cluster8': 'Raster 8x8',
+  'algorithm.lines4': 'Diagonale Linien',
+  'algorithm.sierra2': 'Sierra 2 Zeilen',
+
+  'preset.giornale': 'Zeitungsdruck',
+  'preset.fanzine': 'Kopiertes Fanzine',
+  'preset.terminale': 'Phosphor-Terminal',
+  'preset.arcade': 'Arcade 16 Farben',
+  'preset.incisione': 'Kupferstich',
+
+  'mode.halfblock': 'Halbblöcke',
+  'mode.quadrant': 'Quadranten',
+
+  'ui.presets': 'Vorlagen',
+  'ui.colours': 'Farben',
+  'ui.open': 'Foto öffnen',
+  'ui.noFile': 'keine Datei gewählt',
+  'ui.shoot': 'Aufnehmen',
+  'ui.download': 'PNG laden',
+  'ui.reset': 'Zurücksetzen',
+  'ui.dropTitle': 'Foto hierher ziehen',
+  'ui.dropButton': 'Foto auswählen',
+  'ui.dropHint': 'oder mit Strg+V einfügen — das Bild verlässt deinen Browser nie',
+  'ui.noImage': 'kein Bild geladen',
+  'ui.addColour': 'Farbe hinzufügen',
+  'ui.removeColour': 'Diese Farbe entfernen',
+  'ui.copyPalette': 'Gewählte Palette hierher kopieren',
+  'ui.loading': 'Lade…',
+  'ui.preparing': 'Bereite das PNG vor…',
+  'ui.language': 'Sprache',
+  'ui.view': 'Ansicht',
+  'ui.viewImage': 'Bild',
+  'ui.copy': 'Kopieren',
+  'ui.copied': 'Kopiert',
+  'ui.copyFailed': 'Kopieren fehlgeschlagen',
+  'ui.columns': 'Spalten',
+  'ui.textHint': 'Das Foto in Zeichen geschrieben. Kopieren und einfügen, wo du willst.',
+  'ui.error': 'Fehler: {msg}',
+  'ui.notAnImage': 'Diese Datei ist kein Bild',
+  'ui.unreadable': 'Bild nicht lesbar',
+  'ui.exportFailed': 'Export fehlgeschlagen',
+  'ui.saved': 'Gespeichert: {name}',
+  'ui.cancelled': 'Speichern abgebrochen',
+  'ui.tooLarge': 'Das PNG ist zu groß: Megapixel verringern',
+
+  'tui.preview': 'VORSCHAU',
+  'tui.controls': 'REGLER',
+  'tui.files': 'DATEIEN',
+  'tui.keys': 'TASTEN',
+  'tui.theme': 'THEMA',
+  'tui.preset': 'VORLAGE',
+  'tui.language': 'SPRACHE',
+  'tui.open': 'ÖFFNEN',
+  'tui.save': 'SPEICHERN',
+  'tui.tooSmall': 'Fenster zu klein (mindestens 40x12)',
+  'tui.noImageHint': 'kein Bild · o öffnet einen Pfad · ? zeigt die Tasten',
+  'tui.noImageHere': 'Hier ist kein Bild. Drücke o, um einen Pfad zu öffnen.',
+  'tui.openHint': 'Pfad zu einem Bild oder einem Ordner',
+  'tui.saveHint': 'Zieldatei (.png oder .jpg) — wird in voller Auflösung verarbeitet',
+  'tui.confirm': 'Eingabe bestätigt · Esc bricht ab',
+  'tui.onlyPngJpg': 'Nur .png oder .jpg',
+  'tui.noImageLoaded': 'Kein Bild geladen',
+  'tui.emptyFolder': 'Ordner enthält keine Bilder',
+  'tui.reset': 'Parameter zurückgesetzt',
+  'tui.previewMode': 'Vorschau: {name}',
+  'tui.previewShort': 'vors. {size}',
+  'tui.themeSet': 'Thema: {name}',
+  'tui.presetSet': 'Vorlage: {name}',
+  'tui.languageSet': 'Sprache: {name}',
+  'tui.jobOpen': 'Öffne {name}',
+  'tui.jobRead': 'Lese {name}',
+  'tui.jobPreview': 'Bereite die Vorschau vor',
+  'tui.jobSave': 'Speichere {name}',
+  'tui.jobProcess': 'Verarbeite in voller Auflösung',
+  'tui.jobWrite': 'Schreibe {size}',
+  'tui.jobDone': 'Fertig',
+  'tui.savedAs': 'Gespeichert: {name} ({size})',
+  'tui.saveFailed': 'Speichern fehlgeschlagen: {msg}',
+  'tui.loaded': '{name} · {size}',
+
+  'key.move': 'Durch Parameter oder Dateien blättern',
+  'key.adjust': 'Gewählten Wert verstellen',
+  'key.adjustBig': 'In Fünferschritten verstellen',
+  'key.activate': 'Auslösen: Datei laden, Schalter umlegen',
+  'key.focus': 'Fokus zwischen Reglern und Dateien wechseln',
+  'key.step': 'Nächstes und vorheriges Bild',
+  'key.ends': 'An den Anfang / ans Ende springen',
+  'key.mode': 'Vorschaumodus wechseln',
+  'key.theme': 'Thema wählen',
+  'key.preset': 'Vorlage anwenden',
+  'key.lang': 'Sprache wählen',
+  'key.invert': 'Umkehren (Kürzel)',
+  'key.reset': 'Alle Parameter zurücksetzen',
+  'key.openPath': 'Einen Pfad öffnen',
+  'key.save': 'In voller Auflösung speichern',
+  'key.files': 'Dateiliste ein- oder ausblenden',
+  'key.help': 'Dieser Bildschirm',
+  'key.quit': 'Beenden',
+
+  'bar.move': 'blättern',
+  'bar.adjust': 'regeln',
+  'bar.focus': 'Fokus',
+  'bar.preview': 'Vorschau',
+  'bar.preset': 'Vorlage',
+  'bar.theme': 'Thema',
+  'bar.save': 'sichern',
+  'bar.keys': 'Tasten',
+  'bar.open': 'Pfad öffnen',
+  'bar.quit': 'beenden',
+
+  'cli.tagline': 'einstellbares Dithering für deine Fotos',
+  'cli.missingValue': 'Wert für --{name} fehlt',
+  'cli.wantsNumber': '--{name} erwartet eine Zahl, nicht „{value}“',
+  'cli.noSuchValue': '--{name}: „{value}“ gibt es nicht. Werte: {list}',
+  'cli.noSuchPreset': 'Vorlage „{name}“ gibt es nicht. Verfügbar: {list}',
+  'cli.noSuchMode': 'Modus „{name}“ gibt es nicht. Verfügbar: {list}',
+  'cli.noSuchLang': 'Sprache „{name}“ gibt es nicht. Verfügbar: {list}',
+  'cli.notFound': '{name} nicht gefunden',
+  'cli.onlyPngJpeg': '{name}: nur PNG und JPEG werden akzeptiert',
+  'cli.needPrintFile': 'Mindestens eine Datei zum Ausgeben nötig',
+  'cli.needProcessFile': 'Mindestens eine Datei zum Verarbeiten nötig',
+  'cli.manyFiles': 'Bei mehreren Dateien --out-dir statt --out verwenden',
+  'cli.notATty': 'Kein interaktives Terminal: -o zum Speichern oder --print zur Ausgabe',
+  'cli.offSwitch': '(--no-{name} schaltet es aus)',
+  'cli.colourCount': '{n} Farben',
+  'cli.listPalettes': 'PALETTEN',
+  'cli.listAlgorithms': 'ALGORITHMEN',
+  'cli.listPresets': 'VORLAGEN',
+  'cli.listThemes': 'THEMEN',
+  'cli.listModes': 'VORSCHAUEN',
+};
+
+const DIZIONARI = { en, it, es, fr, de };
+
+/** La lingua e' valida se la conosciamo; se no si ricade sull'inglese. */
+function normalizeLocale(locale) {
+  if (!locale) return DEFAULT_LOCALE;
+  const corto = String(locale).toLowerCase().split(/[-_]/)[0];
+  return LOCALES.includes(corto) ? corto : DEFAULT_LOCALE;
+}
+
+/**
+ * Lingua da usare quando nessuno ne ha chiesta una.
+ * Nel browser si guarda cosa preferisce chi legge; altrove, inglese.
+ */
+function detectLocale(preferite) {
+  const elenco = preferite
+    || (typeof navigator !== 'undefined' && (navigator.languages || [navigator.language]))
+    || [];
+  for (const l of elenco) {
+    const corto = String(l || '').toLowerCase().split(/[-_]/)[0];
+    if (LOCALES.includes(corto)) return corto;
+  }
+  return DEFAULT_LOCALE;
+}
+
+/**
+ * Costruisce la funzione di traduzione per una lingua.
+ *
+ * `t('ui.copy')` restituisce la stringa; `t('ui.saved', { name: 'x.png' })`
+ * sostituisce i segnaposto fra graffe. Una chiave che non esiste torna com'e',
+ * cosi' un refuso si vede subito invece di sparire in una stringa vuota.
+ */
+function createTranslator(locale) {
+  const lingua = normalizeLocale(locale);
+  const dizionario = DIZIONARI[lingua];
+  const t = (key, valori) => {
+    const testo = (dizionario && dizionario[key]) ?? en[key] ?? key;
+    if (!valori) return testo;
+    return testo.replace(/\{(\w+)\}/g, (intero, nome) => (
+      valori[nome] === undefined ? intero : String(valori[nome])
+    ));
+  };
+  t.locale = lingua;
+  return t;
+}
+
+/** Tutte le chiavi conosciute: la usano i test per scovare buchi e refusi. */
+function allKeys() {
+  return Object.keys(en);
+}
+
+
+
+/** Vero se la chiave esiste nel riferimento inglese. Serve ai suggerimenti,
+ *  che non tutti i parametri hanno. */
+function hasKey(key) {
+  return en[key] !== undefined;
+}
+
+  return { DEFAULT_LOCALE, DICTIONARIES: DIZIONARI, LOCALES, LOCALE_NAMES, allKeys, createTranslator, detectLocale, hasKey, normalizeLocale };
+})();
+
+const __m_src_core_textart_js = (() => {
+  const { luma, resampleBox, applyAdjustments, sharpen } = __m_src_core_adjust_js;
+  const { ditherImage } = __m_src_core_dither_js;
+  const { paletteInfo } = __m_src_core_palettes_js;
+/**
+ * L'immagine scritta con i caratteri.
+ *
+ * Due modi, con due compromessi diversi:
+ *  - ascii   un carattere per pixel, scelto su una rampa di densita'. Si
+ *            incolla ovunque, perche' usa solo caratteri che ogni font ha.
+ *  - braille otto punti per cella, cioe' 2x4 pixel: quattro volte il
+ *            dettaglio, ma i glifi braille mancano da parecchi font e
+ *            altrove le colonne si sfalsano.
+ *
+ * Qui sta solo la parte comune - quale carattere per quale pixel - cosi'
+ * terminale e browser disegnano la stessa immagine invece di due varianti
+ * che col tempo divergono.
+ */
+
+
+
+
+
+/** Dal buio al pieno. Pensata per fondo scuro: piu' denso = piu' chiaro. */
+const ASCII_RAMP = ' .·:;+=xX$&@█';
+
+const TEXT_MODES = ['ascii', 'braille'];
+
+/**
+ * Quanti pixel entrano in una cella, e quanto va allargata l'immagine perche'
+ * a schermo torni con le proporzioni giuste: una cella di testo e' larga uno
+ * e alta circa due.
+ */
+const TEXT_CELLS = {
+  ascii: { cx: 1, cy: 1, ratio: 2 },
+  braille: { cx: 2, cy: 4, ratio: 1 },
+};
+
+/** Il carattere della rampa per una luminanza 0-255. */
+function asciiChar(l) {
+  const ultimo = ASCII_RAMP.length - 1;
+  return ASCII_RAMP[Math.max(0, Math.min(ultimo, Math.round((l / 255) * ultimo)))];
+}
+
+/**
+ * Soglia adattiva: la meta' fra il pixel piu' scuro e il piu' chiaro.
+ * Su un'immagine gia' ditherata a due tinte cade esattamente in mezzo.
+ */
+function brailleThreshold(img) {
+  let min = 255;
+  let max = 0;
+  for (let i = 0; i < img.data.length; i += 4) {
+    const l = luma(img.data[i], img.data[i + 1], img.data[i + 2]);
+    if (l < min) min = l;
+    if (l > max) max = l;
+  }
+  return (min + max) / 2;
+}
+
+/**
+ * La cella braille che parte da (x, y): quali punti accendere e di che
+ * colore sono in media i pixel accesi.
+ * @returns {{char: string, bits: number, colour: number[]|null}}
+ */
+function brailleCell(img, x, y, threshold) {
+  let bits = 0;
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  let accesi = 0;
+  for (let dy = 0; dy < 4; dy++) {
+    for (let dx = 0; dx < 2; dx++) {
+      const sx = x + dx;
+      const sy = y + dy;
+      if (sx >= img.width || sy >= img.height) continue;
+      const i = (sy * img.width + sx) * 4;
+      const [cr, cg, cb] = [img.data[i], img.data[i + 1], img.data[i + 2]];
+      if (luma(cr, cg, cb) <= threshold) continue;
+      // Numerazione dei punti braille: i primi tre di ogni colonna sono
+      // contigui, il quarto sta nei due bit alti.
+      bits |= dy < 3 ? 1 << (dy + 3 * dx) : 0x40 << dx;
+      r += cr; g += cg; b += cb;
+      accesi++;
+    }
+  }
+  return {
+    char: String.fromCharCode(0x2800 + bits),
+    bits,
+    colour: accesi ? [r / accesi, g / accesi, b / accesi] : null,
+  };
+}
+
+/**
+ * Le misure in pixel che l'immagine deve avere per riempire `cols` colonne
+ * di testo in questo modo, senza deformarsi.
+ */
+function textTarget(srcWidth, srcHeight, cols, mode) {
+  const m = TEXT_CELLS[mode] || TEXT_CELLS.ascii;
+  const width = Math.max(m.cx, Math.round(cols) * m.cx);
+  // Proporzioni: la cella e' alta circa il doppio di quanto e' larga.
+  const height = Math.max(m.cy, Math.round((width / (srcWidth / srcHeight)) / m.ratio));
+  return {
+    width,
+    height: Math.ceil(height / m.cy) * m.cy,
+    cols: Math.round(cols),
+    rows: Math.ceil(height / m.cy),
+  };
+}
+
+/** Ridimensiona un'immagine perche' stia in `cols` colonne di testo. */
+function fitForText(img, cols, mode) {
+  const t = textTarget(img.width, img.height, cols, mode);
+  return resampleBox(img, t.width, t.height);
+}
+
+/**
+ * L'immagine come testo semplice, senza colori: pronta da copiare e
+ * incollare. L'immagine deve gia' avere le misure date da textTarget.
+ */
+function toText(img, mode = 'ascii') {
+  const righe = [];
+  if (mode === 'braille') {
+    const soglia = brailleThreshold(img);
+    for (let y = 0; y < img.height; y += 4) {
+      let riga = '';
+      for (let x = 0; x < img.width; x += 2) riga += brailleCell(img, x, y, soglia).char;
+      righe.push(riga.replace(/⠀+$/, ''));
+    }
+  } else {
+    for (let y = 0; y < img.height; y++) {
+      let riga = '';
+      for (let x = 0; x < img.width; x++) {
+        const i = (y * img.width + x) * 4;
+        riga += asciiChar(luma(img.data[i], img.data[i + 1], img.data[i + 2]));
+      }
+      righe.push(riga.replace(/ +$/, ''));
+    }
+  }
+  return righe.join('\n');
+}
+
+/**
+ * Dall'immagine di partenza al testo, passando per le regolazioni di tono.
+ *
+ * I due modi vogliono trattamenti opposti, ed e' il motivo per cui questa
+ * funzione esiste invece di lasciar fare al chiamante:
+ *  - l'ASCII **non** va ditherato. La rampa ha gia' tredici livelli, e
+ *    ridurre a due tinte prima di mapparla li butta via: verrebbero righe
+ *    di blocchi pieni al posto di una figura leggibile.
+ *  - il braille invece **va** ditherato, perche' un punto o c'e' o non c'e':
+ *    la gradazione la fa il dithering con la densita' dei puntini.
+ *
+ * @param {object} source immagine di partenza (RGBA)
+ * @param {object} options `mode`, `cols`, piu' i parametri di tono e
+ *   l'algoritmo, gli stessi che usa il resto del motore.
+ */
+function imageToText(source, options = {}) {
+  const mode = TEXT_MODES.includes(options.mode) ? options.mode : 'ascii';
+  const cols = Math.max(8, Math.min(400, Math.round(options.cols || 80)));
+
+  const piccola = fitForText(source, cols, mode);
+  applyAdjustments(piccola, options);
+  if (options.sharpen) sharpen(piccola, options.sharpen);
+
+  if (mode !== 'braille') return toText(piccola, 'ascii');
+
+  const { colors, ramp } = paletteInfo('bw');
+  const ditherata = ditherImage(piccola, {
+    algorithm: options.algorithm || 'atkinson',
+    colors,
+    ramp,
+    strength: (options.strength ?? 100) / 100,
+    bias: options.bias ?? 0,
+    noise: options.noise ?? 0,
+    serpentine: options.serpentine !== false,
+  });
+  return toText(ditherata, 'braille');
+}
+
+  return { ASCII_RAMP, TEXT_CELLS, TEXT_MODES, asciiChar, brailleCell, brailleThreshold, fitForText, imageToText, textTarget, toText };
 })();
 
 const __m_src_core_options_js = (() => {
-  const { ALGORITHMS, ALGORITHM_LABELS } = __m_src_core_dither_js;
-  const { PALETTES, PALETTE_KEYS, isCustomPalette } = __m_src_core_palettes_js;
+  const { ALGORITHMS } = __m_src_core_dither_js;
+  const { PALETTE_KEYS, isCustomPalette } = __m_src_core_palettes_js;
+  const { createTranslator, hasKey } = __m_src_core_i18n_js;
 /**
  * Schema dei parametri, definito una volta sola.
  * Sia il widget web sia la TUI costruiscono i propri controlli iterando
@@ -939,30 +2087,26 @@ const __m_src_core_options_js = (() => {
 
 
 
+
 /** @typedef {'enum'|'range'|'bool'} ParamType */
 
 const PARAMS = [
   {
     key: 'palette',
-    label: 'Palette',
     group: 'dither',
     type: 'enum',
     values: PALETTE_KEYS,
-    labels: Object.fromEntries(PALETTE_KEYS.map((k) => [k, PALETTES[k].label])),
     default: 'bw',
   },
   {
     key: 'algorithm',
-    label: 'Algoritmo',
     group: 'dither',
     type: 'enum',
     values: ALGORITHMS,
-    labels: ALGORITHM_LABELS,
     default: 'floydSteinberg',
   },
   {
     key: 'scale',
-    label: 'Pixel',
     group: 'dither',
     type: 'range',
     min: 1,
@@ -970,11 +2114,9 @@ const PARAMS = [
     step: 1,
     default: 1,
     unit: 'x',
-    hint: 'Riduce prima di ditherare: 1 = dettaglio pieno, 8 = pixelone da 8 bit',
   },
   {
     key: 'strength',
-    label: 'Intensità',
     group: 'dither',
     type: 'range',
     min: 0,
@@ -982,22 +2124,18 @@ const PARAMS = [
     step: 5,
     default: 100,
     unit: '%',
-    hint: 'Quanta parte dell’errore (o del rumore ordinato) viene applicata',
   },
   {
     key: 'bias',
-    label: 'Soglia',
     group: 'dither',
     type: 'range',
     min: -100,
     max: 100,
     step: 1,
     default: 0,
-    hint: 'Sposta il punto di taglio: negativo scurisce, positivo schiarisce',
   },
   {
     key: 'noise',
-    label: 'Grana',
     group: 'dither',
     type: 'range',
     min: 0,
@@ -1005,20 +2143,16 @@ const PARAMS = [
     step: 1,
     default: 0,
     unit: '%',
-    hint: 'Rumore casuale prima della soglia: rompe le bande troppo regolari',
   },
   {
     key: 'serpentine',
-    label: 'Serpentina',
     group: 'dither',
     type: 'bool',
     default: true,
-    hint: 'Scansione alternata riga per riga: elimina le strisciate diagonali',
   },
 
   {
     key: 'brightness',
-    label: 'Luminosità',
     group: 'tone',
     type: 'range',
     min: -100,
@@ -1028,7 +2162,6 @@ const PARAMS = [
   },
   {
     key: 'contrast',
-    label: 'Contrasto',
     group: 'tone',
     type: 'range',
     min: -100,
@@ -1038,7 +2171,6 @@ const PARAMS = [
   },
   {
     key: 'gamma',
-    label: 'Gamma',
     group: 'tone',
     type: 'range',
     min: 0.2,
@@ -1049,7 +2181,6 @@ const PARAMS = [
   },
   {
     key: 'saturation',
-    label: 'Saturazione',
     group: 'tone',
     type: 'range',
     min: -100,
@@ -1059,7 +2190,6 @@ const PARAMS = [
   },
   {
     key: 'sharpen',
-    label: 'Nitidezza',
     group: 'tone',
     type: 'range',
     min: 0,
@@ -1067,11 +2197,9 @@ const PARAMS = [
     step: 5,
     default: 0,
     unit: '%',
-    hint: 'Maschera di contrasto: recupera i dettagli che il dithering mangia',
   },
   {
     key: 'invert',
-    label: 'Inverti',
     group: 'tone',
     type: 'bool',
     default: false,
@@ -1079,7 +2207,6 @@ const PARAMS = [
 
   {
     key: 'megapixels',
-    label: 'Megapixel',
     group: 'output',
     type: 'range',
     // Gradini scelti a mano invece di un intervallo regolare: fra 0.01 e 24
@@ -1093,15 +2220,12 @@ const PARAMS = [
     ],
     default: 2,
     format: formatMegapixels,
-    hint: 'Risoluzione del risultato: abbassala per sgranare di proposito la foto',
   },
   {
     key: 'upscale',
-    label: 'Ringrandisci',
     group: 'output',
     type: 'bool',
     default: true,
-    hint: 'Riporta il risultato alla dimensione di prima con pixel netti',
   },
 ];
 
@@ -1116,46 +2240,75 @@ for (const p of PARAMS) {
 
 const PARAM_BY_KEY = Object.fromEntries(PARAMS.map((p) => [p.key, p]));
 
-const GROUP_LABELS = {
-  dither: 'DITHER',
-  tone: 'TONO',
-  output: 'OUTPUT',
-};
+/**
+ * Etichette tradotte.
+ *
+ * I dati qui sopra non portano piu' testo: le scritte arrivano tutte da
+ * i18n.js, cosi' una stringa si traduce una volta sola e nessuna interfaccia
+ * puo' restare indietro rispetto alle altre. Ogni funzione vuole il
+ * traduttore della lingua scelta; senza, si parla inglese.
+ */
+const inglese = createTranslator('en');
+
+function groupLabel(group, t = inglese) {
+  return t(`group.${group}`);
+}
+
+function paramLabel(param, t = inglese) {
+  return t(`param.${param.key}.label`);
+}
+
+/** Il suggerimento e' facoltativo: non tutti i parametri ne hanno uno. */
+function paramHint(param, t = inglese) {
+  const key = `param.${param.key}.hint`;
+  return hasKey(key) ? t(key) : null;
+}
+
+function paletteLabel(key, t = inglese) {
+  return t(`palette.${key}`);
+}
+
+function algorithmLabel(key, t = inglese) {
+  return t(`algorithm.${key}`);
+}
+
+function presetLabel(key, t = inglese) {
+  return t(`preset.${key}`);
+}
+
+/** L'etichetta di un valore di un parametro a elenco. */
+function enumLabel(param, value, t = inglese) {
+  if (param.key === 'palette') return paletteLabel(value, t);
+  if (param.key === 'algorithm') return algorithmLabel(value, t);
+  return String(value);
+}
 
 const DEFAULTS = Object.fromEntries(PARAMS.map((p) => [p.key, p.default]));
 
 /** Preset pronti: la stessa lista alimenta il menu web e il picker della TUI. */
 const PRESETS = {
   macintosh: {
-    label: 'Macintosh 1984',
     options: { palette: 'bw', algorithm: 'atkinson', contrast: 15, sharpen: 40 },
   },
   giornale: {
-    label: 'Giornale',
     options: { palette: 'bw', algorithm: 'cluster8', scale: 2, contrast: 20 },
   },
   gameboy: {
-    label: 'Game Boy',
     options: { palette: 'gameboy', algorithm: 'bayer4', scale: 4, contrast: 10 },
   },
   fanzine: {
-    label: 'Fanzine fotocopiata',
     options: { palette: 'bw', algorithm: 'bayer8', contrast: 45, sharpen: 80, noise: 8 },
   },
   terminale: {
-    label: 'Terminale a fosfori',
     options: { palette: 'greenCrt', algorithm: 'bayer4', scale: 2, contrast: 25 },
   },
   arcade: {
-    label: 'Arcade 16 colori',
     options: { palette: 'pico8', algorithm: 'floydSteinberg', scale: 3, saturation: 25 },
   },
   cga: {
-    label: 'CGA 1981',
     options: { palette: 'cgaCyan', algorithm: 'bayer4', scale: 3, saturation: 20 },
   },
   incisione: {
-    label: 'Incisione',
     options: { palette: 'bw', algorithm: 'lines4', contrast: 30, sharpen: 60 },
   },
 };
@@ -1248,11 +2401,11 @@ function normalizeOptions(input = {}) {
 }
 
 /** Testo del valore di un parametro, usato identico da web e terminale. */
-function formatValue(param, value) {
+function formatValue(param, value, t = inglese) {
   if (param.type === 'bool') return value ? 'ON' : 'OFF';
   if (param.type === 'enum') {
-    if (isCustomPalette(value)) return 'Personalizzata';
-    return (param.labels && param.labels[value]) || String(value);
+    if (isCustomPalette(value)) return t('palette.custom');
+    return enumLabel(param, value, t);
   }
   if (param.format) return param.format(Number(value));
   const n = Number(value);
@@ -1267,7 +2420,7 @@ function applyPreset(name, base = DEFAULTS) {
   return normalizeOptions({ ...base, ...preset.options });
 }
 
-  return { DEFAULTS, GROUP_LABELS, PARAMS, PARAM_BY_KEY, PRESETS, applyPreset, formatValue, normalizeOptions, paramSteps, stepBy, stepIndex };
+  return { DEFAULTS, PARAMS, PARAM_BY_KEY, PRESETS, algorithmLabel, applyPreset, enumLabel, formatValue, groupLabel, normalizeOptions, paletteLabel, paramHint, paramLabel, paramSteps, presetLabel, stepBy, stepIndex };
 })();
 
 const __m_src_core_process_js = (() => {
@@ -1354,10 +2507,10 @@ function targetSize(width, height, megapixels) {
   return { processImage, targetSize };
 })();
 
-const __m_src_core_index_js = Object.assign({}, __m_src_core_palettes_js, __m_src_core_matrices_js, __m_src_core_adjust_js, __m_src_core_dither_js, __m_src_core_options_js, __m_src_core_process_js);
+const __m_src_core_index_js = Object.assign({}, __m_src_core_i18n_js, __m_src_core_palettes_js, __m_src_core_matrices_js, __m_src_core_adjust_js, __m_src_core_dither_js, __m_src_core_textart_js, __m_src_core_options_js, __m_src_core_process_js);
 
 const __m_src_web_ditherbox_js = (() => {
-  const { PARAMS, GROUP_LABELS, PRESETS, DEFAULTS, PALETTES, normalizeOptions, formatValue, applyPreset, paramSteps, stepIndex, processImage, targetSize, resampleBox, fitWithin, paletteInfo, rgbToHex, stringifyPalette, isCustomPalette } = __m_src_core_index_js;
+  const { PARAMS, PRESETS, DEFAULTS, PALETTES, normalizeOptions, formatValue, applyPreset, paramSteps, stepIndex, groupLabel, paramLabel, paramHint, presetLabel, paletteLabel, enumLabel, processImage, targetSize, resampleBox, fitWithin, paletteInfo, rgbToHex, stringifyPalette, isCustomPalette, imageToText, TEXT_MODES, createTranslator, detectLocale, normalizeLocale, LOCALES, LOCALE_NAMES } = __m_src_core_index_js;
 /**
  * DitherBox - widget per il browser.
  *
@@ -1406,12 +2559,40 @@ async function decodeSource(source) {
     img.decoding = 'async';
     await new Promise((resolve, reject) => {
       img.onload = resolve;
-      img.onerror = () => reject(new Error('Immagine non leggibile'));
+      img.onerror = () => reject(new Error('unreadable'));
       img.src = url;
     });
     return img;
   } finally {
     if (source instanceof Blob) URL.revokeObjectURL(url);
+  }
+}
+
+/**
+ * Scrive negli appunti. L'API moderna esiste solo in contesto sicuro
+ * (https o localhost); altrove si ripiega sulla selezione di un campo
+ * nascosto, che e' brutta ma funziona da vent'anni.
+ */
+async function scriviNegliAppunti(testo) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(testo);
+      return true;
+    }
+  } catch { /* si prova il ripiego */ }
+
+  try {
+    const area = document.createElement('textarea');
+    area.value = testo;
+    area.setAttribute('readonly', '');
+    area.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+    document.body.appendChild(area);
+    area.select();
+    const esito = document.execCommand('copy');
+    area.remove();
+    return esito;
+  } catch {
+    return false;
   }
 }
 
@@ -1439,6 +2620,10 @@ class DitherBox {
    * @param {'dark'|'light'} [config.theme]  impone lo schema invece di
    *   seguire le preferenze del sistema: serve ai siti che vivono di un
    *   solo schema e non devono ribaltarsi addosso al visitatore.
+   * @param {string} [config.lang]  lingua dell'interfaccia (en, it, es, fr,
+   *   de). Senza indicazione si guarda quella del browser, e se non e' fra
+   *   queste si parla inglese.
+   * @param {boolean} [config.languagePicker=true] mostra il selettore.
    */
   constructor(target, config = {}) {
     const root = typeof target === 'string' ? document.querySelector(target) : target;
@@ -1448,9 +2633,14 @@ class DitherBox {
     this.config = {
       previewMaxSize: 900,
       presets: true,
+      languagePicker: true,
       downloadName: 'ditherbox.png',
       ...config,
     };
+    this.locale = config.lang ? normalizeLocale(config.lang) : detectLocale();
+    this.t = createTranslator(this.locale);
+    this.view = 'image';           // image | ascii | braille
+    this.textCols = 100;
     this.options = normalizeOptions(config.options);
     this.source = null;        // ImageData a piena risoluzione
     this.previewBase = null;   // copia ridotta, base di tutte le anteprime
@@ -1469,7 +2659,8 @@ class DitherBox {
 
   /** Carica un File, un Blob o un URL. */
   async load(source, name) {
-    this.#status('Carico…');
+    const t = this.t;
+    this.#status(t('ui.loading'));
     try {
       const drawable = await decodeSource(source);
       this.source = toImageData(drawable);
@@ -1482,7 +2673,7 @@ class DitherBox {
       this.previewCache = null;
       this.sourceName = name || (source instanceof File ? source.name : null);
       this.root.classList.add('is-loaded');
-      if (this.fileName) this.fileName.textContent = this.sourceName || 'immagine caricata';
+      if (this.fileName) this.fileName.textContent = this.sourceName || t('ui.noFile');
       this.render();
       this.#emit('load', { width: this.source.width, height: this.source.height });
     } catch (err) {
@@ -1503,6 +2694,61 @@ class DitherBox {
     return { ...this.options };
   }
 
+  /** Cambia la lingua dell'interfaccia e ridisegna i controlli. */
+  setLocale(locale) {
+    const nuova = normalizeLocale(locale);
+    if (nuova === this.locale) return;
+    this.locale = nuova;
+    this.t = createTranslator(nuova);
+    // I controlli portano il testo dentro: si ricostruiscono invece di
+    // rincorrere ogni etichetta. Lo stato sta tutto in this.options.
+    this.controls.clear();
+    this.#build();
+    this.render();
+    this.#emit('change', this.getOptions());
+  }
+
+  getLocale() {
+    return this.locale;
+  }
+
+  /** Passa fra immagine, ASCII e braille. */
+  setView(view) {
+    this.view = ['ascii', 'braille'].includes(view) ? view : 'image';
+    this.#syncView();
+    this.render();
+  }
+
+  getView() {
+    return this.view;
+  }
+
+  /** Il testo della vista corrente, anche senza cambiare vista. */
+  toText(mode = this.view === 'image' ? 'ascii' : this.view) {
+    if (!this.source) throw new Error(this.t('ui.noImage'));
+    return imageToText(this.source, { ...this.options, mode, cols: this.textCols });
+  }
+
+  /**
+   * Copia negli appunti il testo della vista.
+   *
+   * `navigator.clipboard` non c'e' fuori dai contesti sicuri e in qualche
+   * browser vecchio: in quel caso si ripiega sulla vecchia selezione di un
+   * campo nascosto, che funziona ovunque.
+   */
+  async copyText() {
+    let testo;
+    try {
+      testo = this.toText();
+    } catch (err) {
+      this.#fail(err);
+      return false;
+    }
+    const riuscito = await scriviNegliAppunti(testo);
+    this.#flashCopy(riuscito);
+    return riuscito;
+  }
+
   /** Torna ai valori di partenza. */
   reset() {
     this.set({ ...DEFAULTS, ...(this.config.options || {}) });
@@ -1510,7 +2756,7 @@ class DitherBox {
 
   /** Ricalcola l anteprima. Debounced: gli slider sparano decine di eventi. */
   render() {
-    if (!this.previewBase) return;
+    if (!this.source) return;
     if (this._pending) cancelAnimationFrame(this._pending);
     this._pending = requestAnimationFrame(() => {
       this._pending = null;
@@ -1523,7 +2769,7 @@ class DitherBox {
    * L anteprima lavora ridotta; l export no.
    */
   renderFull() {
-    if (!this.source) throw new Error('Nessuna immagine caricata');
+    if (!this.source) throw new Error(this.t('ui.noImage'));
     const { image } = processImage(this.source, this.options);
     return this.#toCanvas(image);
   }
@@ -1533,7 +2779,7 @@ class DitherBox {
     const canvas = this.renderFull();
     return new Promise((resolve, reject) => {
       canvas.toBlob(
-        (blob) => (blob ? resolve(blob) : reject(new Error('Export fallito'))),
+        (blob) => (blob ? resolve(blob) : reject(new Error(this.t('ui.exportFailed')))),
         type,
         quality,
       );
@@ -1542,7 +2788,7 @@ class DitherBox {
 
   /** Scarica il risultato come PNG. */
   async download(filename) {
-    this.#status('Preparo il PNG…');
+    this.#status(this.t('ui.preparing'));
     const blob = await this.toBlob();
     const url = URL.createObjectURL(blob);
     const a = el('a');
@@ -1582,32 +2828,89 @@ class DitherBox {
     root.append(this.#buildStage(), this.#buildPanel());
     this.#wireDropZone();
     this.#syncControls();
+    this.#syncView();
   }
 
   #buildStage() {
+    const t = this.t;
     const stage = el('div', 'dbx__stage');
+
+    // Barra delle viste: immagine, oppure la stessa foto scritta coi
+    // caratteri. Sta sopra il contenuto invece che sovrapposta, cosi' non
+    // copre mai un angolo dell'immagine.
+    stage.appendChild(this.#buildViewBar());
+
+    const area = el('div', 'dbx__area');
     this.canvas = el('canvas', 'dbx__canvas');
     this.ctx = this.canvas.getContext('2d');
-    stage.appendChild(this.canvas);
+    this.textPane = el('pre', 'dbx__text', { tabindex: '0', 'aria-label': t('ui.textHint') });
+    this.textPane.hidden = true;
+    area.append(this.canvas, this.textPane);
 
     const drop = el('div', 'dbx__drop');
     const invito = el('button', 'dbx__drop-button', {
-      type: 'button', text: 'Scegli una foto',
+      type: 'button', text: t('ui.dropButton'),
     });
     invito.addEventListener('click', () => this.fileInput.click());
     drop.append(
       this.#cameraIcon(),
-      el('p', 'dbx__drop-title', { text: 'Trascina qui una foto' }),
+      el('p', 'dbx__drop-title', { text: t('ui.dropTitle') }),
       invito,
-      el('p', 'dbx__drop-sub', {
-        text: 'oppure incollala con Ctrl+V — l’immagine non lascia il tuo browser',
-      }),
+      el('p', 'dbx__drop-sub', { text: t('ui.dropHint') }),
     );
-    stage.appendChild(drop);
+    area.appendChild(drop);
+    stage.appendChild(area);
 
     this.statusEl = el('div', 'dbx__status', { role: 'status', 'aria-live': 'polite' });
     stage.appendChild(this.statusEl);
     return stage;
+  }
+
+  /** Le tre viste, piu' i comandi che servono solo a quelle testuali. */
+  #buildViewBar() {
+    const t = this.t;
+    const bar = el('div', 'dbx__viewbar');
+
+    this.viewButtons = new Map();
+    const viste = [
+      ['image', t('ui.viewImage')],
+      ['ascii', t('mode.ascii')],
+      ['braille', t('mode.braille')],
+    ];
+    const gruppo = el('div', 'dbx__views', { role: 'tablist', 'aria-label': t('ui.view') });
+    for (const [chiave, etichetta] of viste) {
+      const b = el('button', 'dbx__view', {
+        type: 'button', role: 'tab', text: etichetta,
+      });
+      b.addEventListener('click', () => this.setView(chiave));
+      gruppo.appendChild(b);
+      this.viewButtons.set(chiave, b);
+    }
+    bar.appendChild(gruppo);
+
+    // Comandi della vista testo: quante colonne, e il pulsante per copiare.
+    this.textTools = el('div', 'dbx__texttools');
+
+    const etichettaCol = el('label', 'dbx__viewlabel', { text: t('ui.columns') });
+    this.colsInput = el('input', 'dbx__cols', {
+      type: 'range', min: 20, max: 200, step: 4, value: String(this.textCols),
+    });
+    this.colsValue = el('output', 'dbx__viewvalue', { text: String(this.textCols) });
+    this.colsInput.addEventListener('input', () => {
+      this.textCols = Number(this.colsInput.value);
+      this.colsValue.textContent = String(this.textCols);
+      this.render();
+    });
+    etichettaCol.appendChild(this.colsInput);
+
+    this.copyButton = el('button', 'dbx__button dbx__button--copy', {
+      type: 'button', text: t('ui.copy'),
+    });
+    this.copyButton.addEventListener('click', () => this.copyText());
+
+    this.textTools.append(etichettaCol, this.colsValue, this.copyButton);
+    bar.appendChild(this.textTools);
+    return bar;
   }
 
   /**
@@ -1623,6 +2926,7 @@ class DitherBox {
   }
 
   #buildSourceBar() {
+    const t = this.t;
     const bar = el('div', 'dbx__source');
 
     // Il campo file vero, dentro una label: cosi' il clic funziona su tutta
@@ -1634,10 +2938,10 @@ class DitherBox {
       if (file) this.load(file).catch(() => {});
       this.fileInput.value = '';
     });
-    this.fileName = el('span', 'dbx__file-name', { text: 'nessun file scelto' });
+    this.fileName = el('span', 'dbx__file-name', { text: t('ui.noFile') });
     field.append(
       this.fileInput,
-      el('span', 'dbx__file-label', { text: 'Apri foto' }),
+      el('span', 'dbx__file-label', { text: t('ui.open') }),
       this.fileName,
     );
     bar.appendChild(field);
@@ -1651,21 +2955,32 @@ class DitherBox {
       this.cameraInput.value = '';
     });
     const shoot = el('button', 'dbx__button dbx__button--camera', {
-      type: 'button', text: 'Scatta', title: 'Scatta una foto con la fotocamera',
+      type: 'button', text: t('ui.shoot'), title: t('ui.shoot'),
     });
     shoot.addEventListener('click', () => this.cameraInput.click());
     bar.append(shoot, this.cameraInput);
+
+    if (this.config.languagePicker) {
+      const scelta = el('select', 'dbx__lang', { 'aria-label': t('ui.language'), title: t('ui.language') });
+      for (const l of LOCALES) {
+        scelta.appendChild(el('option', null, { value: l, text: LOCALE_NAMES[l] }));
+      }
+      scelta.value = this.locale;
+      scelta.addEventListener('change', () => this.setLocale(scelta.value));
+      bar.appendChild(scelta);
+    }
 
     return bar;
   }
 
   #buildScroller() {
+    const t = this.t;
     const scroller = el('div', 'dbx__scroll');
 
     if (this.config.presets) {
-      scroller.appendChild(this.#buildSection('Preset', this.#buildPresetChips()));
+      scroller.appendChild(this.#buildSection(t('ui.presets'), this.#buildPresetChips()));
     }
-    scroller.appendChild(this.#buildSection('Colori', this.#buildPaletteChips()));
+    scroller.appendChild(this.#buildSection(t('ui.colours'), this.#buildPaletteChips()));
 
     const groups = new Map();
     for (const param of PARAMS) {
@@ -1674,7 +2989,7 @@ class DitherBox {
       if (!groups.has(param.group)) {
         const body = el('div', 'dbx__controls');
         groups.set(param.group, body);
-        scroller.appendChild(this.#buildSection(GROUP_LABELS[param.group] || param.group, body));
+        scroller.appendChild(this.#buildSection(groupLabel(param.group, t), body));
       }
       groups.get(param.group).appendChild(this.#buildControl(param));
     }
@@ -1688,9 +3003,10 @@ class DitherBox {
   }
 
   #buildPresetChips() {
+    const t = this.t;
     const bar = el('div', 'dbx__chips');
-    for (const [key, preset] of Object.entries(PRESETS)) {
-      const b = el('button', 'dbx__chip', { type: 'button', text: preset.label });
+    for (const key of Object.keys(PRESETS)) {
+      const b = el('button', 'dbx__chip', { type: 'button', text: presetLabel(key, t) });
       b.addEventListener('click', () => this.set(applyPreset(key, this.options)));
       bar.appendChild(b);
     }
@@ -1702,6 +3018,7 @@ class DitherBox {
    * dice niente, mentre qui si sceglie guardando le tinte.
    */
   #buildPaletteChips() {
+    const t = this.t;
     const wrap = el('div', 'dbx__palettes');
     this.paletteButtons = new Map();
 
@@ -1721,11 +3038,11 @@ class DitherBox {
     };
 
     for (const [key, entry] of Object.entries(PALETTES)) {
-      aggiungi(key, entry.label, entry.colors);
+      aggiungi(key, paletteLabel(key, t), entry.colors);
     }
 
     // Voce personalizzata: si aggiorna insieme all'editor qui sotto.
-    this.customButton = aggiungi('__custom__', 'Su misura', this.customColors);
+    this.customButton = aggiungi('__custom__', t('palette.custom'), this.customColors);
     this.customButton.addEventListener('click', () => {
       this.set({ palette: stringifyPalette(this.customColors) });
     });
@@ -1736,6 +3053,7 @@ class DitherBox {
 
   /** Editor della palette personalizzata: una fila di selettori colore. */
   #buildCustomEditor() {
+    const t = this.t;
     const editor = el('div', 'dbx__custom');
     this.customList = el('div', 'dbx__custom-list');
 
@@ -1753,7 +3071,7 @@ class DitherBox {
 
         if (this.customColors.length > 2) {
           const togli = el('button', 'dbx__custom-remove', {
-            type: 'button', text: '×', title: 'Togli questo colore',
+            type: 'button', text: '×', title: t('ui.removeColour'),
           });
           togli.addEventListener('click', () => {
             this.customColors.splice(i, 1);
@@ -1768,7 +3086,7 @@ class DitherBox {
     };
 
     const aggiungi = el('button', 'dbx__custom-add', {
-      type: 'button', text: '+', title: 'Aggiungi un colore',
+      type: 'button', text: '+', title: t('ui.addColour'),
     });
     aggiungi.addEventListener('click', () => {
       if (this.customColors.length >= 16) return;
@@ -1781,7 +3099,7 @@ class DitherBox {
     // Riempie l'editor coi colori della palette selezionata: e' il modo piu'
     // naturale di partire da una predefinita e poi ritoccarla.
     const copia = el('button', 'dbx__custom-add', {
-      type: 'button', text: '⧉', title: 'Copia qui i colori della palette scelta',
+      type: 'button', text: '⧉', title: t('ui.copyPalette'),
     });
     copia.addEventListener('click', () => {
       const { colors } = paletteInfo(this.options.palette);
@@ -1809,10 +3127,12 @@ class DitherBox {
   }
 
   #buildControl(param) {
+    const t = this.t;
     const id = `dbx-${param.key}-${Math.random().toString(36).slice(2, 7)}`;
     const wrap = el('div', `dbx__control dbx__control--${param.type}`);
-    const label = el('label', 'dbx__label', { for: id, text: param.label });
-    if (param.hint) label.title = param.hint;
+    const label = el('label', 'dbx__label', { for: id, text: paramLabel(param, t) });
+    const hint = paramHint(param, t);
+    if (hint) label.title = hint;
     wrap.appendChild(label);
 
     let input;
@@ -1821,9 +3141,7 @@ class DitherBox {
     if (param.type === 'enum') {
       input = el('select', 'dbx__select', { id });
       for (const v of param.values) {
-        input.appendChild(el('option', null, {
-          value: v, text: (param.labels && param.labels[v]) || v,
-        }));
+        input.appendChild(el('option', null, { value: v, text: enumLabel(param, v, t) }));
       }
       input.addEventListener('change', () => this.set({ [param.key]: input.value }));
     } else if (param.type === 'bool') {
@@ -1844,7 +3162,7 @@ class DitherBox {
       label.addEventListener('dblclick', () => this.set({ [param.key]: param.default }));
     }
 
-    if (param.hint) input.title = param.hint;
+    if (hint) input.title = hint;
     wrap.appendChild(input);
     if (value) wrap.appendChild(value);
 
@@ -1853,15 +3171,16 @@ class DitherBox {
   }
 
   #buildActions() {
+    const t = this.t;
     const actions = el('div', 'dbx__actions');
 
     const save = el('button', 'dbx__button dbx__button--primary', {
-      type: 'button', text: 'Scarica PNG',
+      type: 'button', text: t('ui.download'),
     });
     save.addEventListener('click', () => this.download().catch((e) => this.#fail(e)));
 
     const reset = el('button', 'dbx__button dbx__button--ghost', {
-      type: 'button', text: 'Azzera',
+      type: 'button', text: t('ui.reset'),
     });
     reset.addEventListener('click', () => this.reset());
 
@@ -1910,7 +3229,7 @@ class DitherBox {
         const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
         if (!file) return;
         if (!file.type.startsWith('image/')) {
-          this.#fail(new Error('Quel file non è un’immagine'));
+          this.#fail(new Error(this.t('ui.notAnImage')));
           return;
         }
         this.load(file).catch(() => {});
@@ -1933,7 +3252,7 @@ class DitherBox {
       if (param.type === 'bool') input.checked = Boolean(v);
       else if (param.type === 'range') input.value = stepIndex(param, v);
       else input.value = v;
-      if (value) value.textContent = formatValue(param, v);
+      if (value) value.textContent = formatValue(param, v, this.t);
     }
 
     if (this.paletteButtons) {
@@ -1974,6 +3293,7 @@ class DitherBox {
   }
 
   #draw() {
+    if (this.view !== 'image') return this.#drawText();
     const started = performance.now();
     const source = this.#previewSource();
     // I megapixel li ha gia' applicati #previewSource: qui si dice al motore
@@ -1991,6 +3311,64 @@ class DitherBox {
     this.#status(
       `${this.source.width}×${this.source.height} → ${out.width}×${out.height} (${mp} MP) · ${ms} ms`,
     );
+  }
+
+  /** Rende la foto come testo e la mette nel riquadro, con la misura del
+   *  carattere calcolata perche' le colonne ci stiano tutte. */
+  #drawText() {
+    const started = performance.now();
+    const testo = imageToText(this.source, {
+      ...this.options, mode: this.view, cols: this.textCols,
+    });
+    this.textPane.textContent = testo;
+    this.#fitText();
+
+    const righe = testo.split('\n').length;
+    const ms = Math.round(performance.now() - started);
+    this.#status(`${this.textCols}×${righe} · ${testo.length} ${this.t('ui.copy').toLowerCase() === 'copy' ? 'chars' : 'car.'} · ${ms} ms`);
+  }
+
+  /** La larghezza di un carattere non e' nota a priori: la si misura una
+   *  volta e da li' si ricava la dimensione che fa entrare le colonne. */
+  #fitText() {
+    const pane = this.textPane;
+    const utile = pane.clientWidth - 16;
+    if (utile <= 0) return;
+    pane.style.fontSize = '20px';
+    const prima = pane.scrollWidth;
+    const perCarattere = prima / this.textCols / 20;
+    pane.style.fontSize = '';
+    if (!perCarattere) return;
+    const dimensione = Math.max(3, Math.min(16, utile / this.textCols / perCarattere));
+    pane.style.fontSize = `${dimensione.toFixed(2)}px`;
+  }
+
+  /** Accende la vista scelta e spegne le altre. */
+  #syncView() {
+    const testuale = this.view !== 'image';
+    if (this.canvas) this.canvas.hidden = testuale;
+    if (this.textPane) this.textPane.hidden = !testuale;
+    if (this.textTools) this.textTools.hidden = !testuale;
+    if (this.viewButtons) {
+      for (const [chiave, b] of this.viewButtons) {
+        const attiva = chiave === this.view;
+        b.classList.toggle('is-active', attiva);
+        b.setAttribute('aria-selected', String(attiva));
+      }
+    }
+  }
+
+  /** Conferma visiva sul pulsante, senza aprire finestre. */
+  #flashCopy(riuscito) {
+    if (!this.copyButton) return;
+    const t = this.t;
+    this.copyButton.textContent = t(riuscito ? 'ui.copied' : 'ui.copyFailed');
+    this.copyButton.classList.toggle('is-done', riuscito);
+    clearTimeout(this._copyTimer);
+    this._copyTimer = setTimeout(() => {
+      this.copyButton.textContent = t('ui.copy');
+      this.copyButton.classList.remove('is-done');
+    }, 1600);
   }
 
   #showCanvas(image) {
@@ -2024,7 +3402,7 @@ class DitherBox {
   }
 
   #fail(err) {
-    this.#status(`Errore: ${err.message}`);
+    this.#status(this.t('ui.error', { msg: err.message }));
     this.#emit('error', err);
   }
 
@@ -2093,11 +3471,14 @@ function autoInit(scope = document) {
 
 global.DitherBox = Object.assign(__m_src_web_ditherbox_js.DitherBox, {
   ALGORITHMS: __m_src_core_index_js.ALGORITHMS,
-  ALGORITHM_LABELS: __m_src_core_index_js.ALGORITHM_LABELS,
+  ASCII_RAMP: __m_src_core_index_js.ASCII_RAMP,
   DEFAULTS: __m_src_core_index_js.DEFAULTS,
+  DEFAULT_LOCALE: __m_src_core_index_js.DEFAULT_LOCALE,
+  DICTIONARIES: __m_src_core_index_js.DICTIONARIES,
   DIFFUSION_ALGORITHMS: __m_src_core_index_js.DIFFUSION_ALGORITHMS,
   DIFFUSION_KERNELS: __m_src_core_index_js.DIFFUSION_KERNELS,
-  GROUP_LABELS: __m_src_core_index_js.GROUP_LABELS,
+  LOCALES: __m_src_core_index_js.LOCALES,
+  LOCALE_NAMES: __m_src_core_index_js.LOCALE_NAMES,
   LUMA_B: __m_src_core_index_js.LUMA_B,
   LUMA_G: __m_src_core_index_js.LUMA_G,
   LUMA_R: __m_src_core_index_js.LUMA_R,
@@ -2108,26 +3489,45 @@ global.DitherBox = Object.assign(__m_src_web_ditherbox_js.DitherBox, {
   PARAMS: __m_src_core_index_js.PARAMS,
   PARAM_BY_KEY: __m_src_core_index_js.PARAM_BY_KEY,
   PRESETS: __m_src_core_index_js.PRESETS,
+  TEXT_CELLS: __m_src_core_index_js.TEXT_CELLS,
+  TEXT_MODES: __m_src_core_index_js.TEXT_MODES,
+  algorithmLabel: __m_src_core_index_js.algorithmLabel,
+  allKeys: __m_src_core_index_js.allKeys,
   applyAdjustments: __m_src_core_index_js.applyAdjustments,
   applyPreset: __m_src_core_index_js.applyPreset,
+  asciiChar: __m_src_core_index_js.asciiChar,
   bayer: __m_src_core_index_js.bayer,
   bayerMatrix: __m_src_core_index_js.bayerMatrix,
+  brailleCell: __m_src_core_index_js.brailleCell,
+  brailleThreshold: __m_src_core_index_js.brailleThreshold,
   buildQuantizer: __m_src_core_index_js.buildQuantizer,
   cloneImage: __m_src_core_index_js.cloneImage,
   createImage: __m_src_core_index_js.createImage,
+  createTranslator: __m_src_core_index_js.createTranslator,
+  detectLocale: __m_src_core_index_js.detectLocale,
   ditherImage: __m_src_core_index_js.ditherImage,
   downscaleByFactor: __m_src_core_index_js.downscaleByFactor,
+  enumLabel: __m_src_core_index_js.enumLabel,
+  fitForText: __m_src_core_index_js.fitForText,
   fitWithin: __m_src_core_index_js.fitWithin,
   formatValue: __m_src_core_index_js.formatValue,
   grayRamp: __m_src_core_index_js.grayRamp,
+  groupLabel: __m_src_core_index_js.groupLabel,
+  hasKey: __m_src_core_index_js.hasKey,
   hexToRgb: __m_src_core_index_js.hexToRgb,
+  imageToText: __m_src_core_index_js.imageToText,
   isCustomPalette: __m_src_core_index_js.isCustomPalette,
   luma: __m_src_core_index_js.luma,
   lumaHistogram: __m_src_core_index_js.lumaHistogram,
+  normalizeLocale: __m_src_core_index_js.normalizeLocale,
   normalizeOptions: __m_src_core_index_js.normalizeOptions,
   paletteInfo: __m_src_core_index_js.paletteInfo,
+  paletteLabel: __m_src_core_index_js.paletteLabel,
+  paramHint: __m_src_core_index_js.paramHint,
+  paramLabel: __m_src_core_index_js.paramLabel,
   paramSteps: __m_src_core_index_js.paramSteps,
   parseCustomPalette: __m_src_core_index_js.parseCustomPalette,
+  presetLabel: __m_src_core_index_js.presetLabel,
   processImage: __m_src_core_index_js.processImage,
   resampleBox: __m_src_core_index_js.resampleBox,
   resolvePalette: __m_src_core_index_js.resolvePalette,
@@ -2137,6 +3537,8 @@ global.DitherBox = Object.assign(__m_src_web_ditherbox_js.DitherBox, {
   stepIndex: __m_src_core_index_js.stepIndex,
   stringifyPalette: __m_src_core_index_js.stringifyPalette,
   targetSize: __m_src_core_index_js.targetSize,
+  textTarget: __m_src_core_index_js.textTarget,
+  toText: __m_src_core_index_js.toText,
   upscaleByFactor: __m_src_core_index_js.upscaleByFactor,
   DEFAULTS: __m_src_web_ditherbox_js.DEFAULTS,
   DitherBox: __m_src_web_ditherbox_js.DitherBox,

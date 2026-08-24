@@ -24,6 +24,8 @@ const MODULES = [
   'src/core/matrices.js',
   'src/core/adjust.js',
   'src/core/dither.js',
+  'src/core/i18n.js',
+  'src/core/textart.js',
   'src/core/options.js',
   'src/core/process.js',
   'src/core/index.js',
@@ -42,6 +44,15 @@ function stripImports(source, path) {
         throw new Error(`${path}: import esterno non impacchettabile (${from})`);
       }
       const target = resolve(dirname(join(ROOT, path)), from).slice(ROOT.length + 1);
+      // Un import verso un file che non e' nell'elenco produrrebbe un
+      // riferimento a una variabile mai definita, e il guasto salterebbe
+      // fuori solo aprendo la pagina. Meglio fermarsi qui.
+      if (!MODULES.includes(target)) {
+        throw new Error(
+          `${path}: importa ${target}, che non e' fra i moduli impacchettati. `
+          + 'Aggiungilo a MODULES in scripts/build.js, dopo le sue dipendenze.',
+        );
+      }
       imports.push({ clause: clause.trim(), target });
       return '';
     },
@@ -88,9 +99,19 @@ async function build() {
     // dei moduli che ri-esporta.
     const reexports = [...source.matchAll(/^export\s+\*\s+from\s+['"]([^'"]+)['"];?[ \t]*$/gm)];
     if (reexports.length) {
-      const parts = reexports.map(
-        (m) => varName(resolve(dirname(join(ROOT, path)), m[1]).slice(ROOT.length + 1)),
-      );
+      const parts = reexports.map((m) => {
+        const target = resolve(dirname(join(ROOT, path)), m[1]).slice(ROOT.length + 1);
+        // Stessa verifica del ramo degli import: un `export * from` verso un
+        // file assente dall'elenco produce un riferimento a nulla, e il
+        // guasto si vede solo aprendo la pagina.
+        if (!MODULES.includes(target)) {
+          throw new Error(
+            `${path}: ri-esporta ${target}, che non e' fra i moduli impacchettati. `
+            + 'Aggiungilo a MODULES in scripts/build.js, dopo le sue dipendenze.',
+          );
+        }
+        return varName(target);
+      });
       chunks.push(`const ${varName(path)} = Object.assign({}, ${parts.join(', ')});`);
       for (const [out] of await exportMap(path, source)) {
         publicNames.add(`${out}: ${varName(path)}.${out}`);

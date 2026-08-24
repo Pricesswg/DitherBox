@@ -4,33 +4,29 @@
  * questa lista: aggiungere un parametro qui lo fa comparire in entrambi.
  */
 
-import { ALGORITHMS, ALGORITHM_LABELS } from './dither.js';
-import { PALETTES, PALETTE_KEYS, isCustomPalette } from './palettes.js';
+import { ALGORITHMS } from './dither.js';
+import { PALETTE_KEYS, isCustomPalette } from './palettes.js';
+import { createTranslator, hasKey } from './i18n.js';
 
 /** @typedef {'enum'|'range'|'bool'} ParamType */
 
 export const PARAMS = [
   {
     key: 'palette',
-    label: 'Palette',
     group: 'dither',
     type: 'enum',
     values: PALETTE_KEYS,
-    labels: Object.fromEntries(PALETTE_KEYS.map((k) => [k, PALETTES[k].label])),
     default: 'bw',
   },
   {
     key: 'algorithm',
-    label: 'Algoritmo',
     group: 'dither',
     type: 'enum',
     values: ALGORITHMS,
-    labels: ALGORITHM_LABELS,
     default: 'floydSteinberg',
   },
   {
     key: 'scale',
-    label: 'Pixel',
     group: 'dither',
     type: 'range',
     min: 1,
@@ -38,11 +34,9 @@ export const PARAMS = [
     step: 1,
     default: 1,
     unit: 'x',
-    hint: 'Riduce prima di ditherare: 1 = dettaglio pieno, 8 = pixelone da 8 bit',
   },
   {
     key: 'strength',
-    label: 'Intensità',
     group: 'dither',
     type: 'range',
     min: 0,
@@ -50,22 +44,18 @@ export const PARAMS = [
     step: 5,
     default: 100,
     unit: '%',
-    hint: 'Quanta parte dell’errore (o del rumore ordinato) viene applicata',
   },
   {
     key: 'bias',
-    label: 'Soglia',
     group: 'dither',
     type: 'range',
     min: -100,
     max: 100,
     step: 1,
     default: 0,
-    hint: 'Sposta il punto di taglio: negativo scurisce, positivo schiarisce',
   },
   {
     key: 'noise',
-    label: 'Grana',
     group: 'dither',
     type: 'range',
     min: 0,
@@ -73,20 +63,16 @@ export const PARAMS = [
     step: 1,
     default: 0,
     unit: '%',
-    hint: 'Rumore casuale prima della soglia: rompe le bande troppo regolari',
   },
   {
     key: 'serpentine',
-    label: 'Serpentina',
     group: 'dither',
     type: 'bool',
     default: true,
-    hint: 'Scansione alternata riga per riga: elimina le strisciate diagonali',
   },
 
   {
     key: 'brightness',
-    label: 'Luminosità',
     group: 'tone',
     type: 'range',
     min: -100,
@@ -96,7 +82,6 @@ export const PARAMS = [
   },
   {
     key: 'contrast',
-    label: 'Contrasto',
     group: 'tone',
     type: 'range',
     min: -100,
@@ -106,7 +91,6 @@ export const PARAMS = [
   },
   {
     key: 'gamma',
-    label: 'Gamma',
     group: 'tone',
     type: 'range',
     min: 0.2,
@@ -117,7 +101,6 @@ export const PARAMS = [
   },
   {
     key: 'saturation',
-    label: 'Saturazione',
     group: 'tone',
     type: 'range',
     min: -100,
@@ -127,7 +110,6 @@ export const PARAMS = [
   },
   {
     key: 'sharpen',
-    label: 'Nitidezza',
     group: 'tone',
     type: 'range',
     min: 0,
@@ -135,11 +117,9 @@ export const PARAMS = [
     step: 5,
     default: 0,
     unit: '%',
-    hint: 'Maschera di contrasto: recupera i dettagli che il dithering mangia',
   },
   {
     key: 'invert',
-    label: 'Inverti',
     group: 'tone',
     type: 'bool',
     default: false,
@@ -147,7 +127,6 @@ export const PARAMS = [
 
   {
     key: 'megapixels',
-    label: 'Megapixel',
     group: 'output',
     type: 'range',
     // Gradini scelti a mano invece di un intervallo regolare: fra 0.01 e 24
@@ -161,15 +140,12 @@ export const PARAMS = [
     ],
     default: 2,
     format: formatMegapixels,
-    hint: 'Risoluzione del risultato: abbassala per sgranare di proposito la foto',
   },
   {
     key: 'upscale',
-    label: 'Ringrandisci',
     group: 'output',
     type: 'bool',
     default: true,
-    hint: 'Riporta il risultato alla dimensione di prima con pixel netti',
   },
 ];
 
@@ -184,46 +160,75 @@ for (const p of PARAMS) {
 
 export const PARAM_BY_KEY = Object.fromEntries(PARAMS.map((p) => [p.key, p]));
 
-export const GROUP_LABELS = {
-  dither: 'DITHER',
-  tone: 'TONO',
-  output: 'OUTPUT',
-};
+/**
+ * Etichette tradotte.
+ *
+ * I dati qui sopra non portano piu' testo: le scritte arrivano tutte da
+ * i18n.js, cosi' una stringa si traduce una volta sola e nessuna interfaccia
+ * puo' restare indietro rispetto alle altre. Ogni funzione vuole il
+ * traduttore della lingua scelta; senza, si parla inglese.
+ */
+const inglese = createTranslator('en');
+
+export function groupLabel(group, t = inglese) {
+  return t(`group.${group}`);
+}
+
+export function paramLabel(param, t = inglese) {
+  return t(`param.${param.key}.label`);
+}
+
+/** Il suggerimento e' facoltativo: non tutti i parametri ne hanno uno. */
+export function paramHint(param, t = inglese) {
+  const key = `param.${param.key}.hint`;
+  return hasKey(key) ? t(key) : null;
+}
+
+export function paletteLabel(key, t = inglese) {
+  return t(`palette.${key}`);
+}
+
+export function algorithmLabel(key, t = inglese) {
+  return t(`algorithm.${key}`);
+}
+
+export function presetLabel(key, t = inglese) {
+  return t(`preset.${key}`);
+}
+
+/** L'etichetta di un valore di un parametro a elenco. */
+export function enumLabel(param, value, t = inglese) {
+  if (param.key === 'palette') return paletteLabel(value, t);
+  if (param.key === 'algorithm') return algorithmLabel(value, t);
+  return String(value);
+}
 
 export const DEFAULTS = Object.fromEntries(PARAMS.map((p) => [p.key, p.default]));
 
 /** Preset pronti: la stessa lista alimenta il menu web e il picker della TUI. */
 export const PRESETS = {
   macintosh: {
-    label: 'Macintosh 1984',
     options: { palette: 'bw', algorithm: 'atkinson', contrast: 15, sharpen: 40 },
   },
   giornale: {
-    label: 'Giornale',
     options: { palette: 'bw', algorithm: 'cluster8', scale: 2, contrast: 20 },
   },
   gameboy: {
-    label: 'Game Boy',
     options: { palette: 'gameboy', algorithm: 'bayer4', scale: 4, contrast: 10 },
   },
   fanzine: {
-    label: 'Fanzine fotocopiata',
     options: { palette: 'bw', algorithm: 'bayer8', contrast: 45, sharpen: 80, noise: 8 },
   },
   terminale: {
-    label: 'Terminale a fosfori',
     options: { palette: 'greenCrt', algorithm: 'bayer4', scale: 2, contrast: 25 },
   },
   arcade: {
-    label: 'Arcade 16 colori',
     options: { palette: 'pico8', algorithm: 'floydSteinberg', scale: 3, saturation: 25 },
   },
   cga: {
-    label: 'CGA 1981',
     options: { palette: 'cgaCyan', algorithm: 'bayer4', scale: 3, saturation: 20 },
   },
   incisione: {
-    label: 'Incisione',
     options: { palette: 'bw', algorithm: 'lines4', contrast: 30, sharpen: 60 },
   },
 };
@@ -316,11 +321,11 @@ export function normalizeOptions(input = {}) {
 }
 
 /** Testo del valore di un parametro, usato identico da web e terminale. */
-export function formatValue(param, value) {
+export function formatValue(param, value, t = inglese) {
   if (param.type === 'bool') return value ? 'ON' : 'OFF';
   if (param.type === 'enum') {
-    if (isCustomPalette(value)) return 'Personalizzata';
-    return (param.labels && param.labels[value]) || String(value);
+    if (isCustomPalette(value)) return t('palette.custom');
+    return enumLabel(param, value, t);
   }
   if (param.format) return param.format(Number(value));
   const n = Number(value);
