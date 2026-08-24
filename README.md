@@ -17,7 +17,7 @@ German.
 
 The same engine runs as a web widget, which you can try here:
 
-> **`[link coming soon: alessandrosimonitto.it]`**
+> **<https://www.alessandrosimonitto.it/progetti/ditherbox>**
 
 Everything happens on a canvas in your own browser. The photo is never
 uploaded anywhere.
