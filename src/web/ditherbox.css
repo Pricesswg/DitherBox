@@ -5,18 +5,20 @@
  */
 
 .dbx {
-  /* --- i tre colori che bastano a intonarlo a un sito ---------------- */
-  --dbx-bg: #0e0f12;
-  --dbx-fg: #e6e8ec;
-  --dbx-accent: #7dd3a0;
+  /* --- i tre colori che bastano a intonarlo a un sito ----------------
+     I valori di serie sono quelli di alessandrosimonitto.it: fondo quasi
+     nero, testo bianco, ambra come accento. */
+  --dbx-bg: #0f0f0f;
+  --dbx-fg: #ffffff;
+  --dbx-accent: #ffc000;
 
   /* --- ricavati dai tre qui sopra ------------------------------------
      Questi valori fissi servono ai browser senza color-mix; dove c'e',
      il blocco @supports in fondo li rimpiazza con le miscele, che
      seguono da sole qualunque colore tu metta nei tre di sopra. */
-  --dbx-panel: #16181d;
-  --dbx-border: #2a2e37;
-  --dbx-muted: #8b929f;
+  --dbx-panel: #191919;
+  --dbx-border: #272727;
+  --dbx-muted: #ababab;
 
   /* Il testo sopra il pulsante colorato: il fondo della pagina e'
      l'estremo opposto del testo, quindi funziona sia quando l'accento e'
@@ -24,7 +26,11 @@
      mezzo e nessuno dei due contrasta abbastanza. */
   --dbx-accent-fg: var(--dbx-bg);
 
-  --dbx-radius: 10px;
+  --dbx-radius: 0px;
+  /* Raggio dei pezzi piccoli: pastiglie, pulsanti, campi. Segue quello
+     grande, cosi' basta cambiare --dbx-radius per passare da un aspetto a
+     spigoli vivi a uno morbido senza inseguire dieci regole. */
+  --dbx-radius-small: var(--dbx-radius);
   --dbx-gap: 14px;
   --dbx-panel-width: 320px;
   --dbx-height: clamp(440px, 70vh, 780px);
@@ -75,13 +81,39 @@
   .dbx {
     --dbx-bg: #f6f7f9;
     --dbx-fg: #16181d;
-    --dbx-accent: #1f7a4d;
+    /* L'ambra su fondo chiaro non contrasta (1.6:1): stessa tinta, scurita
+       fino a reggere il testo bianco sopra il pulsante. */
+    --dbx-accent: #8a6400;
 
     /* Ripiego per i browser senza color-mix, come sopra. */
-    --dbx-panel: #ffffff;
-    --dbx-border: #d8dce3;
-    --dbx-muted: #656c78;
+    --dbx-panel: #edeef0;
+    --dbx-border: #e0e1e3;
+    --dbx-muted: #646569;
   }
+}
+
+/*
+ * Schema imposto. Un sito che vive di un solo schema - come quello per cui
+ * questo widget e' nato, che e' scuro e basta - non deve ribaltarsi addosso
+ * al visitatore che tiene il sistema in chiaro. Con data-theme la scelta e'
+ * dell'autore e batte le preferenze del sistema in entrambi i versi.
+ */
+.dbx[data-theme="dark"] {
+  --dbx-bg: #0f0f0f;
+  --dbx-fg: #ffffff;
+  --dbx-accent: #ffc000;
+  --dbx-panel: #191919;
+  --dbx-border: #272727;
+  --dbx-muted: #ababab;
+}
+
+.dbx[data-theme="light"] {
+  --dbx-bg: #f6f7f9;
+  --dbx-fg: #16181d;
+  --dbx-accent: #8a6400;
+  --dbx-panel: #edeef0;
+  --dbx-border: #e0e1e3;
+  --dbx-muted: #646569;
 }
 
 /*
@@ -96,9 +128,13 @@
  */
 @supports (color: color-mix(in srgb, red, blue)) {
   .dbx {
-    --dbx-panel: color-mix(in srgb, var(--dbx-bg) 93%, var(--dbx-fg));
-    --dbx-border: color-mix(in srgb, var(--dbx-bg) 80%, var(--dbx-fg));
-    --dbx-muted: color-mix(in srgb, var(--dbx-fg) 62%, var(--dbx-bg));
+    /* Proporzioni tarate sul fondo quasi nero del sito: cadono su #191919,
+       #272727 e #ababab, cioe' a un passo dai #0f0f0f, #1c1c1c e #999999 che
+       il sito usa gia' per card, bordi e testo attenuato. Reggono anche in
+       chiaro, dove il testo attenuato resta sopra 4.5:1. */
+    --dbx-panel: color-mix(in srgb, var(--dbx-bg) 96%, var(--dbx-fg));
+    --dbx-border: color-mix(in srgb, var(--dbx-bg) 90%, var(--dbx-fg));
+    --dbx-muted: color-mix(in srgb, var(--dbx-fg) 65%, var(--dbx-bg));
   }
 }
 
@@ -126,7 +162,7 @@
     repeating-conic-gradient(var(--dbx-border) 0% 25%, transparent 0% 50%)
       0 0 / 16px 16px;
   border: 1px solid var(--dbx-border);
-  border-radius: calc(var(--dbx-radius) - 2px);
+  border-radius: max(0px, calc(var(--dbx-radius) - 2px));
   overflow: hidden;
 }
 
@@ -169,7 +205,7 @@
   cursor: pointer;
   background: var(--dbx-accent);
   border: 1px solid var(--dbx-accent);
-  border-radius: 6px;
+  border-radius: var(--dbx-radius-small);
 }
 
 .dbx.is-dragging .dbx__stage {
@@ -186,7 +222,7 @@
   color: var(--dbx-muted);
   background: var(--dbx-bg);
   border: 1px solid var(--dbx-border);
-  border-radius: 4px;
+  border-radius: var(--dbx-radius-small);
   pointer-events: none;
 }
 
@@ -201,7 +237,7 @@
   min-height: 0;
   background: var(--dbx-panel);
   border: 1px solid var(--dbx-border);
-  border-radius: calc(var(--dbx-radius) - 2px);
+  border-radius: max(0px, calc(var(--dbx-radius) - 2px));
   overflow: hidden;
 }
 
@@ -225,7 +261,7 @@
   cursor: pointer;
   background: var(--dbx-bg);
   border: 1px dashed var(--dbx-border);
-  border-radius: 6px;
+  border-radius: var(--dbx-radius-small);
 }
 
 .dbx__file-field:hover { border-color: var(--dbx-accent); }
@@ -308,7 +344,7 @@
   cursor: pointer;
   background: transparent;
   border: 1px solid var(--dbx-border);
-  border-radius: 999px;
+  border-radius: var(--dbx-radius-small);
 }
 
 .dbx__chip:hover { border-color: var(--dbx-accent); color: var(--dbx-accent); }
@@ -335,7 +371,7 @@
   cursor: pointer;
   background: transparent;
   border: 1px solid var(--dbx-border);
-  border-radius: 999px;
+  border-radius: var(--dbx-radius-small);
   text-align: left;
 }
 
@@ -353,7 +389,7 @@
   width: 26px;
   height: 12px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--dbx-radius-small);
 }
 
 .dbx__swatch-dot { flex: 1 1 0; min-width: 0; }
@@ -386,7 +422,7 @@
   cursor: pointer;
   background: none;
   border: 1px solid var(--dbx-border);
-  border-radius: 4px;
+  border-radius: var(--dbx-radius-small);
 }
 
 .dbx__custom-remove {
@@ -417,7 +453,7 @@
   cursor: pointer;
   background: transparent;
   border: 1px solid var(--dbx-border);
-  border-radius: 4px;
+  border-radius: var(--dbx-radius-small);
 }
 
 .dbx__custom-add:hover { color: var(--dbx-accent); border-color: var(--dbx-accent); }
@@ -458,7 +494,7 @@
   color: var(--dbx-fg);
   background: var(--dbx-bg);
   border: 1px solid var(--dbx-border);
-  border-radius: 5px;
+  border-radius: var(--dbx-radius-small);
 }
 
 .dbx__checkbox {
@@ -494,7 +530,7 @@
   cursor: pointer;
   background: transparent;
   border: 1px solid var(--dbx-border);
-  border-radius: 6px;
+  border-radius: var(--dbx-radius-small);
 }
 
 .dbx__button:hover { border-color: var(--dbx-accent); }

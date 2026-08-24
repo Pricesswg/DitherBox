@@ -1436,6 +1436,9 @@ class DitherBox {
    * @param {boolean} [config.presets]       mostra la barra dei preset
    * @param {string}  [config.src]           immagine da caricare all avvio
    * @param {string}  [config.downloadName]  nome del file scaricato
+   * @param {'dark'|'light'} [config.theme]  impone lo schema invece di
+   *   seguire le preferenze del sistema: serve ai siti che vivono di un
+   *   solo schema e non devono ribaltarsi addosso al visitatore.
    */
   constructor(target, config = {}) {
     const root = typeof target === 'string' ? document.querySelector(target) : target;
@@ -1565,6 +1568,7 @@ class DitherBox {
     }
     this.root.replaceChildren();
     this.root.classList.remove('dbx', 'is-loaded', 'is-dragging');
+    if (this.config.theme) this.root.removeAttribute('data-theme');
   }
 
   // ------------------------------------------------------- costruzione UI
@@ -1572,6 +1576,7 @@ class DitherBox {
   #build() {
     const root = this.root;
     root.classList.add('dbx');
+    if (this.config.theme) root.setAttribute('data-theme', this.config.theme);
     root.replaceChildren();
 
     root.append(this.#buildStage(), this.#buildPanel());
@@ -2069,7 +2074,13 @@ function autoInit(scope = document) {
       else if (param.type === 'bool') options[param.key] = raw !== 'false';
       else options[param.key] = raw;
     }
-    boxes.push(new DitherBox(node, { options, src: node.dataset.src || undefined }));
+    boxes.push(new DitherBox(node, {
+      options,
+      src: node.dataset.src || undefined,
+      // Se l'attributo c'e' gia' nell'HTML lo legge direttamente il foglio
+      // di stile; qui serve solo perche' il widget sappia di averlo.
+      theme: node.dataset.theme || undefined,
+    }));
   }
   return boxes;
 }

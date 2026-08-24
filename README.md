@@ -140,21 +140,56 @@ const canvas = ditherToCanvas(document.querySelector('img'), { palette: 'gameboy
 
 ### Intonarlo al tuo sito
 
-Tutti i colori passano da custom property:
+I colori di serie sono quelli di alessandrosimonitto.it: fondo quasi nero,
+testo bianco, ambra come accento, angoli vivi.
+
+Per intonarlo a un altro sito bastano **tre valori**: pannello, bordi e testo
+attenuato si ricavano da questi per miscela.
 
 ```css
 .dbx {
   --dbx-bg: #12100e;
-  --dbx-panel: #1b1815;
-  --dbx-border: #34302b;
+  --dbx-fg: #f2ece2;
   --dbx-accent: #e8a33d;
-  --dbx-accent-fg: #12100e;
-  --dbx-font: 'Berkeley Mono', monospace;
-  --dbx-radius: 0;
 }
 ```
 
-Il foglio di stile ha gia' una variante chiara sotto `prefers-color-scheme`.
+Il resto e' tutto sovrascrivibile se il ricavato non convince:
+`--dbx-panel`, `--dbx-border`, `--dbx-muted`, `--dbx-accent-fg` (che di suo
+segue `--dbx-bg`), `--dbx-radius` e `--dbx-radius-small` (che di suo segue il
+primo), `--dbx-font`, `--dbx-panel-width`, `--dbx-height`.
+
+Se il tuo sito espone gia' le sue variabili, agganciacele e il widget seguira'
+da solo ogni futura modifica alla palette:
+
+```css
+.dbx {
+  --dbx-bg: var(--color-bg-card);
+  --dbx-fg: var(--color-text);
+  --dbx-accent: var(--color-accent);
+  --dbx-font: var(--font-body);
+}
+```
+
+### Schema chiaro e scuro
+
+Di suo il widget segue le preferenze del sistema. Su un sito che vive di un
+solo schema questo e' sbagliato: chi tiene il sistema in chiaro si vedrebbe un
+riquadro chiaro in mezzo a una pagina nera. Imponilo:
+
+```astro
+<DitherBox theme="dark" />
+```
+
+```html
+<div data-ditherbox data-theme="dark"></div>
+```
+
+```js
+new DitherBox('#dither', { theme: 'dark' });
+```
+
+`data-theme` batte le preferenze del sistema in entrambi i versi.
 
 ---
 
@@ -280,9 +315,10 @@ yellow = "#b58900"
 red = "#dc322f"
 ```
 
-Temi inclusi: `winamp`, `gruvbox`, `dracula`, `nord`, `catppuccin`,
-`tokyo-night`, `everforest`, `ember`, `matte-black`, `hackerman`, `vantablack`,
-`terminale` (che eredita lo sfondo del tuo terminale).
+Temi inclusi: `simonitto` (predefinito, gli stessi colori del widget),
+`winamp`, `gruvbox`, `dracula`, `nord`, `catppuccin`, `tokyo-night`,
+`everforest`, `ember`, `matte-black`, `hackerman`, `vantablack`, `terminale`
+(che eredita lo sfondo del tuo terminale).
 
 ---
 

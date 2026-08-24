@@ -26,6 +26,12 @@ const hex = (s) => [
 const KEYS = ['accent', 'bright_fg', 'fg', 'green', 'yellow', 'red'];
 
 const RAW_THEMES = {
+  // I colori di alessandrosimonitto.it: fondo quasi nero, ambra come
+  // accento, e il verde e il rosso che il sito usa gia' per gli stati.
+  simonitto: {
+    bg: '#0d0d0d', accent: '#ffc000', bright_fg: '#ffffff', fg: '#777777',
+    green: '#00e87a', yellow: '#e8a000', red: '#f87171',
+  },
   winamp: {
     bg: '#232323', accent: '#1de11d', bright_fg: '#d4d4c8', fg: '#78786e',
     green: '#1de11d', yellow: '#ffd21e', red: '#ff4b1f',
@@ -164,5 +170,5 @@ export function loadConfig() {
   }
 }
 
-export const DEFAULT_THEME = 'winamp';
+export const DEFAULT_THEME = 'simonitto';
 export { KEYS as THEME_KEYS };

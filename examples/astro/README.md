@@ -56,6 +56,39 @@ img.replaceWith(canvas);
 
 ## Intonarlo al tuo sito
 
+I colori di serie sono gia' quelli di alessandrosimonitto.it. Se preferisci
+agganciarli alle variabili del sito, cosi' che seguano da sole ogni futura
+modifica alla palette, bastano queste righe:
+
+```css
+.dbx {
+  --dbx-bg: var(--color-bg-card);
+  --dbx-fg: var(--color-text);
+  --dbx-accent: var(--color-accent);
+
+  /* Facoltativi: senza questi vengono ricavati per miscela dai tre di sopra,
+     e cadono comunque a un passo da questi valori. */
+  --dbx-panel: var(--color-bg-card);
+  --dbx-border: var(--color-border);
+  --dbx-muted: var(--color-text-muted);
+
+  --dbx-font: var(--font-body);
+  --dbx-radius: 0;
+}
+```
+
+Il sito e' scuro e basta, quindi conviene imporre lo schema invece di
+lasciare che il widget segua le preferenze del sistema:
+
+```astro
+<DitherBox theme="dark" />
+```
+
+Senza, chi tiene il sistema in chiaro si vedrebbe un riquadro chiaro in mezzo
+a una pagina nera.
+
+## Partire da zero
+
 Il foglio di stile passa tutto da custom property. Ridefiniscile dove vuoi:
 
 ```css

@@ -8,6 +8,7 @@
  *   ---
  *   <DitherBox palette="gameboy" algorithm="bayer4" scale={4} />
  *   <DitherBox palette="#0a0c10,#c2fe0b" megapixels={0.3} />
+ *   <DitherBox theme="dark" />
  *
  * Lo script sta in un blocco <script> normale: Astro lo impacchetta e lo
  * manda solo al browser, quindi il widget non viene mai eseguito sul server.
@@ -34,10 +35,16 @@ export interface Props {
   upscale?: boolean;
   /** Immagine da caricare all'avvio, invece della schermata vuota. */
   src?: string;
+  /**
+   * Impone lo schema di colore invece di seguire le preferenze del sistema.
+   * Su un sito che e' solo scuro va messo "dark", se no il widget si
+   * ribalta in chiaro addosso a chi tiene il sistema in chiaro.
+   */
+  theme?: 'dark' | 'light';
   class?: string;
 }
 
-const { class: className, src, ...options } = Astro.props;
+const { class: className, src, theme, ...options } = Astro.props;
 
 // Solo i parametri davvero passati diventano attributi: gli altri
 // restano ai valori di partenza del widget.
@@ -48,7 +55,7 @@ const dataset = Object.fromEntries(
 );
 ---
 
-<div class={className} data-ditherbox data-src={src} {...dataset}></div>
+<div class={className} data-ditherbox data-src={src} data-theme={theme} {...dataset}></div>
 
 <script>
   import { autoInit } from 'ditherbox/web';
