@@ -5,13 +5,25 @@
  */
 
 .dbx {
+  /* --- i tre colori che bastano a intonarlo a un sito ---------------- */
   --dbx-bg: #0e0f12;
+  --dbx-fg: #e6e8ec;
+  --dbx-accent: #7dd3a0;
+
+  /* --- ricavati dai tre qui sopra ------------------------------------
+     Questi valori fissi servono ai browser senza color-mix; dove c'e',
+     il blocco @supports in fondo li rimpiazza con le miscele, che
+     seguono da sole qualunque colore tu metta nei tre di sopra. */
   --dbx-panel: #16181d;
   --dbx-border: #2a2e37;
-  --dbx-fg: #e6e8ec;
   --dbx-muted: #8b929f;
-  --dbx-accent: #7dd3a0;
-  --dbx-accent-fg: #08110c;
+
+  /* Il testo sopra il pulsante colorato: il fondo della pagina e'
+     l'estremo opposto del testo, quindi funziona sia quando l'accento e'
+     chiaro sia quando e' scuro. Sovrascrivilo se il tuo accento sta in
+     mezzo e nessuno dei due contrasta abbastanza. */
+  --dbx-accent-fg: var(--dbx-bg);
+
   --dbx-radius: 10px;
   --dbx-gap: 14px;
   --dbx-panel-width: 320px;
@@ -62,12 +74,31 @@
 @media (prefers-color-scheme: light) {
   .dbx {
     --dbx-bg: #f6f7f9;
+    --dbx-fg: #16181d;
+    --dbx-accent: #1f7a4d;
+
+    /* Ripiego per i browser senza color-mix, come sopra. */
     --dbx-panel: #ffffff;
     --dbx-border: #d8dce3;
-    --dbx-fg: #16181d;
     --dbx-muted: #656c78;
-    --dbx-accent: #1f7a4d;
-    --dbx-accent-fg: #ffffff;
+  }
+}
+
+/*
+ * I colori di servizio si ricavano miscelando fondo e testo, cosi' cambiare
+ * i tre di base basta a rintonare tutto il widget senza rimettere mano a
+ * bordi, pannelli e testo attenuato.
+ *
+ * Sta dopo il blocco del tema chiaro di proposito: le custom property non
+ * ammettono il trucco della doppia dichiarazione (un valore non valido si
+ * scopre solo quando lo si usa, e a quel punto la dichiarazione precedente
+ * e' gia' stata scartata), quindi il ripiego va isolato con @supports.
+ */
+@supports (color: color-mix(in srgb, red, blue)) {
+  .dbx {
+    --dbx-panel: color-mix(in srgb, var(--dbx-bg) 93%, var(--dbx-fg));
+    --dbx-border: color-mix(in srgb, var(--dbx-bg) 80%, var(--dbx-fg));
+    --dbx-muted: color-mix(in srgb, var(--dbx-fg) 62%, var(--dbx-bg));
   }
 }
 

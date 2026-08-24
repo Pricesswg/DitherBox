@@ -11,8 +11,7 @@ import { statSync } from 'node:fs';
 import {
   PARAMS, GROUP_LABELS, PRESETS, DEFAULTS,
   normalizeOptions, formatValue, applyPreset, paramSteps, stepIndex, stepBy,
-  processImage, targetSize, resampleBox, cloneImage,
-  applyAdjustments, lumaHistogram, isCustomPalette,
+  processImage, targetSize, resampleBox, isCustomPalette,
 } from '../core/index.js';
 
 import {
@@ -23,11 +22,14 @@ import { MODES, MODE_KEYS, cellTarget, renderImage } from './preview.js';
 import { loadThemes, loadConfig, DEFAULT_THEME } from './theme.js';
 import { loadImage, saveImage, listImages, isSupported } from './imageio.js';
 
-const HEADER_HEIGHT = 5;
+const STATUS_HEIGHT = 1;
 const HELP_HEIGHT = 1;
 const CONTROLS_WIDTH = 38;
+const CONTROLS_MAX = 52;
 const NARROW_WIDTH = 78;
-const HIST_BANDS = 22;
+
+/** Rotellina in braille: gira mentre un'operazione e' in corso. */
+const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
 /** Elenco piatto dei parametri, con le intestazioni di gruppo intercalate. */
 function buildRows() {
@@ -52,7 +54,13 @@ export class DitherTui {
     if (!this.themes[this.themeName]) this.themeName = DEFAULT_THEME;
 
     this.options = normalizeOptions({ ...DEFAULTS, ...pickOptions(config), ...opts.options });
-    this.previewMode = opts.mode || config.mode || 'braille';
+    // Predefinito i mezzi blocchi, non il braille: '▀' e' un blocco, largo
+    // esattamente una cella in qualunque font. I glifi braille invece
+    // mancano da parecchi font monospaziati, il terminale ripiega su un
+    // altro font con avanzamento diverso e le colonne si sfalsano, con la
+    // cornice che sembra rotta. Il braille resta a un tasto di distanza (v)
+    // e da' molto piu' dettaglio dove il font lo regge.
+    this.previewMode = opts.mode || config.mode || 'halfblock';
     if (!MODES[this.previewMode]) this.previewMode = 'braille';
 
     this.rows = buildRows();
@@ -64,10 +72,11 @@ export class DitherTui {
     this.marqueeOffset = 0;
     this.cache = null;
     this.running = false;
+    this.job = null;          // operazione in corso, per la barra di avanzamento
+    this.spinnerFrame = 0;
 
     this.source = null;
     this.sourceInfo = null;
-    this.thumb = null;
     this.imagePath = null;
     this.files = [];
     this.fileIndex = -1;
@@ -147,6 +156,10 @@ export class DitherTui {
 
   #tick() {
     let needs = false;
+    if (this.job) {
+      this.spinnerFrame++;
+      needs = true;
+    }
     if (this.toast && Date.now() > this.toast.until) {
       this.toast = null;
       needs = true;
@@ -171,23 +184,27 @@ export class DitherTui {
   }
 
   async openImage(path) {
-    this.#say('Carico…', 'fg');
-    this.render();
-    const img = await loadImage(path);
-    this.source = { width: img.width, height: img.height, data: img.data };
-    this.imagePath = path;
-    this.sourceInfo = {
-      format: img.format.toUpperCase(),
-      bytes: safeSize(path),
-    };
-    // Miniatura fissa per l'istogramma: ricalcolarla a ogni frame su una
-    // foto da 12 megapixel sarebbe uno spreco assurdo.
-    this.thumb = resampleBox(this.source, 96, 96);
-    this.cache = null;
-    this.marqueeOffset = 0;
-    const idx = this.files.indexOf(path);
-    if (idx >= 0) this.fileIndex = idx;
-    this.#say(`${basename(path)} caricata`, 'green');
+    const nome = basename(path);
+    this.#startJob(`Apro ${nome}`);
+    try {
+      await this.#jobStep(`Leggo ${nome}`, 0.2);
+      const img = await loadImage(path);
+
+      await this.#jobStep(`Preparo l’anteprima`, 0.75);
+      this.source = { width: img.width, height: img.height, data: img.data };
+      this.imagePath = path;
+      this.sourceInfo = {
+        format: img.format.toUpperCase(),
+        bytes: safeSize(path),
+      };
+      this.cache = null;
+      this.marqueeOffset = 0;
+      const idx = this.files.indexOf(path);
+      if (idx >= 0) this.fileIndex = idx;
+    } finally {
+      this.#endJob();
+    }
+    this.#say(`${nome} · ${this.source.width}×${this.source.height}`, 'green');
   }
 
   // ------------------------------------------------------------- input
@@ -575,13 +592,19 @@ export class DitherTui {
           this.#say('Uso solo .png o .jpg', 'red');
           return this.render();
         }
-        this.#say('Elaboro a piena risoluzione…', 'yellow');
-        this.render();
+        this.#startJob(`Salvo ${basename(path)}`);
         try {
+          await this.#jobStep('Elaboro a piena risoluzione', 0.25);
           const { image } = processImage(this.source, this.options);
+
+          await this.#jobStep(`Scrivo ${image.width}×${image.height}`, 0.8);
           await saveImage(path, image);
+
+          await this.#jobStep('Fatto', 1);
+          this.#endJob();
           this.#say(`Salvato: ${basename(path)} (${image.width}×${image.height})`, 'green');
         } catch (err) {
+          this.#endJob();
           this.#say(`Salvataggio fallito: ${err.message}`, 'red');
         }
         this.render();
@@ -591,6 +614,40 @@ export class DitherTui {
 
   #say(text, kind = 'fg') {
     this.toast = { text, kind, until: Date.now() + 4000 };
+  }
+
+  // ------------------------------------------------ operazioni in corso
+
+  /**
+   * Segna l'inizio di un'operazione: da qui in poi la riga di stato
+   * diventa la sua barra.
+   */
+  #startJob(label) {
+    this.job = { label, fraction: 0, started: Date.now() };
+    this.spinnerFrame = 0;
+    this.toast = null;
+  }
+
+  /**
+   * Avanza alla fase successiva e ridisegna.
+   *
+   * La pausa non e' un abbellimento: il passo dopo occupa la CPU per
+   * secondi interi, e senza cedere il controllo il frame appena scritto
+   * resterebbe in coda fino a operazione finita. La barra segue le fasi
+   * vere, non un conto alla rovescia inventato: mentre una fase lavora
+   * resta ferma dov'e', ed e' giusto cosi'.
+   */
+  async #jobStep(label, fraction) {
+    if (!this.job) return;
+    this.job.label = label;
+    this.job.fraction = fraction;
+    this.spinnerFrame++;
+    this.render();
+    await new Promise((r) => setImmediate(r));
+  }
+
+  #endJob() {
+    this.job = null;
   }
 
   // ---------------------------------------------------------- disegno
@@ -608,7 +665,7 @@ export class DitherTui {
     // Il centro va disegnato per primo: e' lui a riempire la cache
     // dell'anteprima, che poi l'intestazione legge per la riga di stato.
     const middle = this.#middle(W, layout);
-    const lines = [...this.#header(W, layout), ...middle];
+    const lines = [this.#statusLine(W), ...middle];
     if (layout.fileHeight) lines.push(...this.#filePanel(W, layout.fileHeight));
     lines.push(this.#helpBar(W));
 
@@ -618,83 +675,127 @@ export class DitherTui {
 
   #layout(W, H) {
     const narrow = W < NARROW_WIDTH;
-    const controlsWidth = narrow ? 0 : Math.min(CONTROLS_WIDTH, Math.floor(W * 0.45));
-    let remaining = H - HEADER_HEIGHT - HELP_HEIGHT;
-    const wantFiles = this.showFiles && this.files.length > 0 && remaining >= 16 && !narrow;
-    const fileHeight = wantFiles ? Math.min(7, Math.max(4, Math.floor(remaining * 0.25))) : 0;
+    let remaining = H - STATUS_HEIGHT - HELP_HEIGHT;
+
+    // La lista compare solo se c'e' davvero qualcosa da scegliere: con una
+    // sola immagine erano sei righe di cornice vuota sottratte all'anteprima.
+    const wantFiles = this.showFiles && this.files.length > 1 && remaining >= 16 && !narrow;
+    const fileHeight = wantFiles ? Math.min(7, Math.max(4, Math.floor(remaining * 0.22))) : 0;
     remaining -= fileHeight;
-    return {
-      narrow,
-      controlsWidth,
-      previewWidth: W - controlsWidth,
-      middleHeight: Math.max(3, remaining),
-      fileHeight,
-    };
+    const middleHeight = Math.max(3, remaining);
+
+    let controlsWidth = narrow ? 0 : Math.min(CONTROLS_WIDTH, Math.floor(W * 0.45));
+    let previewWidth = W - controlsWidth;
+
+    // Il riquadro dell'anteprima si stringe sull'immagine invece di restare
+    // largo quanto lo schermo. Con una foto verticale su un terminale largo
+    // restava un vuoto enorme accanto a un'immagine schiacciata, e lo spazio
+    // in piu' serve molto di piu' ai controlli.
+    if (!narrow && this.source) {
+      const celle = this.#previewCells(middleHeight - 2, previewWidth - 2);
+      const voluto = celle + 4;
+      if (voluto < previewWidth) {
+        const massimo = Math.min(CONTROLS_MAX, Math.floor(W * 0.45));
+        const extra = Math.min(previewWidth - voluto, Math.max(0, massimo - controlsWidth));
+        controlsWidth += extra;
+        previewWidth -= extra;
+      }
+    }
+
+    return { narrow, controlsWidth, previewWidth, middleHeight, fileHeight };
   }
 
-  /** Il display in alto: titolo che scorre, dati, istogramma, stato. */
-  #header(W, layout) {
+  /**
+   * Quante colonne occuperebbe l'immagine dentro un riquadro alto `innerH`.
+   * Serve a dimensionare il riquadro sull'immagine e non viceversa: quando
+   * l'altezza e' il vincolo (le foto verticali) il conto si chiude in un
+   * passaggio solo, perche' stringere la larghezza non cambia il risultato.
+   */
+  #previewCells(innerH, maxInnerW) {
+    const m = MODES[this.previewMode];
+    const t = cellTarget(
+      this.source.width, this.source.height,
+      Math.max(1, maxInnerW), Math.max(1, innerH), this.previewMode,
+    );
+    return Math.ceil(t.width / m.cx);
+  }
+
+  /**
+   * Riga di stato: una sola riga, non un pannello.
+   *
+   * Prima qui c'era una cornice alta cinque righe con l'istogramma e il nome
+   * del tema. Su un terminale da trentacinque righe si mangiava un settimo
+   * dello spazio per dire cose che si vedono gia' altrove, e quello che ne
+   * pativa era l'anteprima. Adesso la riga porta l'essenziale, e quando c'e'
+   * un'operazione in corso diventa la sua barra di avanzamento.
+   */
+  #statusLine(W) {
     const t = this.theme;
-    const inner = W - 2;
-    const name = this.imagePath ? basename(this.imagePath) : 'nessuna immagine';
+    if (this.job) return this.#jobLine(W);
 
-    const rightInfo = this.source
-      ? `${this.source.width}×${this.source.height} · ${this.sourceInfo.format}${this.sourceInfo.bytes ? ` · ${this.sourceInfo.bytes}` : ''}`
-      : '';
-    const titleWidth = Math.max(8, inner - visibleLength(rightInfo) - 3);
-    this.marqueeText = name;
-    this.marqueeWidth = titleWidth - 2;
-    const title = marquee(name, this.marqueeWidth, this.marqueeOffset);
-    const line1 = `${fg(t.green)}▶ ${RESET}${fg(t.accent)}${BOLD}${pad(title, titleWidth - 2)}${RESET}`
-      + `${fg(t.fg)}${padStart(rightInfo, inner - titleWidth)}${RESET}`;
+    if (this.toast) {
+      const colore = t[this.toast.kind] || t.fg;
+      return pad(`${fg(colore)}${truncate(this.toast.text, W - 1)}${RESET}`, W);
+    }
 
-    const preview = this.#previewResult();
-    const chain = [
+    if (!this.source) {
+      return pad(`${fg(t.fg)}${truncate('nessuna immagine · o per aprire un percorso · ? per i tasti', W - 1)}${RESET}`, W);
+    }
+
+    const nome = basename(this.imagePath);
+    const catena = [
       labelOf('palette', this.options.palette),
       labelOf('algorithm', this.options.algorithm),
       `${this.options.scale}x`,
-    ].join(' · ').toUpperCase();
-    const hist = this.#histogram(HIST_BANDS);
-    const chainWidth = inner - HIST_BANDS - 2;
-    const line2 = `${fg(t.bright_fg)}${pad(truncate(chain, chainWidth), chainWidth)}${RESET}  ${hist}`;
+    ].join(' · ');
 
-    const status = this.toast
-      ? `${fg(t[this.toast.kind] || t.fg)}${this.toast.text}${RESET}`
-      : `${fg(t.fg)}${preview ? `anteprima ${preview.image.width}×${preview.image.height} · export ${this.#exportSize()}` : 'in attesa di un’immagine'}${RESET}`;
-    const right = `${MODES[this.previewMode].label.toLowerCase()} · ${this.themeName}`;
-    const statusWidth = inner - visibleLength(right) - 1;
-    const line3 = `${pad(truncate(status, statusWidth), statusWidth)} ${fg(t.fg)}${right}${RESET}`;
+    const anteprima = this.#previewResult();
 
-    return panel({
-      title: `${BOLD}DITHERBOX${RESET}${fg(t.fg)}`,
-      lines: [line1, line2, line3],
-      width: W,
-      height: HEADER_HEIGHT,
-      color: fg(t.fg),
-      titleColor: fg(t.accent),
-    });
+    // Le voci della coda in ordine di importanza: su un terminale stretto
+    // si lasciano cadere dall'ultima, invece di spremere il nome del file
+    // fino a troncarlo a meta' parola.
+    const facoltative = [
+      `${this.source.width}×${this.source.height} → ${this.#exportSize()}`,
+      anteprima ? `ant. ${anteprima.image.width}×${anteprima.image.height}` : null,
+      MODES[this.previewMode].label.toLowerCase(),
+    ].filter(Boolean);
+
+    const NOME_MINIMO = 18;
+    let coda = facoltative.join(' · ');
+    while (facoltative.length
+      && W - visibleLength(catena) - visibleLength(coda) - 6 < NOME_MINIMO) {
+      facoltative.pop();
+      coda = facoltative.join(' · ');
+    }
+
+    const spazioNome = Math.max(6, W - visibleLength(catena) - visibleLength(coda) - 6);
+    this.marqueeText = nome;
+    this.marqueeWidth = spazioNome;
+    const titolo = marquee(nome, spazioNome, this.marqueeOffset);
+
+    const sinistra = `${fg(t.green)}▶ ${RESET}${fg(t.accent)}${BOLD}${titolo}${RESET}`
+      + `${fg(t.fg)}  ${catena}${RESET}`;
+    const destra = coda ? `${fg(t.fg)}${coda}${RESET}` : '';
+    const riempimento = Math.max(1, W - visibleLength(sinistra) - visibleLength(destra));
+    return truncate(`${sinistra}${' '.repeat(riempimento)}${destra}`, W);
   }
 
-  /** Istogramma della luminanza dopo le regolazioni di tono. */
-  #histogram(bands) {
+  /** La stessa riga, mentre un'operazione e' in corso. */
+  #jobLine(W) {
     const t = this.theme;
-    if (!this.thumb) return ' '.repeat(bands);
-    const work = cloneImage(this.thumb);
-    applyAdjustments(work, this.options);
-    const values = lumaHistogram(work, bands);
-    let out = '';
-    let last = null;
-    for (const v of values) {
-      // Colore per altezza, come lo spettro di cliamp: basso verde,
-      // medio giallo, picco rosso.
-      const color = v > 0.72 ? t.red : v > 0.4 ? t.yellow : t.green;
-      if (color !== last) {
-        out += fg(color);
-        last = color;
-      }
-      out += BLOCKS_V[Math.round(v * 8)];
-    }
-    return out + RESET;
+    const { label, fraction, started } = this.job;
+    const rotella = SPINNER[this.spinnerFrame % SPINNER.length];
+    const secondi = ((Date.now() - started) / 1000).toFixed(1);
+
+    const testa = `${fg(t.accent)}${rotella} ${RESET}${fg(t.bright_fg)}${label}${RESET}`;
+    const coda = `${fg(t.fg)}${secondi}s${RESET}`;
+    const barW = Math.max(6, Math.min(24, W - visibleLength(testa) - visibleLength(coda) - 10));
+    const percento = `${Math.round(fraction * 100)}%`.padStart(4);
+    const barra = `${fg(t.green)}${bar(fraction, barW, '▰', '▱')}${RESET}`
+      + `${fg(t.accent)} ${percento}${RESET}`;
+
+    const riempimento = Math.max(1, W - visibleLength(testa) - visibleLength(barra) - visibleLength(coda) - 2);
+    return truncate(`${testa}${' '.repeat(riempimento)}${barra}  ${coda}`, W);
   }
 
   #exportSize() {

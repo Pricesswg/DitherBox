@@ -16,30 +16,34 @@ scrivi da solo, regolazioni di tono, controllo della risoluzione in megapixel
 e otto preset pronti.
 
 ```
-╭─ DITHERBOX ────────────────────────────────────────────────────────────────────────╮
-│▶ ritratto.png                                               900×1200 · PNG · 1.6 MB│
-│1-BIT B/N · FLOYD-STEINBERG · 1X                                 ▁▃▂▄▅█▅▄▄▅▇        │
-│anteprima 45×60 · export 768×1024                                   braille · winamp│
-╰────────────────────────────────────────────────────────────────────────────────────╯
-╭─ ANTEPRIMA ──────────────────────────────────╮╭─ CONTROLLI 1/18 ───────────────────╮
-│           ⣕⢯⢺⡱⣫⡺⡕⣏⢞⣕⢯⢺⡱⣫⡺⡕⣏⢞⣕⢯⢺⡱⡃            ││DITHER                              │
-│           ⢎⢧⢳⢝⢼⢜⢵⢕⢗⡕⡯⡪⣺⢪⡺⡕⣕⢗⡕⡯⡪⣺⠅            ││> Palette      ◄ 1-bit B/N       ►  │
-│           ⡫⡎⡧⡫⡺⡜⡕⡇⡗⡍⡎⢕⢑⠕⢇⢯⢪⡺⡸⣱⢫⢪⡂            ││  Algoritmo    ◄ Floyd-Steinberg ►  │
-│           ⢕⢝⢜⢎⢞⢜⢕⢣⢣⢣⢣⠱⡐⠅⡂⠣⢳⢩⡺⡸⡜⡕⡅            ││  Pixel        ▱▱▱▱▱▱▱▱▱▱▱▱      1x │
-│           ⢕⢝⢜⢕⢕⢝⡼⣾⢿⡷⣵⢅⡪⠨⠀⡁⢱⢣⢣⢣⡣⡳⡁            ││  Intensita    ▰▰▰▰▰▰▱▱▱▱▱▱    100% │
-│           ⢕⢕⢕⢕⢕⢕⢽⣫⣟⣎⡗⣟⢜⢘⠌⢐⠨⡪⡪⡪⡪⡪⡂            ││  Soglia       ▰▰▰▰▰▰▱▱▱▱▱▱       0 │
-│           ⠕⡕⡕⡕⡕⡕⡕⡧⡳⡸⡪⡃⡣⠂⠡⢀⢪⢪⢪⢪⢪⢪⠂            ││  Grana        ▱▱▱▱▱▱▱▱▱▱▱▱      0% │
-│           ⡣⢣⢱⢡⢣⢱⢑⢅⠣⢃⠣⠡⡈⠄⠁⡢⠅⡇⡕⡕⢜⢌⠆            ││  Serpentina   [■] ON               │
-│           ⡪⡊⡆⢇⠕⡜⢔⢱⢨⠠⡈⠄⠄⡡⡡⡪⡅⢇⠎⡜⡸⢰⠁            ││TONO                                │
-│           ⡢⢃⢎⠪⡪⢘⢌⠆⡣⠀⡂⠕⠈⢄⠪⡢⢊⠎⡜⢌⢪⢘⠄            ││  Luminosita   ▰▰▰▰▰▰▱▱▱▱▱▱       0 │
-│           ⢘⠔⡑⡅⡪⠪⢐⠕⠅⠌⠄⠅⡑⠠⡡⡪⢘⢌⢪⢐⠕⡡⡁            ││  Contrasto    ▰▰▰▰▰▰▱▱▱▱▱▱       0 │
-│           ⠌⡪⢐⢅⢪⠡⡃⢕⢑⠨⠨⠠⢂⠡⢐⢅⠕⡰⠡⡊⡌⡢⠂            ││  Gamma        ▰▰▰▱▱▱▱▱▱▱▱▱    1.00 │
+▶ ritratto.jpg  1-bit B/N · Atkinson · 1x             760×1000 → 760×1000 · ant. 58×76
+╭─ ANTEPRIMA ──────────────────────────────────╮╭─ CONTROLLI ────────────────────────╮
+│        ⠿⣹⢏⡿⣹⢏⡿⣹⢏⡿⣹⢏⡿⣹⢏⡿⣹⢏⡿⣹⢏⡿⣹⢏⡿⣹⢏⡿⣹         ││DITHER                              │
+│        ⣛⢧⡻⣜⢧⡻⣜⢧⡻⣜⢧⡻⣜⢧⡻⣜⢧⡻⣜⢧⡻⣜⢧⡻⣜⢧⡻⣜⣳         ││> Palette      ◄ 1-bit B/N       ►  │
+│        ⣏⢾⡱⣏⢾⡱⣏⢾⡱⣏⢾⡱⣏⠾⡱⢏⠾⣱⢏⡾⣱⢏⡾⣱⢏⡾⣱⢏⡶         ││  Algoritmo    ◄ Atkinson        ►  │
+│        ⡜⣧⠵⣚⢧⡵⡚⣧⠵⣚⠧⡑⢆⡲⠡⠄⢂⠉⠸⢲⢏⡼⡲⢏⣼⠲⡝⡮⡵         ││  Pixel        ▱▱▱▱▱▱▱▱▱▱▱▱      1x │
+│        ⣙⢦⢛⡜⣦⠳⣙⢮⡱⢃⡞⣭⠒⡥⠃⡜⠠⠐⠀⠈⢮⠵⣩⠞⡴⡛⣥⢳⡹         ││  Intensità    ▰▰▰▰▰▰▱▱▱▱▱▱    100% │
+│        ⣍⢎⡳⡜⢦⡛⣥⢚⣥⣷⣾⣿⣷⣶⣁⢂⢁⠂⠀⠀⠀⠻⡔⣫⢖⡹⡔⣣⢏         ││  Soglia       ▰▰▰▰▰▰▱▱▱▱▱▱       0 │
+│        ⡜⢪⡕⣩⠖⡹⡤⢫⣿⣿⣿⣿⠿⣟⣿⣳⠆⠤⢀⠀⠀⠱⣙⡴⢪⠕⣍⢦⢋         ││  Grana        ▱▱▱▱▱▱▱▱▱▱▱▱      0% │
+│        ⡜⢣⡜⠥⡜⢣⡑⢧⠯⣟⣿⣳⢾⡝⣶⠱⢢⠐⠂⠀⠀⢸⠤⢃⡏⡼⡐⢎⢣         ││  Serpentina   [■] ON               │
+│        ⢎⡱⢌⡳⢌⠣⡜⢢⠛⡵⡺⢭⢚⡍⡖⠩⠀⠂⠀⠀⢀⠣⡜⢣⠜⡰⡙⢌⡲         ││TONO                                │
+│        ⢢⡑⡎⠴⣉⠖⡩⢆⢣⠐⡉⠆⠃⢂⠀⠁⠀⠀⠀⠀⢌⡱⡘⡥⢊⡕⡩⢒⠥         ││  Luminosità   ▰▰▰▰▰▰▱▱▱▱▱▱       0 │
+│        ⢢⠱⣈⠇⠴⡉⡔⢊⠦⡑⢄⠀⠀⠀⠀⠀⠀⠀⡠⢘⢢⠱⢌⢐⡣⢌⡑⠎⡔         ││  Contrasto    ▰▰▰▰▰▰▰▱▱▱▱▱      15 │
+│        ⠒⡡⠆⣉⠆⡱⠌⢡⠒⡉⢆⠉⠐⠀⠀⠀⠂⠑⢌⢡⠊⡔⢊⠆⡔⢊⢌⠲⠌         ││  Gamma        ▰▰▰▱▱▱▱▱▱▱▱▱    1.00 │
+│        ⠡⢂⠱⡀⢎⠰⡉⢄⠣⢁⠎⠀⠀⠀⡁⠀⠀⠀⠊⡄⢣⠘⡄⢊⠔⡡⢊⠔⡉         ││  Saturazione  ▰▰▰▰▰▰▱▱▱▱▱▱       0 │
+│        ⡁⠎⣐⠡⢊⡐⢡⠊⢄⠣⡘⠀⠀⠀⠠⠀⠀⠀⡃⠜⣀⠣⠘⡄⢊⠔⠡⡘⠄         ││  Nitidezza    ▱▱▱▱▱▱▱▱▱▱▱▱      0% │
+│        ⠐⡐⢂⠡⢂⠘⡄⠌⠂⡔⠡⠀⠀⠀⢂⠀⠀⠀⠌⡐⠤⢁⠒⠌⡀⠎⡐⠡⠌         ││  Inverti      [ ] OFF              │
+│        ⠐⡈⠤⠁⠄⠒⠈⡐⠁⢀⠡⠀⠀⠀⢀⠀⠀⠀⢀⠈⠐⠀⠃⠌⡐⠂⢁⠊⠄         ││OUTPUT                              │
+│        ⠐⡈⠄⠡⠈⡀⢡⠠⢁⠎⢐⠢⡐⢄⠂⡐⠠⢀⠂⠌⢀⠂⠄⠀⠀⠉⠄⡈⠄         ││  Megapixel    ▰▰▰▰▰▰▰▱▱▱▱▱    2 MP │
+│        ⠐⡀⠄⢢⠡⠌⠂⡅⢊⠌⢂⡱⢈⠄⡃⠄⢁⠂⠌⢀⠂⠌⠠⠁⠄⠂⢀⠀⠀         ││  Ringrandisci [■] ON               │
+│        ⡐⠌⡘⠤⢁⠎⡡⠌⠢⡘⢄⠢⢁⢊⠔⡈⠄⠈⡐⢀⠊⠄⠡⠈⠄⢁⠂⠌⠀         ││                                    │
 ╰──────────────────────────────────────────────╯╰────────────────────────────────────╯
-╭─ FILE 1/3 · Foto ──────────────────────────────────────────────────────────────────╮
-│> ★ ritratto.png                                                                    │
+╭─ FILE 1/2 · DitherBox ─────────────────────────────────────────────────────────────╮
+│> ★ ritratto.jpg                                                                    │
 │    scogliera.jpg                                                                   │
+│                                                                                    │
 ╰────────────────────────────────────────────────────────────────────────────────────╯
- jk scorri  hl regola  tab fuoco  v anteprima  p preset  t tema  s salva  ? tasti  q esci
+ jk scorri  hl regola  tab fuoco  v anteprima  p preset  t tema  s salva  ? tasti  q
 ```
 
 ---
@@ -197,15 +201,41 @@ quanto e' larga. Ogni modo sfrutta il carattere in modo diverso:
 
 | Modo | Pixel per cella | Quando conviene |
 |---|---|---|
-| `braille` | 2×4 | Il piu' dettagliato. Perfetto per il bianco e nero |
-| `halfblock` | 1×2 | Il piu' fedele nei colori |
+| `halfblock` | 1×2 | **Predefinito.** Fedele nei colori e sicuro in qualunque font |
+| `braille` | 2×4 | Il piu' dettagliato, ma vedi la nota qui sotto |
 | `quadrant` | 2×2 | Via di mezzo, due colori per cella |
 | `ascii` | 1×1 | Il piu' nostalgico |
+
+Il predefinito e' `halfblock` e non `braille` per un motivo pratico: `▀` e' un
+blocco, largo esattamente una cella in qualunque font. I glifi braille invece
+mancano da parecchi font monospaziati; il terminale ripiega su un altro font
+con avanzamento diverso, le colonne si sfalsano e la cornice sembra rotta. Se
+il tuo font il braille lo regge, premi `v`: il dettaglio raddoppia abbondante
+(nell'immagine qui sopra e' braille).
 
 L'anteprima viene ditherata **direttamente alla risoluzione del terminale**, non
 rimpicciolita dopo: se si dithera grande e poi si riduce, la media dei pixel
 richiude i puntini in grigi e la trama sparisce. Quello che vedi e' dithering
 vero, non una foto sfocata.
+
+Lo spazio va tutto all'immagine: in cima c'e' una riga sola, il riquadro
+dell'anteprima si stringe sulla foto invece di restare largo quanto lo schermo,
+e la lista dei file compare solo quando ci sono davvero piu' immagini fra cui
+scegliere.
+
+### La riga di stato
+
+Normalmente riporta il file, la catena di elaborazione e le misure. Quando c'e'
+un'operazione in corso diventa la sua barra:
+
+```
+⠹ Elaboro a piena risoluzione        ▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱   25%   1.8s
+```
+
+La barra segue le fasi vere dell'operazione — leggo, elaboro, scrivo — non un
+conto alla rovescia inventato: mentre una fase lavora la barra resta ferma dov'e'.
+Su un terminale stretto la riga lascia cadere le informazioni meno importanti
+invece di troncare il nome del file.
 
 ### Senza interfaccia
 
@@ -365,7 +395,7 @@ tutte e tre le interfacce lo leggono da li'.
 
 ```sh
 npm install
-npm test          # 92 test
+npm test          # 95 test
 npm run build     # rigenera dist/ per l'uso con <script>
 npm run screenshot -- esito.png 1240 820 foto.png    # guarda il widget
 ```

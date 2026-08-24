@@ -241,7 +241,7 @@ export async function run(argv = process.argv.slice(2)) {
   }
   const options = normalizeOptions({ ...base, ...optionsFromFlags(flags) });
 
-  const mode = flags.mode || config.mode || 'braille';
+  const mode = flags.mode || config.mode || 'halfblock';
   if (!MODES[mode]) throw new Error(`Modo "${mode}" inesistente. Disponibili: ${MODE_KEYS.join(', ')}`);
   const theme = flags.theme || config.theme || DEFAULT_THEME;
 

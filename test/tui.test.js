@@ -48,18 +48,107 @@ test('senza immagine mostra un invito invece di rompersi', async () => {
   const { render } = await mountTui(DitherTui, { width: 90, height: 30 });
   const t = testo(render());
   assert.match(t, /nessuna immagine/);
-  assert.match(t, /DITHERBOX/);
+  assert.match(t, /aprire un percorso/);
 });
 
-test('l intestazione riporta nome, misure e catena di elaborazione', async (t) => {
+test('la riga di stato sta in una riga e riporta l essenziale', async (t) => {
   const dir = tempDir(t);
   const path = await writeSample(dir, 'ritratto.png', 640, 480);
-  const { render } = await mountTui(DitherTui, { width: 100, height: 32, path, dir });
-  const t2 = testo(render());
-  assert.match(t2, /ritratto\.png/);
-  assert.match(t2, /640×480/);
-  assert.match(t2, /1-BIT B\/N/);
-  assert.match(t2, /anteprima \d+×\d+ · export \d+×\d+/);
+  const { frame, render } = await mountTui(DitherTui, { width: 100, height: 32, path, dir });
+  render();
+
+  const prima = senzaColori(frame[0]);
+  assert.match(prima, /ritratto\.png/);
+  assert.match(prima, /1-bit B\/N/i);
+  assert.match(prima, /640×480 → \d+×\d+/);
+  assert.match(prima, /ant\. \d+×\d+/);
+
+  // Una riga sola: la seconda deve essere gia' il bordo dell'anteprima.
+  assert.match(senzaColori(frame[1]), /ANTEPRIMA/);
+
+  // E niente istogramma ne nome del tema, che occupavano quattro righe.
+  const tutto = testo(frame);
+  assert.doesNotMatch(tutto, /winamp/);
+  assert.doesNotMatch(tutto, /DITHERBOX/);
+});
+
+test('il riquadro dell anteprima si stringe sull immagine', async (t) => {
+  const dir = tempDir(t);
+  // Foto verticale su terminale largo: prima restava un riquadro largo
+  // quanto lo schermo con dentro un'immagine schiacciata.
+  const path = await writeSample(dir, 'alta.png', 600, 1200);
+  const { frame, render } = await mountTui(DitherTui, {
+    width: 140, height: 36, path, dir, mode: 'halfblock',
+  });
+  render();
+
+  const righe = frame.map(senzaColori);
+  const bordo = righe.find((l) => l.includes('ANTEPRIMA'));
+  const largoRiquadro = bordo.indexOf('╮') - bordo.indexOf('╭') + 1;
+
+  // Quante colonne occupa davvero il disegno dentro il riquadro.
+  const sx = bordo.indexOf('╭');
+  const dx = bordo.indexOf('╮');
+  let largoImmagine = 0;
+  for (const riga of righe) {
+    const dentro = riga.slice(sx + 1, dx);
+    const primo = dentro.search(/[^\s]/);
+    if (primo < 0) continue;
+    const ultimo = dentro.length - 1 - [...dentro].reverse().join('').search(/[^\s]/);
+    largoImmagine = Math.max(largoImmagine, ultimo - primo + 1);
+  }
+
+  assert.ok(largoImmagine > 0, 'nessuna immagine disegnata');
+  assert.ok(
+    largoRiquadro - largoImmagine < 20,
+    `riquadro largo ${largoRiquadro} per un'immagine di ${largoImmagine}: troppo vuoto`,
+  );
+});
+
+test('con una sola immagine la lista file non ruba righe all anteprima', async (t) => {
+  const dir = tempDir(t);
+  const uno = await writeSample(dir, 'uno.png', 600, 900);
+  const soloUno = await mountTui(DitherTui, { width: 120, height: 34, path: uno, dir });
+  soloUno.tui.files = [uno];
+  soloUno.tui.fileIndex = 0;
+  const testoUno = testo(soloUno.render());
+  assert.doesNotMatch(testoUno, /FILE \d/, 'con un file solo la lista non serve');
+
+  const due = await writeSample(dir, 'due.png', 600, 900);
+  const conDue = await mountTui(DitherTui, { width: 120, height: 34, path: uno, dir });
+  conDue.tui.files = [uno, due];
+  conDue.tui.fileIndex = 0;
+  assert.match(testo(conDue.render()), /FILE 1\/2/, 'con due file la lista deve comparire');
+
+  // E l'anteprima deve essere piu' alta quando la lista non c'e'.
+  const alto = (f) => f.filter((l) => /[⠀-⣿▀▄█░▒▓]/.test(senzaColori(l))).length;
+  assert.ok(
+    alto(soloUno.frame) >= alto(conDue.frame),
+    'senza lista file l anteprima deve avere almeno lo stesso spazio',
+  );
+});
+
+test('caricare e salvare mostrano una barra di avanzamento', async (t) => {
+  const dir = tempDir(t);
+  const path = await writeSample(dir, 'foto.png', 500, 400);
+  const { tui, frame, render } = await mountTui(DitherTui, { width: 100, height: 30, dir });
+
+  // Durante il caricamento la riga di stato deve diventare la barra.
+  const viste = [];
+  const disegnoVero = tui.screen.draw;
+  tui.screen.draw = (l) => { disegnoVero(l); viste.push(senzaColori(l[0])); };
+  await tui.openImage(path);
+  tui.screen.draw = disegnoVero;
+
+  const conBarra = viste.filter((r) => /[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/.test(r) && /%/.test(r));
+  assert.ok(conBarra.length >= 2, `nessuna barra durante il caricamento: ${JSON.stringify(viste)}`);
+  assert.ok(conBarra.some((r) => /Leggo/.test(r)), 'manca la fase di lettura');
+
+  // A operazione finita la riga torna a raccontare l immagine.
+  tui.toast = null;
+  render();
+  assert.doesNotMatch(senzaColori(frame[0]), /%/);
+  assert.match(senzaColori(frame[0]), /foto\.png/);
 });
 
 test('i tasti muovono il cursore e cambiano i valori', async (t) => {
