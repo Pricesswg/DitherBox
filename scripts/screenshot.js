@@ -35,6 +35,10 @@ if (!browser) {
 const page = await browser.newPage({
   viewportSize: { width: Number(w), height: Number(h) },
   deviceScaleFactor: 2,
+  // Il widget segue lo schema del sistema, e Chromium senza schermo parte
+  // sempre in chiaro: per il README serve la versione scura, che e' quella
+  // con i colori del sito.
+  colorScheme: process.env.DBX_SCHEME === 'light' ? 'light' : 'dark',
 });
 
 const errori = [];
@@ -43,6 +47,16 @@ page.on('pageerror', (e) => errori.push(`PAGEERROR: ${e.message}`));
 
 await page.goto(pathToFileURL(join(ROOT, 'examples', 'index.html')).href, { waitUntil: 'networkidle' });
 
+// L'altezza del widget la decide la pagina che lo ospita. Per le immagini
+// del README serve poterla fissare, cosi' il pannello mostra tutte le sue
+// voci invece di tagliare l'ultima riga a meta'.
+if (process.env.DBX_HEIGHT) {
+  await page.evaluate((h) => {
+    document.querySelector('.dbx').style.setProperty('--dbx-height', h);
+  }, process.env.DBX_HEIGHT);
+  await page.waitForTimeout(150);
+}
+
 if (foto) {
   const b64 = readFileSync(foto).toString('base64');
   await page.evaluate(async (dati) => {
@@ -50,7 +64,7 @@ if (foto) {
     const arr = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
     const blob = new Blob([arr], { type: 'image/png' });
-    await window.__boxes[0].load(new File([blob], 'foto.png', { type: 'image/png' }));
+    await window.__boxes[0].load(new File([blob], 'sample.png', { type: 'image/png' }));
   }, b64);
   await page.waitForTimeout(500);
 }

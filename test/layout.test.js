@@ -214,3 +214,58 @@ test('scegliere una palette la segna come attiva', async (t) => {
   assert.equal(esito.nomeDopo, 'Custom', 'una palette scritta a mano accende "Custom"');
   assert.ok(esito.quantePastiglie >= 19, `solo ${esito.quantePastiglie} tavolozze`);
 });
+
+test('data-lang e il selettore cambiano lingua a tutto il widget', async (t) => {
+  const sessione = await apri();
+  if (!sessione) return t.skip('Chromium non disponibile');
+  const { browser, page, errori } = sessione;
+  t.after(() => browser.close());
+  await caricaFoto(page, 400, 300);
+
+  const esito = await page.evaluate(async () => {
+    const attesa = () => new Promise((r) => requestAnimationFrame(r));
+    const box = document.querySelector('.dbx');
+    const etichette = () => [...box.querySelectorAll('.dbx__label')]
+      .slice(0, 3).map((e) => e.textContent.trim());
+    const out = { en: etichette() };
+
+    // Il selettore: quello che ha in mano chi guarda la pagina.
+    const sel = box.querySelector('.dbx__lang');
+    out.lingue = [...sel.options].map((o) => o.value);
+    sel.value = 'fr';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    await attesa();
+    out.fr = etichette();
+    out.copiaFr = box.querySelector('.dbx__button--copy')?.textContent.trim() ?? null;
+
+    // Cambiare lingua non deve azzerare la vista scelta ne' i parametri.
+    window.__boxes[0].setView('ascii');
+    await attesa();
+    window.__boxes[0].setLocale('de');
+    await attesa();
+    out.de = etichette();
+    out.vistaDopo = window.__boxes[0].getView();
+
+    // E un widget montato da data-lang deve nascere gia' nella sua lingua.
+    const nodo = document.createElement('div');
+    nodo.setAttribute('data-ditherbox', '');
+    nodo.dataset.lang = 'es';
+    document.body.appendChild(nodo);
+    const [nuovo] = window.DitherBox.autoInit();
+    await attesa();
+    out.daAttributo = nuovo.getLocale();
+    out.etichetteAttributo = [...nodo.querySelectorAll('.dbx__label')]
+      .slice(0, 3).map((e) => e.textContent.trim());
+    return out;
+  });
+
+  assert.deepEqual(esito.lingue, ['en', 'it', 'es', 'fr', 'de']);
+  assert.deepEqual(esito.en, ['Algorithm', 'Pixel', 'Strength']);
+  assert.deepEqual(esito.fr, ['Algorithme', 'Pixel', 'Intensité']);
+  assert.equal(esito.copiaFr, 'Copier');
+  assert.deepEqual(esito.de, ['Algorithmus', 'Pixel', 'Stärke']);
+  assert.equal(esito.vistaDopo, 'ascii', 'cambiare lingua ha perso la vista');
+  assert.equal(esito.daAttributo, 'es');
+  assert.deepEqual(esito.etichetteAttributo, ['Algoritmo', 'Píxel', 'Intensidad']);
+  assert.deepEqual(errori, []);
+});

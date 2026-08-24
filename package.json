@@ -1,7 +1,7 @@
 {
   "name": "ditherbox",
   "version": "0.1.0",
-  "description": "Dithering regolabile per foto: widget da mettere nel sito piu' app da terminale con interfaccia in stile cliamp",
+  "description": "Adjustable dithering for photos: a drop-in web widget plus a terminal app with a cliamp-style interface",
   "type": "module",
   "license": "MIT",
   "author": "Alessandro Simonitto",
@@ -22,7 +22,10 @@
     "tui",
     "astro",
     "marathon",
-    "palette"
+    "palette",
+    "ascii-art",
+    "braille",
+    "i18n"
   ],
   "bin": {
     "ditherbox": "bin/ditherbox.js"
@@ -46,7 +49,10 @@
     "build": "node scripts/build.js",
     "test": "node --test test/*.test.js",
     "demo": "node bin/ditherbox.js",
-    "screenshot": "node scripts/screenshot.js"
+    "sample": "node scripts/sample.js",
+    "screenshot": "node scripts/screenshot.js",
+    "termshot": "node scripts/termshot.js",
+    "docs": "node scripts/docs-images.js"
   },
   "dependencies": {
     "jpeg-js": "^0.4.4",

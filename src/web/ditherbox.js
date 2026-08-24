@@ -820,7 +820,7 @@ export class DitherBox {
 
     const righe = testo.split('\n').length;
     const ms = Math.round(performance.now() - started);
-    this.#status(`${this.textCols}×${righe} · ${testo.length} ${this.t('ui.copy').toLowerCase() === 'copy' ? 'chars' : 'car.'} · ${ms} ms`);
+    this.#status(`${this.textCols}×${righe} · ${testo.length} ${this.t('ui.chars')} · ${ms} ms`);
   }
 
   /** La larghezza di un carattere non e' nota a priori: la si misura una
@@ -931,6 +931,7 @@ export function ditherToCanvas(drawable, options = {}) {
 /**
  * Aggancia automaticamente ogni elemento con `data-ditherbox`.
  * Gli attributi `data-*` diventano opzioni: data-palette, data-algorithm, ...
+ * piu' data-src, data-lang e data-theme, che opzioni non sono.
  * Per una palette personalizzata basta un elenco di colori:
  * `data-palette="#0a0c10,#c2fe0b"`.
  */
@@ -950,6 +951,7 @@ export function autoInit(scope = document) {
     boxes.push(new DitherBox(node, {
       options,
       src: node.dataset.src || undefined,
+      lang: node.dataset.lang || undefined,
       // Se l'attributo c'e' gia' nell'HTML lo legge direttamente il foglio
       // di stile; qui serve solo perche' il widget sappia di averlo.
       theme: node.dataset.theme || undefined,

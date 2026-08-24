@@ -1,54 +1,27 @@
 # DitherBox
 
-Dithering regolabile per le foto: lo stesso motore in due confezioni.
+Adjustable dithering for photos: the same engine in two packages.
 
-- **Un widget da mettere nel sito** — JavaScript puro, zero dipendenze, nessun
-  bundler richiesto. Funziona in Astro come in una pagina HTML scritta a mano.
-  L'immagine non lascia mai il browser: si elabora tutto sul canvas.
-- **Un'app da terminale** con interfaccia a schermo intero nello stile di
-  [cliamp](https://github.com/bjarneo/cliamp): pannelli bordati, temi a sei
-  colori, slider al posto dell'equalizzatore, l'anteprima disegnata dentro
-  il terminale.
+- **A widget for your site** — plain JavaScript, no dependencies, no bundler
+  required. It works in Astro exactly as it does in a hand-written HTML page.
+  The image never leaves the browser: everything happens on a canvas.
+- **A terminal app** with a full-screen interface in the style of
+  [cliamp](https://github.com/bjarneo/cliamp): boxed panels, six-colour themes,
+  sliders where the equaliser would be, the preview drawn inside the terminal.
 
-Diciannove algoritmi di dithering, diciotto tavolozze (dal bianco e nero a un
-bit al Game Boy, dal CGA al C64 ai colori di Marathon) piu' quelle che ti
-scrivi da solo, regolazioni di tono, controllo della risoluzione in megapixel
-e otto preset pronti.
+Nineteen dithering algorithms, eighteen palettes (from one-bit black and white
+to the Game Boy, from CGA to the C64 to the colours of Marathon) plus any you
+write yourself, tone adjustments, megapixel control over the output, and eight
+ready-made presets. The interface speaks English, Italian, Spanish, French and
+German.
 
-```
-▶ ritratto.jpg  1-bit B/N · Atkinson · 1x             760×1000 → 760×1000 · ant. 58×76
-╭─ ANTEPRIMA ──────────────────────────────────╮╭─ CONTROLLI ────────────────────────╮
-│        ⠿⣹⢏⡿⣹⢏⡿⣹⢏⡿⣹⢏⡿⣹⢏⡿⣹⢏⡿⣹⢏⡿⣹⢏⡿⣹⢏⡿⣹         ││DITHER                              │
-│        ⣛⢧⡻⣜⢧⡻⣜⢧⡻⣜⢧⡻⣜⢧⡻⣜⢧⡻⣜⢧⡻⣜⢧⡻⣜⢧⡻⣜⣳         ││> Palette      ◄ 1-bit B/N       ►  │
-│        ⣏⢾⡱⣏⢾⡱⣏⢾⡱⣏⢾⡱⣏⠾⡱⢏⠾⣱⢏⡾⣱⢏⡾⣱⢏⡾⣱⢏⡶         ││  Algoritmo    ◄ Atkinson        ►  │
-│        ⡜⣧⠵⣚⢧⡵⡚⣧⠵⣚⠧⡑⢆⡲⠡⠄⢂⠉⠸⢲⢏⡼⡲⢏⣼⠲⡝⡮⡵         ││  Pixel        ▱▱▱▱▱▱▱▱▱▱▱▱      1x │
-│        ⣙⢦⢛⡜⣦⠳⣙⢮⡱⢃⡞⣭⠒⡥⠃⡜⠠⠐⠀⠈⢮⠵⣩⠞⡴⡛⣥⢳⡹         ││  Intensità    ▰▰▰▰▰▰▱▱▱▱▱▱    100% │
-│        ⣍⢎⡳⡜⢦⡛⣥⢚⣥⣷⣾⣿⣷⣶⣁⢂⢁⠂⠀⠀⠀⠻⡔⣫⢖⡹⡔⣣⢏         ││  Soglia       ▰▰▰▰▰▰▱▱▱▱▱▱       0 │
-│        ⡜⢪⡕⣩⠖⡹⡤⢫⣿⣿⣿⣿⠿⣟⣿⣳⠆⠤⢀⠀⠀⠱⣙⡴⢪⠕⣍⢦⢋         ││  Grana        ▱▱▱▱▱▱▱▱▱▱▱▱      0% │
-│        ⡜⢣⡜⠥⡜⢣⡑⢧⠯⣟⣿⣳⢾⡝⣶⠱⢢⠐⠂⠀⠀⢸⠤⢃⡏⡼⡐⢎⢣         ││  Serpentina   [■] ON               │
-│        ⢎⡱⢌⡳⢌⠣⡜⢢⠛⡵⡺⢭⢚⡍⡖⠩⠀⠂⠀⠀⢀⠣⡜⢣⠜⡰⡙⢌⡲         ││TONO                                │
-│        ⢢⡑⡎⠴⣉⠖⡩⢆⢣⠐⡉⠆⠃⢂⠀⠁⠀⠀⠀⠀⢌⡱⡘⡥⢊⡕⡩⢒⠥         ││  Luminosità   ▰▰▰▰▰▰▱▱▱▱▱▱       0 │
-│        ⢢⠱⣈⠇⠴⡉⡔⢊⠦⡑⢄⠀⠀⠀⠀⠀⠀⠀⡠⢘⢢⠱⢌⢐⡣⢌⡑⠎⡔         ││  Contrasto    ▰▰▰▰▰▰▰▱▱▱▱▱      15 │
-│        ⠒⡡⠆⣉⠆⡱⠌⢡⠒⡉⢆⠉⠐⠀⠀⠀⠂⠑⢌⢡⠊⡔⢊⠆⡔⢊⢌⠲⠌         ││  Gamma        ▰▰▰▱▱▱▱▱▱▱▱▱    1.00 │
-│        ⠡⢂⠱⡀⢎⠰⡉⢄⠣⢁⠎⠀⠀⠀⡁⠀⠀⠀⠊⡄⢣⠘⡄⢊⠔⡡⢊⠔⡉         ││  Saturazione  ▰▰▰▰▰▰▱▱▱▱▱▱       0 │
-│        ⡁⠎⣐⠡⢊⡐⢡⠊⢄⠣⡘⠀⠀⠀⠠⠀⠀⠀⡃⠜⣀⠣⠘⡄⢊⠔⠡⡘⠄         ││  Nitidezza    ▱▱▱▱▱▱▱▱▱▱▱▱      0% │
-│        ⠐⡐⢂⠡⢂⠘⡄⠌⠂⡔⠡⠀⠀⠀⢂⠀⠀⠀⠌⡐⠤⢁⠒⠌⡀⠎⡐⠡⠌         ││  Inverti      [ ] OFF              │
-│        ⠐⡈⠤⠁⠄⠒⠈⡐⠁⢀⠡⠀⠀⠀⢀⠀⠀⠀⢀⠈⠐⠀⠃⠌⡐⠂⢁⠊⠄         ││OUTPUT                              │
-│        ⠐⡈⠄⠡⠈⡀⢡⠠⢁⠎⢐⠢⡐⢄⠂⡐⠠⢀⠂⠌⢀⠂⠄⠀⠀⠉⠄⡈⠄         ││  Megapixel    ▰▰▰▰▰▰▰▱▱▱▱▱    2 MP │
-│        ⠐⡀⠄⢢⠡⠌⠂⡅⢊⠌⢂⡱⢈⠄⡃⠄⢁⠂⠌⢀⠂⠌⠠⠁⠄⠂⢀⠀⠀         ││  Ringrandisci [■] ON               │
-│        ⡐⠌⡘⠤⢁⠎⡡⠌⠢⡘⢄⠢⢁⢊⠔⡈⠄⠈⡐⢀⠊⠄⠡⠈⠄⢁⠂⠌⠀         ││                                    │
-╰──────────────────────────────────────────────╯╰────────────────────────────────────╯
-╭─ FILE 1/2 · DitherBox ─────────────────────────────────────────────────────────────╮
-│> ★ ritratto.jpg                                                                    │
-│    scogliera.jpg                                                                   │
-│                                                                                    │
-╰────────────────────────────────────────────────────────────────────────────────────╯
- jk scorri  hl regola  tab fuoco  v anteprima  p preset  t tema  s salva  ? tasti  q
-```
+![The terminal interface](docs/tui.png)
 
 ---
 
-## Il widget per il sito
+## The web widget
+
+![The widget](docs/widget.png)
 
 ### Astro
 
@@ -56,7 +29,7 @@ e otto preset pronti.
 npm install ditherbox
 ```
 
-Copia `examples/astro/DitherBox.astro` in `src/components/` e usalo:
+Copy `examples/astro/DitherBox.astro` into `src/components/` and use it:
 
 ```astro
 ---
@@ -66,13 +39,13 @@ import DitherBox from '../components/DitherBox.astro';
 <DitherBox palette="bw" algorithm="atkinson" contrast={15} sharpen={40} />
 ```
 
-Il modulo si puo' importare anche nel frontmatter senza far esplodere la build:
-non tocca il DOM al momento dell'import, quindi il rendering lato server passa
-liscio.
+The module can also be imported in the frontmatter without breaking the build:
+it does not touch the DOM at import time, so server-side rendering goes through
+cleanly.
 
-### HTML e basta
+### Plain HTML
 
-Un file di stile, un file di script, un div:
+One stylesheet, one script, one div:
 
 ```html
 <link rel="stylesheet" href="dist/ditherbox.css">
@@ -85,31 +58,48 @@ Un file di stile, un file di script, un div:
 </script>
 ```
 
-Oppure senza scrivere niente, lasciando che sia l'HTML a dire cosa fare:
+Or without writing anything at all, letting the HTML say what to do:
 
 ```html
 <div data-ditherbox data-palette="gameboy" data-scale="4"></div>
 <script>DitherBox.autoInit();</script>
 ```
 
-Apri `examples/index.html` per vedere entrambe le forme al lavoro.
+Open `examples/index.html` to see both forms at work.
 
-### Cosa sa fare il widget
+### What the widget does
 
-Il campo **Apri foto** sta in cima al pannello e i pulsanti in fondo: sono due
-fasce ferme, solo i parametri in mezzo scorrono. Oltre al campo funzionano il
-trascinamento, l'incolla dagli appunti e — su telefono — il pulsante *Scatta*,
-che apre direttamente la fotocamera. L'orientamento EXIF viene rispettato, cosi'
-le foto verticali non arrivano coricate.
+The **Open photo** field sits at the top of the panel and the buttons at the
+bottom: those two bands stay put, and only the parameters in between scroll.
+Besides the field, drag and drop works, so does pasting from the clipboard,
+and — on a phone — the *Shoot* button, which opens the camera directly. EXIF
+orientation is respected, so portrait photos don't arrive lying down.
 
-L'anteprima subisce **la stessa riduzione in megapixel** del risultato finale:
-se scegli 0,05 MP la vedi sgranata come uscira' davvero, invece di scoprirlo
-dopo aver scaricato il file. La riga di stato dice sempre da quanto a quanto:
-`3024×4032 → 1224×1632 (2.00 MP)`.
+The preview goes through **the same megapixel reduction** as the final result:
+pick 0.05 MP and you see it as coarse as it will really come out, instead of
+finding out after downloading the file. The status line always says from what
+to what: `3024×4032 → 1224×1632 (2.00 MP)`.
 
-Il widget porta un azzeramento degli stili circoscritto a se stesso, cosi' le
-regole del sito che lo ospita (`section { margin-bottom: 2rem }` e compagnia)
-non gli scompongono la disposizione.
+The widget carries a style reset scoped to itself, so the host site's rules
+(`section { margin-bottom: 2rem }` and friends) can't pull its layout apart.
+
+### Text art
+
+Above the preview there are three views: **Image**, **ASCII** and **Braille**.
+The last two turn the photo into characters you can select, and the **Copy**
+button puts the whole block on the clipboard in one go — no dragging across the
+interface. A **Columns** slider decides how wide the art is.
+
+The two modes work differently on purpose. ASCII is *not* dithered: its
+thirteen-step ramp of characters already carries the tone, and quantising to
+one bit first would leave rows of solid blocks. Braille *is* dithered: a dot is
+either on or off, so the gradation has to come from dot density.
+
+```js
+box.setView('ascii');       // 'image' | 'ascii' | 'braille'
+const testo = box.toText(); // the same string the Copy button copies
+await box.copyText();
+```
 
 ### API
 
@@ -119,32 +109,35 @@ import { processImage, applyPreset, PALETTES } from 'ditherbox';
 
 const box = new DitherBox('#dither', {
   options: { palette: 'bw', algorithm: 'atkinson', megapixels: 2 },
-  previewMaxSize: 900,   // lato massimo dell'anteprima interattiva
-  presets: true,         // barra dei preset
-  src: '/foto.jpg',      // immagine da caricare all'avvio
+  previewMaxSize: 900,   // longest side of the interactive preview
+  presets: true,         // preset bar
+  src: '/photo.jpg',     // image to load at startup
+  lang: 'it',            // en | it | es | fr | de (default: the browser's)
+  theme: 'dark',         // force a colour scheme
 });
 
-await box.load(file);            // File, Blob o URL
-box.set({ contrast: 30 });       // aggiorna e ridisegna
+await box.load(file);            // File, Blob or URL
+box.set({ contrast: 30 });       // update and redraw
 box.getOptions();
 box.reset();
-const canvas = box.renderFull(); // a piena risoluzione
+box.setLocale('de');             // switch language on the fly
+const canvas = box.renderFull(); // at full resolution
 const blob = await box.toBlob();
-await box.download('mia-foto.png');
+await box.download('my-photo.png');
 box.on('load' | 'change' | 'error', fn);
 box.destroy();
 
-// Senza interfaccia:
+// Without an interface:
 const canvas = ditherToCanvas(document.querySelector('img'), { palette: 'gameboy' });
 ```
 
-### Intonarlo al tuo sito
+### Matching it to your site
 
-I colori di serie sono quelli di alessandrosimonitto.it: fondo quasi nero,
-testo bianco, ambra come accento, angoli vivi.
+The stock colours are the ones from alessandrosimonitto.it: near-black
+background, white text, amber accent, sharp corners.
 
-Per intonarlo a un altro sito bastano **tre valori**: pannello, bordi e testo
-attenuato si ricavano da questi per miscela.
+To match another site you only need **three values**: panel, borders and muted
+text are derived from these by mixing.
 
 ```css
 .dbx {
@@ -154,13 +147,13 @@ attenuato si ricavano da questi per miscela.
 }
 ```
 
-Il resto e' tutto sovrascrivibile se il ricavato non convince:
-`--dbx-panel`, `--dbx-border`, `--dbx-muted`, `--dbx-accent-fg` (che di suo
-segue `--dbx-bg`), `--dbx-radius` e `--dbx-radius-small` (che di suo segue il
-primo), `--dbx-font`, `--dbx-panel-width`, `--dbx-height`.
+Everything else can still be overridden if the derived value doesn't convince
+you: `--dbx-panel`, `--dbx-border`, `--dbx-muted`, `--dbx-accent-fg` (which
+follows `--dbx-bg` by default), `--dbx-radius` and `--dbx-radius-small` (which
+follows the first), `--dbx-font`, `--dbx-panel-width`, `--dbx-height`.
 
-Se il tuo sito espone gia' le sue variabili, agganciacele e il widget seguira'
-da solo ogni futura modifica alla palette:
+If your site already exposes its own variables, hook them up and the widget
+will follow every future change to the palette by itself:
 
 ```css
 .dbx {
@@ -171,11 +164,11 @@ da solo ogni futura modifica alla palette:
 }
 ```
 
-### Schema chiaro e scuro
+### Light and dark
 
-Di suo il widget segue le preferenze del sistema. Su un sito che vive di un
-solo schema questo e' sbagliato: chi tiene il sistema in chiaro si vedrebbe un
-riquadro chiaro in mezzo a una pagina nera. Imponilo:
+By default the widget follows the system preference. On a site that lives in a
+single scheme that's wrong: someone with their system set to light would get a
+light box in the middle of a black page. Force it:
 
 ```astro
 <DitherBox theme="dark" />
@@ -189,121 +182,147 @@ riquadro chiaro in mezzo a una pagina nera. Imponilo:
 new DitherBox('#dither', { theme: 'dark' });
 ```
 
-`data-theme` batte le preferenze del sistema in entrambi i versi.
+`data-theme` beats the system preference in both directions.
+
+### Language
+
+The widget picks the language from the browser and falls back to English. There
+is a selector in the top-right corner of the panel, and the choice can also be
+set from outside:
+
+```astro
+<DitherBox lang="it" />
+```
+
+```html
+<div data-ditherbox data-lang="fr"></div>
+```
+
+```js
+new DitherBox('#dither', { lang: 'de' });
+box.setLocale('es');
+```
 
 ---
 
-## L'app da terminale
+## The terminal app
 
 ```sh
-npm install -g ditherbox    # oppure: npx ditherbox
+npm install -g ditherbox    # or: npx ditherbox
 ```
 
 ```sh
-ditherbox ~/Foto                     # sfoglia una cartella
-ditherbox ritratto.jpg               # apre direttamente una foto
-ditherbox foto.jpg --print           # stampa nel terminale ed esce
+ditherbox ~/Photos                   # browse a folder
+ditherbox portrait.jpg               # open a photo directly
+ditherbox photo.jpg --print          # print in the terminal and exit
 ```
 
-### Tasti
+### Keys
 
-Ricalcano quelli di cliamp, cosi' se lo usi gia' sei a casa.
+They follow cliamp's, so if you already use that one you're at home.
 
-| Tasto | Cosa fa |
+| Key | What it does |
 |---|---|
-| `↑` `↓` / `j` `k` | Scorri i parametri o i file |
-| `←` `→` / `h` `l` | Regola il valore selezionato |
-| `H` `L` / `shift+← →` | Regola a passi di cinque |
-| `invio` `spazio` | Carica il file, gira l'interruttore |
-| `tab` | Sposta il fuoco fra controlli e lista file |
-| `n` `N` | Immagine successiva / precedente |
-| `g` `G` `home` `fine` | Vai in cima / in fondo |
-| `v` | Cambia modo di anteprima |
-| `t` | Scegli il tema (anteprima dal vivo mentre scorri) |
-| `p` | Applica un preset |
-| `i` | Inverti |
-| `r` | Azzera tutti i parametri |
-| `o` | Apri un percorso |
-| `s` / `ctrl+s` | Salva a piena risoluzione |
-| `ctrl+x` | Mostra o nascondi la lista dei file |
-| `?` / `ctrl+k` | Elenco dei tasti |
-| `q` / `ctrl+c` | Esci |
+| `↑` `↓` / `j` `k` | Scroll the parameters or the files |
+| `←` `→` / `h` `l` | Adjust the selected value |
+| `H` `L` / `shift+← →` | Adjust in steps of five |
+| `enter` `space` | Load the file, flip the switch |
+| `tab` | Move focus between controls and file list |
+| `n` `N` | Next / previous image |
+| `g` `G` `home` `end` | Jump to the top / bottom |
+| `v` | Change preview mode |
+| `t` | Pick the theme (live preview while you scroll) |
+| `p` | Apply a preset |
+| `ctrl+l` | Pick the language (live preview while you scroll) |
+| `i` | Invert |
+| `r` | Reset every parameter |
+| `o` | Open a path |
+| `s` / `ctrl+s` | Save at full resolution |
+| `ctrl+x` | Show or hide the file list |
+| `?` / `ctrl+k` | List of keys |
+| `q` / `ctrl+c` | Quit |
 
-### I quattro modi di anteprima
+### The four preview modes
 
-Il terminale non ha pixel, ha caratteri, e una cella e' alta il doppio di
-quanto e' larga. Ogni modo sfrutta il carattere in modo diverso:
+A terminal has no pixels, it has characters, and a cell is twice as tall as it
+is wide. Each mode uses the character differently:
 
-| Modo | Pixel per cella | Quando conviene |
+| Mode | Pixels per cell | When it helps |
 |---|---|---|
-| `halfblock` | 1×2 | **Predefinito.** Fedele nei colori e sicuro in qualunque font |
-| `braille` | 2×4 | Il piu' dettagliato, ma vedi la nota qui sotto |
-| `quadrant` | 2×2 | Via di mezzo, due colori per cella |
-| `ascii` | 1×1 | Il piu' nostalgico |
+| `halfblock` | 1×2 | **Default.** Faithful in colour and safe in any font |
+| `braille` | 2×4 | The most detailed, but see the note below |
+| `quadrant` | 2×2 | A middle ground, two colours per cell |
+| `ascii` | 1×1 | The most nostalgic |
 
-Il predefinito e' `halfblock` e non `braille` per un motivo pratico: `▀` e' un
-blocco, largo esattamente una cella in qualunque font. I glifi braille invece
-mancano da parecchi font monospaziati; il terminale ripiega su un altro font
-con avanzamento diverso, le colonne si sfalsano e la cornice sembra rotta. Se
-il tuo font il braille lo regge, premi `v`: il dettaglio raddoppia abbondante
-(nell'immagine qui sopra e' braille).
+The default is `halfblock` and not `braille` for a practical reason: `▀` is a
+block, exactly one cell wide in any font. Braille glyphs, on the other hand,
+are missing from plenty of monospaced fonts; the terminal falls back to another
+font with a different advance, the columns drift apart and the frame looks
+broken. If your font handles braille, press `v`: the detail more than doubles
+(the screenshot at the top of this page is braille).
 
-L'anteprima viene ditherata **direttamente alla risoluzione del terminale**, non
-rimpicciolita dopo: se si dithera grande e poi si riduce, la media dei pixel
-richiude i puntini in grigi e la trama sparisce. Quello che vedi e' dithering
-vero, non una foto sfocata.
+The preview is dithered **directly at the terminal's resolution**, not shrunk
+afterwards: dither large and then reduce, and averaging the pixels closes the
+dots back into greys and the texture disappears. What you see is real
+dithering, not a blurred photo.
 
-Lo spazio va tutto all'immagine: in cima c'e' una riga sola, il riquadro
-dell'anteprima si stringe sulla foto invece di restare largo quanto lo schermo,
-e la lista dei file compare solo quando ci sono davvero piu' immagini fra cui
-scegliere.
+All the space goes to the image: there's a single line at the top, the preview
+panel hugs the photo instead of staying as wide as the screen, and the file
+list only appears when there really is more than one image to choose from.
 
-### La riga di stato
+### The status line
 
-Normalmente riporta il file, la catena di elaborazione e le misure. Quando c'e'
-un'operazione in corso diventa la sua barra:
+Normally it reports the file, the processing chain and the sizes. While an
+operation is running it becomes that operation's progress bar:
 
 ```
-⠹ Elaboro a piena risoluzione        ▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱   25%   1.8s
+⠹ Processing at full resolution      ▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱   25%   1.8s
 ```
 
-La barra segue le fasi vere dell'operazione — leggo, elaboro, scrivo — non un
-conto alla rovescia inventato: mentre una fase lavora la barra resta ferma dov'e'.
-Su un terminale stretto la riga lascia cadere le informazioni meno importanti
-invece di troncare il nome del file.
+The bar follows the real phases of the operation — reading, processing,
+writing — not an invented countdown: while a phase is working the bar stays put
+where it is. On a narrow terminal the line drops the least important
+information instead of truncating the file name.
 
-### Senza interfaccia
+### Without an interface
 
 ```sh
-ditherbox foto.jpg -p macintosh -o esito.png
-ditherbox foto.jpg --palette gameboy --scale 4 --contrast 20 -o gb.png
-ditherbox foto.jpg --palette "#0a0c10,#c2fe0b" --megapixels 0.3 -o manifesto.png
-ditherbox ~/Foto --preset fanzine --out-dir ./esiti
-ditherbox --list                      # palette, algoritmi, preset, temi
+ditherbox photo.jpg -p macintosh -o out.png
+ditherbox photo.jpg --palette gameboy --scale 4 --contrast 20 -o gb.png
+ditherbox photo.jpg --palette "#0a0c10,#c2fe0b" --megapixels 0.3 -o poster.png
+ditherbox ~/Photos --preset fanzine --out-dir ./results
+ditherbox --list                      # palettes, algorithms, presets, themes
 ditherbox --help
 ```
 
-Ogni parametro del motore ha la sua opzione: `--palette`, `--algorithm`,
+Every engine parameter has its own option: `--palette`, `--algorithm`,
 `--scale`, `--strength`, `--bias`, `--noise`, `--serpentine`, `--brightness`,
 `--contrast`, `--gamma`, `--saturation`, `--sharpen`, `--invert`,
-`--megapixels`, `--upscale`. Gli interruttori si spengono con `--no-` davanti.
+`--megapixels`, `--upscale`. Switches are turned off by prefixing `--no-`.
 
-### Configurazione
+`-l, --lang <code>` picks the language of the messages; without it the CLI
+reads `LC_ALL`, `LC_MESSAGES` and `LANG`, and falls back to English. The option
+table in `--help` stays in English, because the options themselves are English,
+but the parameter labels, the `--list` headings and every error message follow
+the choice.
+
+### Configuration
 
 `~/.config/ditherbox/config.toml`:
 
 ```toml
 theme = "gruvbox"
 mode = "braille"
+lang = "it"
 palette = "bw"
 algorithm = "atkinson"
 contrast = 15
 megapixels = 2
 ```
 
-I temi personali vanno in `~/.config/ditherbox/themes/*.toml` e usano lo stesso
-schema a sei colori di cliamp, quindi un tema scritto per quello funziona qui
-senza modifiche:
+Personal themes go in `~/.config/ditherbox/themes/*.toml` and use the same
+six-colour schema as cliamp, so a theme written for that one works here without
+changes:
 
 ```toml
 bg = "#002b36"
@@ -315,73 +334,74 @@ yellow = "#b58900"
 red = "#dc322f"
 ```
 
-Temi inclusi: `simonitto` (predefinito, gli stessi colori del widget),
+Included themes: `simonitto` (the default, the same colours as the widget),
 `winamp`, `gruvbox`, `dracula`, `nord`, `catppuccin`, `tokyo-night`,
 `everforest`, `ember`, `matte-black`, `hackerman`, `vantablack`, `terminale`
-(che eredita lo sfondo del tuo terminale).
+(which inherits your terminal's own background).
 
 ---
 
-## I parametri
+## The parameters
 
-| Parametro | Intervallo | Cosa fa |
+| Parameter | Range | What it does |
 |---|---|---|
-| **Palette** | 13 tavolozze | I colori a disposizione del risultato |
-| **Algoritmo** | 19 algoritmi | Come vengono distribuiti i puntini |
-| **Pixel** | 1–16 | Riduce prima di ditherare: 1 = dettaglio pieno, 8 = pixelone da 8 bit |
-| **Intensita** | 0–200% | Quanta parte dell'errore (o del rumore ordinato) viene applicata |
-| **Soglia** | −100 → 100 | Sposta il punto di taglio: negativo scurisce, positivo schiarisce |
-| **Grana** | 0–100% | Rumore casuale prima della soglia: rompe le trame troppo regolari |
-| **Serpentina** | on/off | Scansione alternata riga per riga: elimina le strisciate diagonali |
-| **Luminosita, Contrasto, Gamma, Saturazione** | | Regolazioni di tono, applicate prima del dithering |
-| **Nitidezza** | 0–200% | Maschera di contrasto: recupera i dettagli che il dithering mangia |
-| **Inverti** | on/off | Scambia chiari e scuri |
-| **Megapixel** | 0,01–24 MP | Risoluzione del risultato: abbassala per sgranare di proposito la foto |
-| **Ringrandisci** | on/off | Riporta il risultato alla misura di partenza con pixel netti |
+| **Palette** | 18 palettes | The colours the result is allowed to use |
+| **Algorithm** | 19 algorithms | How the dots get distributed |
+| **Pixel** | 1–16 | Reduce before dithering: 1 = full detail, 8 = chunky 8-bit pixels |
+| **Strength** | 0–200% | How much of the error (or of the ordered noise) is applied |
+| **Threshold** | −100 → 100 | Moves the cut-off point: negative darkens, positive lightens |
+| **Grain** | 0–100% | Random noise before the threshold: breaks up textures that are too regular |
+| **Serpentine** | on/off | Alternating scan row by row: removes the diagonal streaks |
+| **Brightness, Contrast, Gamma, Saturation** | | Tone adjustments, applied before the dithering |
+| **Sharpen** | 0–200% | Unsharp mask: recovers the detail the dithering eats |
+| **Invert** | on/off | Swaps light and dark |
+| **Megapixels** | 0.01–24 MP | Resolution of the result: lower it to ruin the photo on purpose |
+| **Upscale** | on/off | Brings the result back to the original size with crisp pixels |
 
-### Algoritmi
+### Algorithms
 
-**A diffusione dell'errore** — l'errore di ogni pixel viene spalmato sui vicini.
-Trama irregolare, tono molto fedele: `floydSteinberg`, `falseFloydSteinberg`,
-`atkinson`, `jarvis`, `stucki`, `burkes`, `sierra`, `sierra2`, `sierraLite`,
-`stevensonArce`.
+**Error diffusion** — each pixel's error is spread over its neighbours.
+Irregular texture, very faithful tone: `floydSteinberg`,
+`falseFloydSteinberg`, `atkinson`, `jarvis`, `stucki`, `burkes`, `sierra`,
+`sierra2`, `sierraLite`, `stevensonArce`.
 
-`atkinson` e' quello del Macintosh del 1984: diffonde solo sei ottavi
-dell'errore, e da li' viene il contrasto marcato che lo rende riconoscibile.
+`atkinson` is the 1984 Macintosh one: it diffuses only six eighths of the
+error, and that's where the marked contrast that makes it recognisable comes
+from.
 
-**A matrice ordinata** — ogni pixel viene confrontato con una soglia che dipende
-dalla sua posizione. Trama regolare, aria da vecchio videogioco: `bayer2`,
-`bayer4`, `bayer8`, `bayer16`, `cluster4`, `cluster8` (retino da rotocalco),
-`lines4` (incisione).
+**Ordered matrix** — each pixel is compared against a threshold that depends on
+its position. Regular texture, old-video-game air: `bayer2`, `bayer4`,
+`bayer8`, `bayer16`, `cluster4`, `cluster8` (magazine halftone), `lines4`
+(engraving).
 
-**Senza trama** — `none` (soglia secca) e `random` (rumore puro).
+**No texture** — `none` (hard threshold) and `random` (pure noise).
 
-### Tavolozze
+### Palettes
 
-`bw` (un bit), `gray4` `gray8` `gray16`, `gameboy`, `gameboyPocket`, `cgaCyan`,
-`cgaGreen`, `pico8`, `c64`, `zx`, `greenCrt`, `amberCrt`, `marathon`,
-`marathonDuo`, `marathonTerm`, `risograph`, `blueprint`.
+`bw` (one bit), `gray4` `gray8` `gray16`, `gameboy`, `gameboyPocket`,
+`cgaCyan`, `cgaGreen`, `pico8`, `c64`, `zx`, `greenCrt`, `amberCrt`,
+`marathon`, `marathonDuo`, `marathonTerm`, `risograph`, `blueprint`.
 
-`marathon` prende i colori del gioco del 2025: rosa e gialli iper-saturi su blu
-acciaio freddi e neri profondi. E' trattata come **scala di luminanza**, non
-come tavolozza a colori — ed e' la differenza fra il blocco piatto di colore
-che il gioco usa davvero e una nevicata di coriandoli. `marathonDuo` tiene solo
-nero e giallo acido, per il taglio da manifesto; `marathonTerm` sono i terminali
-verdi del Marathon del 1994.
+`marathon` takes the colours of the 2025 game: hyper-saturated pinks and
+yellows over cold steel blues and deep blacks. It is treated as a **luminance
+ramp**, not as a colour palette — and that is the difference between the flat
+block of colour the game actually uses and a snowfall of confetti.
+`marathonDuo` keeps only black and acid yellow, for the poster cut;
+`marathonTerm` is the green terminals of the 1994 Marathon.
 
-Lo stesso vale per tutte le scale tonali (bianco e nero, grigi, Game Boy,
-fosfori, cianografia): vengono mappate sulla **luminanza** e non sul colore RGB
-piu' vicino. E' l'unico modo perche' un rosso saturo finisca sul gradino scuro
-invece che sul verde chiaro che gli capita accanto nello spazio dei colori.
+The same goes for every tonal ramp (black and white, greys, Game Boy,
+phosphor, blueprint): they are mapped on **luminance** and not on the nearest
+RGB colour. It's the only way for a saturated red to land on the dark step
+instead of the light green that happens to sit next to it in colour space.
 
-### Tavolozze su misura
+### Custom palettes
 
-Un elenco di colori esadecimali separati da virgola vale ovunque si possa
-scrivere il nome di una tavolozza — nel widget, nella riga di comando, in
-`config.toml`, in un attributo `data-`:
+A comma-separated list of hex colours works anywhere a palette name can be
+written — in the widget, on the command line, in `config.toml`, in a `data-`
+attribute:
 
 ```sh
-ditherbox foto.jpg --palette "#0a0c10,#c2fe0b" -o manifesto.png
+ditherbox photo.jpg --palette "#0a0c10,#c2fe0b" -o poster.png
 ```
 
 ```html
@@ -390,92 +410,137 @@ ditherbox foto.jpg --palette "#0a0c10,#c2fe0b" -o manifesto.png
 
 ```js
 processImage(imageData, { palette: '#1a1423,#f2e9e4' });
-processImage(imageData, { palette: ['#1a1423', '#f2e9e4'] });   // anche cosi'
+processImage(imageData, { palette: ['#1a1423', '#f2e9e4'] });   // this too
 ```
 
-Nel widget c'e' l'editor: la voce **Su misura** apre una fila di selettori
-colore, con `+` per aggiungerne e `⧉` per partire dai colori della tavolozza
-che hai selezionato e poi ritoccarli.
+The widget has an editor: the **Custom** entry opens a row of colour pickers,
+with `+` to add more and `⧉` to start from the colours of the palette you have
+selected and then adjust them.
 
-Con due sole tinte il risultato e' un duotono: il chiaro e lo scuro della foto
-finiscono sui due colori scelti, con il dithering a fare i mezzitoni.
+With only two tints the result is a duotone: the light and the dark of the
+photo land on the two chosen colours, with the dithering making the midtones.
 
-### Preset
+### Presets
 
-`macintosh` (Mac 1984), `giornale` (retino da stampa), `gameboy`,
-`fanzine` (fotocopia ad alto contrasto), `terminale` (fosfori verdi),
-`arcade` (16 colori), `cga` (1981), `incisione`.
+`macintosh` (Mac 1984), `giornale` (print halftone), `gameboy`,
+`fanzine` (high-contrast photocopy), `terminale` (green phosphor),
+`arcade` (16 colours), `cga` (1981), `incisione` (engraving).
 
 ---
 
-## Il motore, da solo
+## The engine on its own
 
-Puro JavaScript, nessuna dipendenza, nessun riferimento al DOM: gira uguale nel
-browser e in Node.
+Plain JavaScript, no dependencies, no reference to the DOM: it runs the same in
+the browser and in Node.
 
 ```js
 import { processImage, ditherImage, paletteInfo, applyPreset } from 'ditherbox';
 
-// Le immagini sono { width, height, data: Uint8ClampedArray } in RGBA:
-// esattamente la forma di un ImageData, quindi dal canvas si passa diretto.
+// Images are { width, height, data: Uint8ClampedArray } in RGBA:
+// exactly the shape of an ImageData, so a canvas hands one straight over.
 const { image, palette, ditherWidth } = processImage(imageData, applyPreset('gameboy'));
 ```
 
-Aggiungere un parametro lo fa comparire **da solo** nel widget web, nella TUI e
-nella riga di comando: lo schema sta in un posto solo, `src/core/options.js`, e
-tutte e tre le interfacce lo leggono da li'.
+Adding a parameter makes it appear **by itself** in the web widget, in the TUI
+and on the command line: the schema lives in one place, `src/core/options.js`,
+and all three interfaces read it from there.
+
+### Translations
+
+No human-readable text lives in the engine. Labels, hints and messages all come
+from a translator keyed on canonical English strings:
+
+```js
+import { createTranslator, LOCALES, paramLabel } from 'ditherbox';
+
+const t = createTranslator('de');
+t('ui.download');            // 'PNG herunterladen'
+paramLabel(PARAMS[0], t);    // 'Palette'
+```
+
+A key missing from a translation falls back to English; a key missing from
+English is returned as-is, so a typo shows up on screen instead of vanishing
+into an empty string. To add a language, add its dictionary to
+`src/core/i18n.js` and its code to `LOCALES` — `test/i18n.test.js` will then
+tell you which keys are missing and which labels are too long for the TUI's
+label column.
 
 ---
 
-## Sviluppo
+## Development
 
 ```sh
 npm install
-npm test          # 95 test
-npm run build     # rigenera dist/ per l'uso con <script>
-npm run screenshot -- esito.png 1240 820 foto.png    # guarda il widget
+npm test          # 108 tests
+npm run build     # regenerate dist/ for use with <script>
+npm run docs      # regenerate every image in this README
 ```
 
-I test coprono motore, primitive di terminale, lettura e scrittura immagini,
-TUI, riga di comando e file impacchettato. Quelli in `test/layout.test.js`
-aprono davvero il widget in Chromium e controllano l'impaginazione: che le due
-colonne combacino, che niente sbordi dal riquadro, che il campo per aprire la
-foto e i pulsanti restino fermi mentre i parametri scorrono, e che il cursore
-dei megapixel cambi per davvero la misura dell'anteprima. Se Chromium non c'e'
-si saltano invece di far fallire la suite.
+The tests cover the engine, the terminal primitives, image reading and writing,
+the TUI, the command line, the translations and the bundled file. The ones in
+`test/layout.test.js` really do open the widget in Chromium and check the
+layout: that the two columns line up, that nothing spills out of the box, that
+the open-photo field and the buttons stay put while the parameters scroll, and
+that the megapixel slider really does change the size of the preview. If
+Chromium isn't there they skip instead of failing the suite.
 
-Se tocchi qualcosa in `src/core/` o `src/web/`, rilancia `npm run build` e
-committa anche `dist/`: c'e' un test che verifica che il file impacchettato sia
-allineato ai sorgenti.
+If you touch anything in `src/core/` or `src/web/`, run `npm run build` again
+and commit `dist/` too: there's a test that checks the bundled file is in sync
+with the sources.
 
 ```
-src/core/    motore condiviso, niente DOM e niente Node
-src/web/     widget per il browser + foglio di stile
-src/cli/     app da terminale: TUI, temi, renderer, I/O immagini
+src/core/    shared engine, no DOM and no Node
+src/web/     browser widget + stylesheet
+src/cli/     terminal app: TUI, themes, renderer, image I/O
+scripts/     build, screenshots, the sample scene for the docs
 ```
 
-Le uniche dipendenze sono `jpeg-js` e `pngjs`, entrambe in puro JavaScript e
-usate solo dall'app da terminale: niente da compilare, niente moduli nativi. Il
-widget web non ha dipendenze del tutto. Playwright compare fra le dipendenze di
-sviluppo e serve solo ai controlli di impaginazione.
+### The images in this README
 
-## Licenza
+They are generated, not taken by hand:
 
-MIT — vedi [LICENSE](LICENSE). Puoi usarlo, modificarlo e ridistribuirlo,
-anche in progetti commerciali; l'unico obbligo e' tenere la nota di copyright.
+```sh
+npm run docs
+```
 
-### Terze parti
+`scripts/sample.js` computes the test scene — a lit sphere over a chequered
+floor fading into fog. It isn't a photo, and that's deliberate: the docs need
+an image with long continuous gradients (the backdrop, the shading, the fog)
+*and* a regular high-frequency pattern (the chequers), because those are the
+two things dithering handles differently. Any given photo doesn't guarantee
+both.
 
-Il motore e il widget non hanno dipendenze. L'app da terminale ne ha due, che
-si installano da npm e non vengono impacchettate qui dentro:
+`scripts/termshot.js` photographs the terminal interface. It renders the TUI's
+ANSI frame in Chromium with a fixed character grid, because a page is not a
+terminal: the braille glyphs of DejaVu Sans Mono are 21% wider than the
+letters, and pasted in as text they knock every line that contains them out of
+alignment — which is exactly what used to make the screenshot in this file look
+crooked. Each run of characters declares its width in cells and braille is
+squeezed into its own, so the columns stay columns.
 
-| Pacchetto | Licenza | A cosa serve |
+The only dependencies are `jpeg-js` and `pngjs`, both pure JavaScript and used
+only by the terminal app: nothing to compile, no native modules. The web widget
+has no dependencies at all. Playwright appears among the dev dependencies and
+is used only by the layout checks and the screenshot scripts.
+
+## Licence
+
+MIT — see [LICENSE](LICENSE). You can use it, modify it and redistribute it,
+including in commercial projects; the only obligation is to keep the copyright
+notice.
+
+### Third parties
+
+The engine and the widget have no dependencies. The terminal app has two, which
+install from npm and are not bundled in here:
+
+| Package | Licence | What it's for |
 |---|---|---|
-| [`jpeg-js`](https://github.com/eugeneware/jpeg-js) | BSD-3-Clause | Legge e scrive JPEG in puro JavaScript |
-| [`pngjs`](https://github.com/pngjs/pngjs) | MIT | Legge e scrive PNG |
+| [`jpeg-js`](https://github.com/eugeneware/jpeg-js) | BSD-3-Clause | Reads and writes JPEG in pure JavaScript |
+| [`pngjs`](https://github.com/pngjs/pngjs) | MIT | Reads and writes PNG |
 
-Fra le dipendenze di sviluppo c'e' [`playwright`](https://github.com/microsoft/playwright)
-(Apache-2.0), usato solo dai controlli di impaginazione.
+Among the dev dependencies there is [`playwright`](https://github.com/microsoft/playwright)
+(Apache-2.0), used only by the layout checks and the screenshot scripts.
 
-Sono tutte licenze permissive e compatibili con la MIT: nessuna impone di
-aprire il codice di chi le usa.
+These are all permissive licences and compatible with MIT: none of them
+requires whoever uses them to open their own code.

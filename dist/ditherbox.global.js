@@ -1025,6 +1025,7 @@ const en = {
   'ui.copied': 'Copied',
   'ui.copyFailed': 'Could not copy',
   'ui.columns': 'Columns',
+  'ui.chars': 'chars',
   'ui.textHint': 'Text art of the photo. Copy it and paste it wherever you like.',
   'ui.error': 'Error: {msg}',
   'ui.notAnImage': 'That file is not an image',
@@ -1204,6 +1205,7 @@ const it = {
   'ui.copied': 'Copiato',
   'ui.copyFailed': 'Non riesco a copiare',
   'ui.columns': 'Colonne',
+  'ui.chars': 'car.',
   'ui.textHint': 'La foto scritta con i caratteri. Copiala e incollala dove vuoi.',
   'ui.error': 'Errore: {msg}',
   'ui.notAnImage': 'Quel file non è un’immagine',
@@ -1381,6 +1383,7 @@ const es = {
   'ui.copied': 'Copiado',
   'ui.copyFailed': 'No se pudo copiar',
   'ui.columns': 'Columnas',
+  'ui.chars': 'car.',
   'ui.textHint': 'La foto escrita con caracteres. Cópiala y pégala donde quieras.',
   'ui.error': 'Error: {msg}',
   'ui.notAnImage': 'Ese archivo no es una imagen',
@@ -1558,6 +1561,7 @@ const fr = {
   'ui.copied': 'Copié',
   'ui.copyFailed': 'Copie impossible',
   'ui.columns': 'Colonnes',
+  'ui.chars': 'car.',
   'ui.textHint': 'La photo écrite en caractères. Copiez-la et collez-la où vous voulez.',
   'ui.error': 'Erreur : {msg}',
   'ui.notAnImage': 'Ce fichier n’est pas une image',
@@ -1735,6 +1739,7 @@ const de = {
   'ui.copied': 'Kopiert',
   'ui.copyFailed': 'Kopieren fehlgeschlagen',
   'ui.columns': 'Spalten',
+  'ui.chars': 'Z.',
   'ui.textHint': 'Das Foto in Zeichen geschrieben. Kopieren und einfügen, wo du willst.',
   'ui.error': 'Fehler: {msg}',
   'ui.notAnImage': 'Diese Datei ist kein Bild',
@@ -3325,7 +3330,7 @@ class DitherBox {
 
     const righe = testo.split('\n').length;
     const ms = Math.round(performance.now() - started);
-    this.#status(`${this.textCols}×${righe} · ${testo.length} ${this.t('ui.copy').toLowerCase() === 'copy' ? 'chars' : 'car.'} · ${ms} ms`);
+    this.#status(`${this.textCols}×${righe} · ${testo.length} ${this.t('ui.chars')} · ${ms} ms`);
   }
 
   /** La larghezza di un carattere non e' nota a priori: la si misura una
@@ -3436,6 +3441,7 @@ function ditherToCanvas(drawable, options = {}) {
 /**
  * Aggancia automaticamente ogni elemento con `data-ditherbox`.
  * Gli attributi `data-*` diventano opzioni: data-palette, data-algorithm, ...
+ * piu' data-src, data-lang e data-theme, che opzioni non sono.
  * Per una palette personalizzata basta un elenco di colori:
  * `data-palette="#0a0c10,#c2fe0b"`.
  */
@@ -3455,6 +3461,7 @@ function autoInit(scope = document) {
     boxes.push(new DitherBox(node, {
       options,
       src: node.dataset.src || undefined,
+      lang: node.dataset.lang || undefined,
       // Se l'attributo c'e' gia' nell'HTML lo legge direttamente il foglio
       // di stile; qui serve solo perche' il widget sappia di averlo.
       theme: node.dataset.theme || undefined,
