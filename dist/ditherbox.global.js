@@ -1047,6 +1047,7 @@ const en = {
   'tui.tooSmall': 'Window too small (needs at least 40x12)',
   'tui.noImageHint': 'no image · o to open a path · ? for the keys',
   'tui.noImageHere': 'No image here. Press o to open a path.',
+  'tui.sample': 'Sample image. Press o to open your own.',
   'tui.openHint': 'Path to an image or a folder',
   'tui.saveHint': 'Destination file (.png or .jpg) — processed at full resolution',
   'tui.confirm': 'enter confirms · esc cancels',
@@ -1227,6 +1228,7 @@ const it = {
   'tui.tooSmall': 'Finestra troppo piccola (serve almeno 40x12)',
   'tui.noImageHint': 'nessuna immagine · o per aprire un percorso · ? per i tasti',
   'tui.noImageHere': 'Nessuna immagine qui. Premi o per aprire un percorso.',
+  'tui.sample': 'Immagine di prova. Premi o per aprire la tua.',
   'tui.openHint': 'Percorso di un’immagine o di una cartella',
   'tui.saveHint': 'File di destinazione (.png o .jpg) — elaboro a piena risoluzione',
   'tui.confirm': 'invio conferma · esc annulla',
@@ -1405,6 +1407,7 @@ const es = {
   'tui.tooSmall': 'Ventana demasiado pequeña (mínimo 40x12)',
   'tui.noImageHint': 'ninguna imagen · o para abrir una ruta · ? para las teclas',
   'tui.noImageHere': 'Aquí no hay imágenes. Pulsa o para abrir una ruta.',
+  'tui.sample': 'Imagen de prueba. Pulsa o para abrir la tuya.',
   'tui.openHint': 'Ruta de una imagen o de una carpeta',
   'tui.saveHint': 'Archivo de destino (.png o .jpg) — se procesa a resolución completa',
   'tui.confirm': 'intro confirma · esc cancela',
@@ -1583,6 +1586,7 @@ const fr = {
   'tui.tooSmall': 'Fenêtre trop petite (40x12 minimum)',
   'tui.noImageHint': 'aucune image · o pour ouvrir un chemin · ? pour les touches',
   'tui.noImageHere': 'Aucune image ici. Appuyez sur o pour ouvrir un chemin.',
+  'tui.sample': 'Image d’essai. Appuyez sur o pour ouvrir la vôtre.',
   'tui.openHint': 'Chemin d’une image ou d’un dossier',
   'tui.saveHint': 'Fichier de destination (.png ou .jpg) — traité en pleine résolution',
   'tui.confirm': 'entrée valide · échap annule',
@@ -1761,6 +1765,7 @@ const de = {
   'tui.tooSmall': 'Fenster zu klein (mindestens 40x12)',
   'tui.noImageHint': 'kein Bild · o öffnet einen Pfad · ? zeigt die Tasten',
   'tui.noImageHere': 'Hier ist kein Bild. Drücke o, um einen Pfad zu öffnen.',
+  'tui.sample': 'Beispielbild. Mit o dein eigenes öffnen.',
   'tui.openHint': 'Pfad zu einem Bild oder einem Ordner',
   'tui.saveHint': 'Zieldatei (.png oder .jpg) — wird in voller Auflösung verarbeitet',
   'tui.confirm': 'Eingabe bestätigt · Esc bricht ab',
@@ -2574,6 +2579,24 @@ async function decodeSource(source) {
 }
 
 /**
+ * Il nome da mostrare nel campo in cima.
+ *
+ * Da un File si legge; da un URL si prende l'ultimo pezzo del percorso,
+ * se no una foto precaricata comparirebbe come "nessun file scelto"
+ * mentre la si sta guardando.
+ */
+function nomeDellaSorgente(source) {
+  if (source instanceof File) return source.name;
+  if (typeof source !== 'string') return null;
+  try {
+    const percorso = new URL(source, document.baseURI).pathname;
+    return decodeURIComponent(percorso.split('/').pop()) || null;
+  } catch {
+    return source.split(/[?#]/)[0].split('/').pop() || null;
+  }
+}
+
+/**
  * Scrive negli appunti. L'API moderna esiste solo in contesto sicuro
  * (https o localhost); altrove si ripiega sulla selezione di un campo
  * nascosto, che e' brutta ma funziona da vent'anni.
@@ -2657,7 +2680,16 @@ class DitherBox {
     this._pending = null;
 
     this.#build();
-    if (config.src) this.load(config.src).catch((e) => this.#fail(e));
+    if (config.src) {
+      // Una foto precaricata e' una comodita', non qualcosa che chi guarda
+      // ha chiesto: se non arriva (percorso sbagliato, oppure la pagina
+      // aperta da disco invece che da un server, dove il browser blocca la
+      // richiesta) si resta sul riquadro vuoto invece di aprire la giornata
+      // con un errore rosso. `load` ha gia' segnalato il guasto per conto suo.
+      this.load(config.src).catch(() => {
+        this.#status(this.t('ui.noImage'));
+      });
+    }
   }
 
   // ---------------------------------------------------------------- API
@@ -2676,7 +2708,7 @@ class DitherBox {
         this.source, this.config.previewMaxSize, this.config.previewMaxSize,
       );
       this.previewCache = null;
-      this.sourceName = name || (source instanceof File ? source.name : null);
+      this.sourceName = name || nomeDellaSorgente(source);
       this.root.classList.add('is-loaded');
       if (this.fileName) this.fileName.textContent = this.sourceName || t('ui.noFile');
       this.render();

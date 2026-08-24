@@ -11,8 +11,3 @@ node_modules/
 # Uscite di prova
 /schermate/
 /esiti/
-
-# La scena di prova si ricalcola da sola: e' l'ingresso delle schermate del
-# README, non un documento. Le schermate invece si committano, se no il
-# README su GitHub resta senza immagini.
-/docs/sample.png

@@ -5,6 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DitherBox — esempio in HTML semplice</title>
 
+  <!--
+    Questa pagina va servita da un server, non aperta con un doppio clic:
+    da un'origine file:// il browser blocca il caricamento della foto di
+    prova. Basta una riga:
+
+      python3 -m http.server        e poi apri examples/index.html
+
+    Senza server il widget parte semplicemente vuoto, e si trascina dentro
+    una foto come sempre.
+  -->
+
   <!-- Il file impacchettato: nessun bundler, nessuna dipendenza. -->
   <link rel="stylesheet" href="../dist/ditherbox.css">
   <style>
@@ -27,7 +38,8 @@
 <main>
   <h1>DitherBox</h1>
   <p class="intro">
-    Trascina una foto nel riquadro, oppure premi <em>Apri foto</em>.
+    Parte con una foto di prova gia' caricata, cosi' si vede subito l'effetto.
+    Trascinaci sopra la tua, oppure premi <em>Apri foto</em>.
     Tutto avviene nel browser: nessuna immagine viene caricata da nessuna parte.
   </p>
 
@@ -45,6 +57,7 @@
     </p>
     <div
       data-ditherbox
+      data-src="sample.jpg"
       data-palette="gameboy"
       data-algorithm="bayer4"
       data-scale="4"
@@ -56,6 +69,7 @@
 <script>
   // Widget costruito a mano, per avere in mano l'oggetto.
   const box = new DitherBox('#dither', {
+    src: 'sample.jpg',
     options: { palette: 'bw', algorithm: 'atkinson', contrast: 15, sharpen: 40 },
   });
 

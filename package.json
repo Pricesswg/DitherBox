@@ -42,6 +42,7 @@
     "src",
     "bin",
     "dist",
+    "examples",
     "README.md",
     "LICENSE"
   ],
@@ -49,7 +50,6 @@
     "build": "node scripts/build.js",
     "test": "node --test test/*.test.js",
     "demo": "node bin/ditherbox.js",
-    "sample": "node scripts/sample.js",
     "screenshot": "node scripts/screenshot.js",
     "termshot": "node scripts/termshot.js",
     "docs": "node scripts/docs-images.js"

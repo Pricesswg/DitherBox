@@ -17,7 +17,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { readFileSync } from 'node:fs';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { resolve, dirname, join } from 'node:path';
+import { resolve, dirname, join, basename } from 'node:path';
 
 import { launchChromium } from './find-chromium.js';
 
@@ -59,13 +59,17 @@ if (process.env.DBX_HEIGHT) {
 
 if (foto) {
   const b64 = readFileSync(foto).toString('base64');
-  await page.evaluate(async (dati) => {
+  const nome = basename(foto);
+  // Il tipo va dedotto dall'estensione: il widget mostra il nome del file
+  // nel campo in cima, e una foto chiamata .png che e' un JPEG stona.
+  const tipo = /\.jpe?g$/i.test(nome) ? 'image/jpeg' : 'image/png';
+  await page.evaluate(async ({ dati, nome: n, tipo: t }) => {
     const bin = atob(dati);
     const arr = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-    const blob = new Blob([arr], { type: 'image/png' });
-    await window.__boxes[0].load(new File([blob], 'sample.png', { type: 'image/png' }));
-  }, b64);
+    const blob = new Blob([arr], { type: t });
+    await window.__boxes[0].load(new File([blob], n, { type: t }));
+  }, { dati: b64, nome, tipo });
   await page.waitForTimeout(500);
 }
 

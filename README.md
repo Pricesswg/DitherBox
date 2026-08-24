@@ -150,6 +150,12 @@ ditherbox portrait.jpg               # open a photo directly
 ditherbox photo.jpg --print          # print in the terminal and exit
 ```
 
+Run it in a folder with no images and it opens the sample photo that ships
+with it, so there is something to turn the knobs on straight away. Press `o`
+to open your own.
+
+The web widget on the demo page starts with the same photo already loaded.
+
 ### Keys
 
 They follow cliamp's, so if you already use that one you are at home.
@@ -395,7 +401,8 @@ npm run docs      # regenerate every image in this README
 src/core/    shared engine, no DOM and no Node
 src/web/     browser widget + stylesheet
 src/cli/     terminal app: TUI, themes, renderer, image I/O
-scripts/     build, screenshots, the sample scene for the docs
+examples/    demo page, Astro component, the sample photo
+scripts/     build and screenshots
 packaging/   the Homebrew formula
 ```
 
@@ -429,12 +436,14 @@ They are generated, not taken by hand:
 npm run docs
 ```
 
-`scripts/sample.js` computes the test scene, a lit sphere over a chequered
-floor fading into fog. It is not a photo, and that is deliberate: the docs need
-an image with long continuous gradients (the backdrop, the shading, the fog)
-*and* a regular high-frequency pattern (the chequers), because those are the
-two things dithering handles differently. Any given photo does not guarantee
-both.
+The photo is `examples/sample.jpg`, the same one the program loads at startup
+when it finds no images in the folder. It earns its place: the stuccoed wall is
+a long continuous gradient, the webbing and the wire fence are a
+high-frequency pattern, and those are the two things dithering handles
+differently. The tone settings in `scripts/docs-images.js` are not decoration
+either. A dark subject against a bright wall is exactly the case where one bit
+turns the wall into a solid block and swallows the figure, so the contrast goes
+down and the gamma goes up to pull the shadows back out.
 
 `scripts/termshot.js` photographs the terminal interface. It renders the TUI's
 ANSI frame in Chromium on a fixed character grid, because a page is not a

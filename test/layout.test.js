@@ -2,11 +2,57 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { pathToFileURL, fileURLToPath } from 'node:url';
-import { resolve, dirname, join } from 'node:path';
+import { createServer } from 'node:http';
+import { createReadStream, existsSync, statSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { resolve, dirname, join, extname, normalize } from 'node:path';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const PAGINA = pathToFileURL(join(ROOT, 'examples', 'index.html')).href;
+
+/**
+ * La pagina di esempio viene servita su HTTP e non aperta da disco.
+ *
+ * Non e' pignoleria: la pagina carica una foto di prova, e da un'origine
+ * file:// il browser blocca quella richiesta per la politica sulle origini
+ * incrociate. Su file:// il collaudo vedrebbe un errore che nessun utente
+ * vero incontrera' mai, perche' il widget in un sito sta su http.
+ */
+const TIPI = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+};
+
+let servitore = null;
+async function serviRadice() {
+  if (servitore) return servitore;
+  const server = createServer((req, res) => {
+    // Il percorso resta dentro la radice del progetto qualunque cosa arrivi.
+    const chiesto = decodeURIComponent((req.url || '/').split('?')[0]);
+    // Il browser la chiede sempre e la pagina non ce l'ha: senza questa
+    // riga ogni prova finirebbe con un 404 nella lista degli errori.
+    if (chiesto === '/favicon.ico') {
+      res.writeHead(204).end();
+      return;
+    }
+    const file = join(ROOT, normalize(chiesto).replace(/^(\.\.[/\\])+/, ''));
+    if (!file.startsWith(ROOT) || !existsSync(file) || !statSync(file).isFile()) {
+      res.writeHead(404).end('no');
+      return;
+    }
+    res.writeHead(200, { 'content-type': TIPI[extname(file).toLowerCase()] || 'application/octet-stream' });
+    createReadStream(file).pipe(res);
+  });
+  await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
+  const { port } = server.address();
+  servitore = { server, base: `http://127.0.0.1:${port}` };
+  return servitore;
+}
+
+test.after(() => { if (servitore) servitore.server.close(); });
 
 // La pagina di esempio carica dist/, non src/: senza ricostruire il pacchetto
 // questi controlli guarderebbero una versione vecchia del widget e
@@ -39,11 +85,12 @@ async function apri() {
   const browser = await launchChromium(chromium);
   if (!browser) return null;
   try {
+    const { base } = await serviRadice();
     const page = await browser.newPage({ viewportSize: { width: 1280, height: 900 } });
     const errori = [];
     page.on('pageerror', (e) => errori.push(e.message));
     page.on('console', (m) => { if (m.type() === 'error') errori.push(m.text()); });
-    await page.goto(PAGINA, { waitUntil: 'networkidle' });
+    await page.goto(`${base}/examples/index.html`, { waitUntil: 'networkidle' });
     return { browser, page, errori };
   } catch {
     return null;
@@ -267,5 +314,31 @@ test('data-lang e il selettore cambiano lingua a tutto il widget', async (t) => 
   assert.equal(esito.vistaDopo, 'ascii', 'cambiare lingua ha perso la vista');
   assert.equal(esito.daAttributo, 'es');
   assert.deepEqual(esito.etichetteAttributo, ['Algoritmo', 'Píxel', 'Intensidad']);
+  assert.deepEqual(errori, []);
+});
+
+test('la pagina parte con la foto di prova gia caricata', async (t) => {
+  const sessione = await apri();
+  if (!sessione) return t.skip('Chromium non disponibile');
+  const { browser, page, errori } = sessione;
+  t.after(() => browser.close());
+
+  // Nessuna foto viene caricata qui: si guarda com'e' la pagina appena aperta.
+  const esito = await page.evaluate(() => {
+    const box = document.querySelector('.dbx');
+    const b = window.__boxes[0];
+    return {
+      caricata: box.classList.contains('is-loaded'),
+      misure: b.source ? [b.source.width, b.source.height] : null,
+      nome: box.querySelector('.dbx__file-name')?.textContent.trim() ?? null,
+      // Anche il secondo widget, quello montato da data-src.
+      secondaCaricata: window.__boxes[1]?.source ? true : false,
+    };
+  });
+
+  assert.ok(esito.caricata, 'il widget non risulta caricato');
+  assert.deepEqual(esito.misure, [919, 1077], 'non e la foto di prova');
+  assert.match(esito.nome || '', /sample\.jpg/);
+  assert.ok(esito.secondaCaricata, 'data-src non ha caricato niente');
   assert.deepEqual(errori, []);
 });

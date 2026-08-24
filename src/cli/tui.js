@@ -6,7 +6,8 @@
  */
 
 import { basename, dirname, resolve, join } from 'node:path';
-import { statSync } from 'node:fs';
+import { statSync, existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import {
   PARAMS, PRESETS, DEFAULTS,
@@ -34,6 +35,18 @@ const NARROW_WIDTH = 78;
 const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
 const PARAM_BY_KEY_LOCAL = Object.fromEntries(PARAMS.map((p) => [p.key, p]));
+
+/**
+ * La foto di prova che viene con il programma.
+ *
+ * Serve a chi lo apre per la prima volta in una cartella dove non ci sono
+ * immagini: invece di una cornice vuota e un invito, si vede subito che
+ * cosa fa. Il percorso e' relativo al modulo e non alla cartella di lavoro,
+ * se no funzionerebbe solo lanciandolo da dentro il repo.
+ */
+export const SAMPLE_PATH = fileURLToPath(
+  new URL('../../examples/sample.jpg', import.meta.url),
+);
 
 /** Elenco piatto dei parametri, con le intestazioni di gruppo intercalate. */
 function buildRows() {
@@ -107,8 +120,17 @@ export class DitherTui {
       await this.openImage(resolve(initialPath));
     } else {
       await this.#scanDir();
-      if (this.files.length) await this.openImage(this.files[0]);
-      else this.#say(this.tr('tui.noImageHere'), 'yellow');
+      if (this.files.length) {
+        await this.openImage(this.files[0]);
+      } else if (existsSync(SAMPLE_PATH)) {
+        // Aperta la foto di prova, ma senza infilarla nella lista dei file:
+        // non sta in questa cartella e non deve comparire fra le immagini
+        // su cui girare con n e N.
+        await this.openImage(SAMPLE_PATH);
+        this.#say(this.tr('tui.sample'), 'yellow');
+      } else {
+        this.#say(this.tr('tui.noImageHere'), 'yellow');
+      }
     }
 
     this.render();
@@ -615,10 +637,14 @@ export class DitherTui {
     if (!this.source) return this.#say(this.tr('tui.noImageLoaded'), 'red');
     const base = basename(this.imagePath || 'ditherbox').replace(/\.[^.]+$/, '');
     const palette = isCustomPalette(this.options.palette) ? 'custom' : this.options.palette;
-    const suggested = join(
-      dirname(this.imagePath || this.dir),
-      `${base}-${palette}-${this.options.algorithm}.png`,
-    );
+    // La foto di prova sta dentro il pacchetto installato, che con ogni
+    // probabilita' non e' scrivibile e comunque non e' un posto dove
+    // qualcuno vuole i propri file: in quel caso si propone la cartella
+    // da cui il programma e' stato lanciato.
+    const cartella = this.imagePath && this.imagePath !== SAMPLE_PATH
+      ? dirname(this.imagePath)
+      : this.dir;
+    const suggested = join(cartella, `${base}-${palette}-${this.options.algorithm}.png`);
     this.#promptOverlay({
       title: this.tr('tui.save'),
       hint: this.tr('tui.saveHint'),
