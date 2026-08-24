@@ -7,6 +7,8 @@ import { createReadStream, existsSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve, dirname, join, extname, normalize } from 'node:path';
 
+import { loadImage } from '../src/cli/imageio.js';
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
@@ -337,7 +339,13 @@ test('la pagina parte con la foto di prova gia caricata', async (t) => {
   });
 
   assert.ok(esito.caricata, 'il widget non risulta caricato');
-  assert.deepEqual(esito.misure, [919, 1077], 'non e la foto di prova');
+  // Le misure si leggono dal file invece di scriverle qui: la foto di prova
+  // si puo' sostituire senza che questo controllo vada rifatto.
+  const vera = await loadImage(join(ROOT, 'examples', 'sample.jpg'));
+  assert.deepEqual(
+    esito.misure, [vera.width, vera.height],
+    'la foto caricata non e quella di examples/sample.jpg',
+  );
   assert.match(esito.nome || '', /sample\.jpg/);
   assert.ok(esito.secondaCaricata, 'data-src non ha caricato niente');
   assert.deepEqual(errori, []);
