@@ -1,3 +1,13 @@
 node_modules/
 *.log
 .DS_Store
+
+# Chiavi e configurazioni locali: non devono finire in un repo pubblico
+.env
+.env.*
+*.pem
+*.key
+
+# Uscite di prova
+/schermate/
+/esiti/

@@ -4,6 +4,15 @@
   "description": "Dithering regolabile per foto: widget da mettere nel sito piu' app da terminale con interfaccia in stile cliamp",
   "type": "module",
   "license": "MIT",
+  "author": "Alessandro Simonitto",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Pricesswg/DitherBox.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Pricesswg/DitherBox/issues"
+  },
+  "homepage": "https://github.com/Pricesswg/DitherBox#readme",
   "keywords": [
     "dithering",
     "bayer",

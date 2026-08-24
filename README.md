@@ -461,4 +461,21 @@ sviluppo e serve solo ai controlli di impaginazione.
 
 ## Licenza
 
-MIT
+MIT — vedi [LICENSE](LICENSE). Puoi usarlo, modificarlo e ridistribuirlo,
+anche in progetti commerciali; l'unico obbligo e' tenere la nota di copyright.
+
+### Terze parti
+
+Il motore e il widget non hanno dipendenze. L'app da terminale ne ha due, che
+si installano da npm e non vengono impacchettate qui dentro:
+
+| Pacchetto | Licenza | A cosa serve |
+|---|---|---|
+| [`jpeg-js`](https://github.com/eugeneware/jpeg-js) | BSD-3-Clause | Legge e scrive JPEG in puro JavaScript |
+| [`pngjs`](https://github.com/pngjs/pngjs) | MIT | Legge e scrive PNG |
+
+Fra le dipendenze di sviluppo c'e' [`playwright`](https://github.com/microsoft/playwright)
+(Apache-2.0), usato solo dai controlli di impaginazione.
+
+Sono tutte licenze permissive e compatibili con la MIT: nessuna impone di
+aprire il codice di chi le usa.
