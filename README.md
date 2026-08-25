@@ -205,10 +205,13 @@ home directory, `ctrl+u` clears everything before the cursor, `ctrl+w` deletes
 a word backwards, `esc` cancels. Only `.png` and `.jpg` are accepted, and the
 extension decides the format.
 
-The saved file is processed at **full resolution**, not at preview resolution.
-The preview is a small thing drawn with terminal characters; what gets written
-is the real photo, at whatever megapixel count the **Megapixels** parameter is
-set to.
+The saved file is processed at **full resolution**, at whatever megapixel count
+the **Megapixels** parameter is set to. The preview shows that same result,
+reduced: it dithers at the export resolution and then shrinks it to the
+terminal grid, which is exactly what an image viewer does when it opens the
+file. So a fine dither looks smooth in the preview because it will look smooth
+in the file as well. To see the texture, raise **Pixel** or lower
+**Megapixels**, and it appears in both at once.
 
 From the command line the destination is explicit instead:
 
@@ -278,7 +281,8 @@ ditherbox --help
 Every engine parameter has its own option: `--palette`, `--algorithm`,
 `--scale`, `--strength`, `--bias`, `--noise`, `--serpentine`, `--brightness`,
 `--contrast`, `--gamma`, `--saturation`, `--sharpen`, `--invert`,
-`--megapixels`, `--upscale`. Switches are turned off by prefixing `--no-`.
+`--aspect`, `--fit`, `--megapixels`, `--upscale`. Switches are turned off by
+prefixing `--no-`.
 
 `-l, --lang <code>` picks the language of the messages. Without it the CLI
 reads `LC_ALL`, `LC_MESSAGES` and `LANG`, and falls back to English. The option
@@ -334,6 +338,8 @@ background.
 | **Brightness, Contrast, Gamma, Saturation** | | Tone adjustments, applied before the dithering |
 | **Sharpen** | 0 to 200% | Unsharp mask, to recover the detail the dithering eats |
 | **Invert** | on/off | Swaps light and dark |
+| **Aspect** | 9 ratios | Frames the result: 1:1, 5:4, 4:3, 3:2, 16:10, 16:9, 21:9, 4:5, 9:16, or as the photo |
+| **Fit** | crop/bars | What happens to what the ratio leaves out: cut it away, or add bars in a palette colour |
 | **Megapixels** | 0.01 to 24 MP | Resolution of the result: lower it to ruin the photo on purpose |
 | **Upscale** | on/off | Brings the result back to the original size with crisp pixels |
 

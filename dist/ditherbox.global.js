@@ -710,6 +710,83 @@ function resampleBox(img, targetW, targetH) {
   return out;
 }
 
+/**
+ * Le misure del fotogramma che porta `width`x`height` al rapporto `ratio`
+ * senza tagliare niente: si allarga il lato che manca, mai si stringe.
+ *
+ * Serve a misurare le bande prima di averle: il budget di megapixel deve
+ * contarle, altrimenti "2 MP" descrive la fotografia e non il file.
+ */
+function padFrame(width, height, ratio) {
+  const corrente = width / height;
+  if (corrente > ratio) return { width, height: Math.max(1, Math.round(width / ratio)) };
+  if (corrente < ratio) return { width: Math.max(1, Math.round(height * ratio)), height };
+  return { width, height };
+}
+
+/**
+ * Le misure del ritaglio centrato che porta `width`x`height` a `ratio`.
+ * Gemella di padFrame, e come quella esiste per poter misurare il
+ * fotogramma senza costruirlo.
+ */
+function cropFrame(width, height, ratio) {
+  const corrente = width / height;
+  if (corrente > ratio) return { width: Math.max(1, Math.round(height * ratio)), height };
+  if (corrente < ratio) return { width, height: Math.max(1, Math.round(width / ratio)) };
+  return { width, height };
+}
+
+/**
+ * Ritaglio centrato al rapporto `ratio` (larghezza / altezza).
+ * Quello che avanza si perde: e' la cosa che ci si aspetta chiedendo 16:9.
+ */
+function cropToAspect(img, ratio) {
+  const { width: w, height: h } = cropFrame(img.width, img.height, ratio);
+  if (w === img.width && h === img.height) return cloneImage(img);
+
+  const x0 = Math.floor((img.width - w) / 2);
+  const y0 = Math.floor((img.height - h) / 2);
+  const out = createImage(w, h);
+  // Una riga per volta: sono contigue in memoria, quindi si copiano in blocco
+  // invece che pixel per pixel.
+  for (let y = 0; y < h; y++) {
+    const da = ((y + y0) * img.width + x0) * 4;
+    out.data.set(img.data.subarray(da, da + w * 4), y * w * 4);
+  }
+  return out;
+}
+
+/**
+ * Bande centrate fino al rapporto `ratio`, del colore `colour`.
+ *
+ * Va chiamata *dopo* il dithering, e con un colore preso dalla tavolozza:
+ * bande aggiunte prima verrebbero ditherate anche loro, e bande di un colore
+ * qualsiasi introdurrebbero nel file una tinta che la tavolozza non ammette.
+ */
+function padToAspect(img, ratio, colour) {
+  const frame = padFrame(img.width, img.height, ratio);
+  if (frame.width === img.width && frame.height === img.height) return cloneImage(img);
+
+  const out = createImage(frame.width, frame.height);
+  const [r, g, b] = colour;
+  for (let i = 0; i < out.data.length; i += 4) {
+    out.data[i] = r;
+    out.data[i + 1] = g;
+    out.data[i + 2] = b;
+    out.data[i + 3] = 255;
+  }
+  const x0 = Math.floor((frame.width - img.width) / 2);
+  const y0 = Math.floor((frame.height - img.height) / 2);
+  for (let y = 0; y < img.height; y++) {
+    const da = y * img.width * 4;
+    out.data.set(
+      img.data.subarray(da, da + img.width * 4),
+      ((y + y0) * frame.width + x0) * 4,
+    );
+  }
+  return out;
+}
+
 /** Riduce l'immagine perche' stia dentro maxW x maxH, mantenendo le proporzioni. */
 function fitWithin(img, maxW, maxH) {
   const scale = Math.min(maxW / img.width, maxH / img.height, 1);
@@ -730,7 +807,7 @@ function lumaHistogram(img, bins = 16) {
   return Array.from(out, (v) => v / max);
 }
 
-  return { LUMA_B, LUMA_G, LUMA_R, applyAdjustments, cloneImage, createImage, downscaleByFactor, fitWithin, luma, lumaHistogram, resampleBox, sharpen, upscaleByFactor };
+  return { LUMA_B, LUMA_G, LUMA_R, applyAdjustments, cloneImage, createImage, cropFrame, cropToAspect, downscaleByFactor, fitWithin, luma, lumaHistogram, padFrame, padToAspect, resampleBox, sharpen, upscaleByFactor };
 })();
 
 const __m_src_core_dither_js = (() => {
@@ -1082,6 +1159,22 @@ const en = {
   'param.sharpen.label': 'Sharpen',
   'param.sharpen.hint': 'Unsharp mask: brings back the fine detail that dithering eats',
   'param.invert.label': 'Invert',
+  'param.aspect.label': 'Aspect',
+  'param.aspect.hint': 'Frames the result to a fixed ratio, cropping or adding bars',
+  'param.aspect.value.source': 'As the photo',
+  'param.aspect.value.1:1': '1:1',
+  'param.aspect.value.5:4': '5:4',
+  'param.aspect.value.4:3': '4:3',
+  'param.aspect.value.3:2': '3:2',
+  'param.aspect.value.16:10': '16:10',
+  'param.aspect.value.16:9': '16:9',
+  'param.aspect.value.21:9': '21:9',
+  'param.aspect.value.4:5': '4:5',
+  'param.aspect.value.9:16': '9:16',
+  'param.fit.label': 'Fit',
+  'param.fit.hint': 'What to do with whatever does not fit the ratio',
+  'param.fit.value.crop': 'Crop',
+  'param.fit.value.pad': 'Bars',
   'param.megapixels.label': 'Megapixels',
   'param.megapixels.hint': 'Output resolution: lower it to coarsen the photo on purpose',
   'param.upscale.label': 'Upscale',
@@ -1302,6 +1395,22 @@ const it = {
   'param.sharpen.label': 'Nitidezza',
   'param.sharpen.hint': 'Maschera di contrasto: recupera i dettagli fini che il dithering mangia',
   'param.invert.label': 'Inverti',
+  'param.aspect.label': 'Rapporto',
+  'param.aspect.hint': 'Porta il risultato a un rapporto fisso, ritagliando o aggiungendo bande',
+  'param.aspect.value.source': 'Come la foto',
+  'param.aspect.value.1:1': '1:1',
+  'param.aspect.value.5:4': '5:4',
+  'param.aspect.value.4:3': '4:3',
+  'param.aspect.value.3:2': '3:2',
+  'param.aspect.value.16:10': '16:10',
+  'param.aspect.value.16:9': '16:9',
+  'param.aspect.value.21:9': '21:9',
+  'param.aspect.value.4:5': '4:5',
+  'param.aspect.value.9:16': '9:16',
+  'param.fit.label': 'Adatta',
+  'param.fit.hint': 'Che fare di quello che nel rapporto non entra',
+  'param.fit.value.crop': 'Ritaglia',
+  'param.fit.value.pad': 'Bande',
   'param.megapixels.label': 'Megapixel',
   'param.megapixels.hint': 'Risoluzione del risultato: abbassala per sgranare di proposito la foto',
   'param.upscale.label': 'Ingrandisci',
@@ -1498,6 +1607,22 @@ const es = {
   'param.sharpen.label': 'Nitidez',
   'param.sharpen.hint': 'Máscara de enfoque: recupera el detalle fino que se come el tramado',
   'param.invert.label': 'Invertir',
+  'param.aspect.label': 'Relación',
+  'param.aspect.hint': 'Lleva el resultado a una relación fija, recortando o añadiendo bandas',
+  'param.aspect.value.source': 'Como la foto',
+  'param.aspect.value.1:1': '1:1',
+  'param.aspect.value.5:4': '5:4',
+  'param.aspect.value.4:3': '4:3',
+  'param.aspect.value.3:2': '3:2',
+  'param.aspect.value.16:10': '16:10',
+  'param.aspect.value.16:9': '16:9',
+  'param.aspect.value.21:9': '21:9',
+  'param.aspect.value.4:5': '4:5',
+  'param.aspect.value.9:16': '9:16',
+  'param.fit.label': 'Ajuste',
+  'param.fit.hint': 'Qué hacer con lo que no cabe en la relación',
+  'param.fit.value.crop': 'Recortar',
+  'param.fit.value.pad': 'Bandas',
   'param.megapixels.label': 'Megapíxeles',
   'param.megapixels.hint': 'Resolución del resultado: bájala para pixelar la foto a propósito',
   'param.upscale.label': 'Ampliar',
@@ -1692,6 +1817,22 @@ const fr = {
   'param.sharpen.label': 'Netteté',
   'param.sharpen.hint': 'Masque de netteté : récupère le détail fin que le tramage mange',
   'param.invert.label': 'Inverser',
+  'param.aspect.label': 'Format',
+  'param.aspect.hint': 'Amène le résultat à un format fixe, en rognant ou en ajoutant des bandes',
+  'param.aspect.value.source': 'Comme la photo',
+  'param.aspect.value.1:1': '1:1',
+  'param.aspect.value.5:4': '5:4',
+  'param.aspect.value.4:3': '4:3',
+  'param.aspect.value.3:2': '3:2',
+  'param.aspect.value.16:10': '16:10',
+  'param.aspect.value.16:9': '16:9',
+  'param.aspect.value.21:9': '21:9',
+  'param.aspect.value.4:5': '4:5',
+  'param.aspect.value.9:16': '9:16',
+  'param.fit.label': 'Ajuster',
+  'param.fit.hint': 'Que faire de ce qui ne rentre pas dans le format',
+  'param.fit.value.crop': 'Rogner',
+  'param.fit.value.pad': 'Bandes',
   'param.megapixels.label': 'Mégapixels',
   'param.megapixels.hint': 'Résolution du résultat : baissez-la pour pixeliser la photo exprès',
   'param.upscale.label': 'Agrandir',
@@ -1886,6 +2027,22 @@ const de = {
   'param.sharpen.label': 'Schärfe',
   'param.sharpen.hint': 'Unscharfmaskierung: holt die feinen Details zurück, die das Dithering frisst',
   'param.invert.label': 'Umkehren',
+  'param.aspect.label': 'Format',
+  'param.aspect.hint': 'Bringt das Ergebnis auf ein festes Format, durch Beschnitt oder Balken',
+  'param.aspect.value.source': 'Wie das Foto',
+  'param.aspect.value.1:1': '1:1',
+  'param.aspect.value.5:4': '5:4',
+  'param.aspect.value.4:3': '4:3',
+  'param.aspect.value.3:2': '3:2',
+  'param.aspect.value.16:10': '16:10',
+  'param.aspect.value.16:9': '16:9',
+  'param.aspect.value.21:9': '21:9',
+  'param.aspect.value.4:5': '4:5',
+  'param.aspect.value.9:16': '9:16',
+  'param.fit.label': 'Anpassen',
+  'param.fit.hint': 'Was mit dem geschieht, was nicht ins Format passt',
+  'param.fit.value.crop': 'Beschneiden',
+  'param.fit.value.pad': 'Balken',
   'param.megapixels.label': 'Megapixel',
   'param.megapixels.hint': 'Auflösung des Ergebnisses: absenken, um das Foto absichtlich zu vergröbern',
   'param.upscale.label': 'Vergrößern',
@@ -2430,6 +2587,24 @@ const PARAMS = [
   },
 
   {
+    key: 'aspect',
+    group: 'output',
+    type: 'enum',
+    // I rapporti che la gente chiede davvero, dal quadrato del social al
+    // cinemascope, piu' i due verticali. 'source' lascia la foto com'e' ed
+    // e' il default: nessuno vuole che un programma di dithering gli
+    // ritagli la fotografia senza averlo chiesto.
+    values: ['source', '1:1', '5:4', '4:3', '3:2', '16:10', '16:9', '21:9', '4:5', '9:16'],
+    default: 'source',
+  },
+  {
+    key: 'fit',
+    group: 'output',
+    type: 'enum',
+    values: ['crop', 'pad'],
+    default: 'crop',
+  },
+  {
     key: 'megapixels',
     group: 'output',
     type: 'range',
@@ -2488,6 +2663,20 @@ function paramHint(param, t = inglese) {
   return hasKey(key) ? t(key) : null;
 }
 
+/**
+ * Il rapporto largh/alt chiesto, o null per 'source'.
+ *
+ * Si legge dal nome invece di tenere una tabella: '16:9' dice gia' tutto, e
+ * una tabella sarebbe una seconda lista da tenere allineata a `values`.
+ */
+function aspectRatio(value) {
+  const m = /^(\d+):(\d+)$/.exec(String(value));
+  if (!m) return null;
+  const w = Number(m[1]);
+  const h = Number(m[2]);
+  return h > 0 && w > 0 ? w / h : null;
+}
+
 function paletteLabel(key, t = inglese) {
   return t(`palette.${key}`);
 }
@@ -2504,7 +2693,12 @@ function presetLabel(key, t = inglese) {
 function enumLabel(param, value, t = inglese) {
   if (param.key === 'palette') return paletteLabel(value, t);
   if (param.key === 'algorithm') return algorithmLabel(value, t);
-  return String(value);
+  // Gli altri elenchi si traducono per convenzione, param.<chiave>.value.<v>.
+  // Chi non ha una voce resta com'e': i rapporti come '16:9' sono gia' la
+  // loro etichetta in ogni lingua, e tradurli sarebbe solo un modo di
+  // sbagliarli.
+  const key = `param.${param.key}.value.${value}`;
+  return hasKey(key) ? t(key) : String(value);
 }
 
 const DEFAULTS = Object.fromEntries(PARAMS.map((p) => [p.key, p.default]));
@@ -2745,14 +2939,14 @@ function applyPreset(name, base = DEFAULTS) {
   return normalizeOptions({ ...base, ...preset.options });
 }
 
-  return { DEFAULTS, PARAMS, PARAM_BY_KEY, PRESETS, algorithmLabel, applyPreset, effectiveMegapixels, enumLabel, formatValue, groupLabel, normalizeOptions, paletteLabel, paramHint, paramLabel, paramSteps, presetLabel, stepBy, stepIndex, usefulStepCeiling };
+  return { DEFAULTS, PARAMS, PARAM_BY_KEY, PRESETS, algorithmLabel, applyPreset, aspectRatio, effectiveMegapixels, enumLabel, formatValue, groupLabel, normalizeOptions, paletteLabel, paramHint, paramLabel, paramSteps, presetLabel, stepBy, stepIndex, usefulStepCeiling };
 })();
 
 const __m_src_core_process_js = (() => {
-  const { applyAdjustments, sharpen, downscaleByFactor, upscaleByFactor, resampleBox, cloneImage } = __m_src_core_adjust_js;
+  const { applyAdjustments, sharpen, downscaleByFactor, upscaleByFactor, resampleBox, cloneImage, cropToAspect, padToAspect, cropFrame, padFrame, luma } = __m_src_core_adjust_js;
   const { buildQuantizer, ditherImage } = __m_src_core_dither_js;
   const { paletteInfo } = __m_src_core_palettes_js;
-  const { normalizeOptions } = __m_src_core_options_js;
+  const { normalizeOptions, aspectRatio } = __m_src_core_options_js;
 /**
  * La pipeline completa, condivisa da widget web e app da terminale.
  */
@@ -2771,13 +2965,24 @@ function processImage(source, rawOptions = {}) {
   const options = normalizeOptions(rawOptions);
   const { colors, ramp, bits } = paletteInfo(options.palette);
 
+  // 0. Inquadratura. Il ritaglio si fa subito, perche' quello che si butta
+  //    via non deve consumare ne' megapixel ne' tempo; le bande si mettono
+  //    invece alla fine, dopo il dithering, per non ditherarle.
+  const ratio = aspectRatio(options.aspect);
+  const ritaglia = ratio !== null && options.fit === 'crop';
+  const bande = ratio !== null && options.fit === 'pad';
+  const inquadrata = ritaglia ? cropToAspect(source, ratio) : source;
+
   // 1. Riduzione alla risoluzione richiesta. E' anche il motivo per cui le
   //    foto da fotocamera non fanno arrancare l'interfaccia: si lavora su
   //    due megapixel, non su dodici.
-  const target = targetSize(source.width, source.height, options.megapixels);
+  //    Il budget si misura sul fotogramma con le bande gia' contate: senza,
+  //    "2 MP" descriverebbe la fotografia e il file ne peserebbe di piu'.
+  const frame = bande ? padFrame(inquadrata.width, inquadrata.height, ratio) : inquadrata;
+  const target = targetSize(frame.width, frame.height, options.megapixels);
   let img = target.scale < 1
-    ? resampleBox(source, target.width, target.height)
-    : cloneImage(source);
+    ? resampleBox(inquadrata, inquadrata.width * target.scale, inquadrata.height * target.scale)
+    : cloneImage(inquadrata);
 
   // 2. Regolazioni tonali sul pieno dettaglio, prima di buttare via pixel.
   applyAdjustments(img, options);
@@ -2800,9 +3005,13 @@ function processImage(source, rawOptions = {}) {
   });
 
   // 5. Ritorno alla scala di partenza, a pixel netti.
-  const image = options.upscale && options.scale > 1
+  let image = options.upscale && options.scale > 1
     ? upscaleByFactor(dithered, options.scale)
     : cloneImage(dithered);
+
+  // 6. Le bande, dell'unico colore che si puo' usare senza mentire: uno
+  //    di quelli della tavolozza.
+  if (bande) image = padToAspect(image, ratio, coloreBanda(colors));
 
   return {
     image,
@@ -2811,6 +3020,48 @@ function processImage(source, rawOptions = {}) {
     ditherWidth: dithered.width,
     ditherHeight: dithered.height,
   };
+}
+
+/**
+ * Le misure che avra' il file, senza toccare un pixel.
+ *
+ * Le interfacce devono poter scrivere "1868x1078 -> 1414x1414" accanto ai
+ * controlli a ogni battuta di tasto, e ditherare due megapixel per stampare
+ * due numeri non e' una cosa che si possa fare. Ripercorre quindi la
+ * geometria di processImage sulle sole misure.
+ *
+ * Ripercorrerla vuol dire poterne divergere, ed e' il motivo per cui
+ * test/geometria.test.js confronta le due su tutte le combinazioni invece
+ * di fidarsi.
+ */
+function exportSize(width, height, rawOptions = {}) {
+  const options = normalizeOptions(rawOptions);
+  const ratio = aspectRatio(options.aspect);
+  const ritaglia = ratio !== null && options.fit === 'crop';
+  const bande = ratio !== null && options.fit === 'pad';
+
+  let { width: w, height: h } = ritaglia
+    ? cropFrame(width, height, ratio)
+    : { width, height };
+
+  const frame = bande ? padFrame(w, h, ratio) : { width: w, height: h };
+  const { scale } = targetSize(frame.width, frame.height, options.megapixels);
+  if (scale < 1) {
+    w = Math.max(1, Math.round(w * scale));
+    h = Math.max(1, Math.round(h * scale));
+  }
+
+  const f = Math.max(1, Math.round(options.scale));
+  if (f > 1) {
+    w = Math.max(1, Math.floor(w / f));
+    h = Math.max(1, Math.floor(h / f));
+    if (options.upscale) {
+      w *= f;
+      h *= f;
+    }
+  }
+
+  return bande ? padFrame(w, h, ratio) : { width: w, height: h };
 }
 
 /**
@@ -2829,7 +3080,28 @@ function targetSize(width, height, megapixels) {
   };
 }
 
-  return { processImage, targetSize };
+/**
+ * Il colore delle bande: il piu' scuro della tavolozza.
+ *
+ * Nero, quando la tavolozza ce l'ha, ed e' quasi sempre cosi'. Prenderlo
+ * dalla tavolozza invece di scrivere 0,0,0 vuol dire che anche una tavolozza
+ * senza nero, un duotono per esempio, ottiene bande di un colore che il file
+ * puo' davvero contenere.
+ */
+function coloreBanda(colors) {
+  let scelto = colors[0] || [0, 0, 0];
+  let minimo = Infinity;
+  for (const c of colors) {
+    const l = luma(c[0], c[1], c[2]);
+    if (l < minimo) {
+      minimo = l;
+      scelto = c;
+    }
+  }
+  return scelto;
+}
+
+  return { exportSize, processImage, targetSize };
 })();
 
 const __m_src_core_index_js = Object.assign({}, __m_src_core_i18n_js, __m_src_core_palettes_js, __m_src_core_matrices_js, __m_src_core_adjust_js, __m_src_core_dither_js, __m_src_core_textart_js, __m_src_core_options_js, __m_src_core_process_js);
@@ -3876,6 +4148,7 @@ global.DitherBox = Object.assign(__m_src_web_ditherbox_js.DitherBox, {
   applyAdjustments: __m_src_core_index_js.applyAdjustments,
   applyPreset: __m_src_core_index_js.applyPreset,
   asciiChar: __m_src_core_index_js.asciiChar,
+  aspectRatio: __m_src_core_index_js.aspectRatio,
   bayer: __m_src_core_index_js.bayer,
   bayerMatrix: __m_src_core_index_js.bayerMatrix,
   bitDepthPalette: __m_src_core_index_js.bitDepthPalette,
@@ -3885,11 +4158,14 @@ global.DitherBox = Object.assign(__m_src_web_ditherbox_js.DitherBox, {
   cloneImage: __m_src_core_index_js.cloneImage,
   createImage: __m_src_core_index_js.createImage,
   createTranslator: __m_src_core_index_js.createTranslator,
+  cropFrame: __m_src_core_index_js.cropFrame,
+  cropToAspect: __m_src_core_index_js.cropToAspect,
   detectLocale: __m_src_core_index_js.detectLocale,
   ditherImage: __m_src_core_index_js.ditherImage,
   downscaleByFactor: __m_src_core_index_js.downscaleByFactor,
   effectiveMegapixels: __m_src_core_index_js.effectiveMegapixels,
   enumLabel: __m_src_core_index_js.enumLabel,
+  exportSize: __m_src_core_index_js.exportSize,
   fitForText: __m_src_core_index_js.fitForText,
   fitWithin: __m_src_core_index_js.fitWithin,
   formatValue: __m_src_core_index_js.formatValue,
@@ -3903,6 +4179,8 @@ global.DitherBox = Object.assign(__m_src_web_ditherbox_js.DitherBox, {
   lumaHistogram: __m_src_core_index_js.lumaHistogram,
   normalizeLocale: __m_src_core_index_js.normalizeLocale,
   normalizeOptions: __m_src_core_index_js.normalizeOptions,
+  padFrame: __m_src_core_index_js.padFrame,
+  padToAspect: __m_src_core_index_js.padToAspect,
   paletteInfo: __m_src_core_index_js.paletteInfo,
   paletteLabel: __m_src_core_index_js.paletteLabel,
   paramHint: __m_src_core_index_js.paramHint,

@@ -419,3 +419,64 @@ test('la TUI parte nella lingua chiesta e traduce etichette e tasti', async (t) 
   assert.match(aiuto, /TASTEN/);
   assert.match(aiuto, /Sprache/, 'la voce della lingua manca dall aiuto');
 });
+
+/** I colori truecolor che compaiono in un frame, come stringhe "r,g,b". */
+function coloriDelFrame(frame) {
+  const out = new Set();
+  for (const riga of frame) {
+    for (const m of riga.matchAll(/\x1b\[(?:38|48);2;(\d+);(\d+);(\d+)m/g)) {
+      out.add(`${m[1]},${m[2]},${m[3]}`);
+    }
+  }
+  return out;
+}
+
+const grigiIntermedi = (frame) => [...coloriDelFrame(frame)].filter((c) => {
+  const [r, g, b] = c.split(',').map(Number);
+  return r === g && g === b && r > 16 && r < 239;
+}).length;
+
+/**
+ * Con la tavolozza a due toni e Pixel a 1, il file salvato e' ditherato a
+ * piena risoluzione: chi lo apre lo vede rimpicciolito e i punti si
+ * rimediano in grigi. Ditherando invece alla griglia del terminale ogni
+ * cella e' nera o bianca, e l'anteprima promette una trama che nel file
+ * non si vedra' mai. E' il difetto per cui il salvataggio sembrava rotto.
+ *
+ * Il confronto e' fra due Pixel diversi invece che su un numero assoluto:
+ * anche il tema ha i suoi grigi, e sottrarli fra loro li toglie di mezzo.
+ */
+test("l'anteprima mostra il file come si vedra', non la trama alla griglia", async (t) => {
+  const dir = tempDir(t);
+  const path = await writeSample(dir, 'grande.png', 1200, 900);
+  const { tui, render } = await mountTui(
+    DitherTui, { width: 100, height: 34, path, dir, mode: 'halfblock' },
+  );
+
+  const conPixel = (scale) => {
+    tui.options = { ...tui.options, palette: 'bw', algorithm: 'bayer8', scale };
+    tui.cache = null;
+    return grigiIntermedi(render());
+  };
+
+  const fine = conPixel(1);
+  const grosso = conPixel(16);
+  assert.ok(
+    fine > grosso + 8,
+    `a Pixel 1 i grigi dovrebbero essere molti di piu': ${fine} contro ${grosso}`,
+  );
+});
+
+test("l'intestazione dichiara la misura d'uscita col rapporto chiesto", async (t) => {
+  const dir = tempDir(t);
+  const path = await writeSample(dir, 'foto.png', 1000, 1000);
+  const { tui, render } = await mountTui(DitherTui, { width: 120, height: 34, path, dir });
+
+  tui.options = { ...tui.options, aspect: '16:9', fit: 'crop', megapixels: 24 };
+  tui.cache = null;
+  assert.match(testo(render()), /1000×563/);
+
+  tui.options = { ...tui.options, aspect: '16:9', fit: 'pad' };
+  tui.cache = null;
+  assert.match(testo(render()), /1778×1000/);
+});

@@ -14,7 +14,7 @@ import {
   normalizeOptions, formatValue, applyPreset, paramSteps, stepIndex, stepBy,
   usefulStepCeiling, effectiveMegapixels,
   groupLabel, paramLabel, presetLabel, enumLabel,
-  processImage, targetSize, resampleBox, isCustomPalette,
+  processImage, exportSize, resampleBox, isCustomPalette,
   createTranslator, normalizeLocale, LOCALES, LOCALE_NAMES,
 } from '../core/index.js';
 
@@ -31,6 +31,16 @@ const HELP_HEIGHT = 1;
 const CONTROLS_WIDTH = 38;
 const CONTROLS_MAX = 52;
 const NARROW_WIDTH = 78;
+
+/**
+ * Tetto ai megapixel su cui elabora l'anteprima.
+ *
+ * L'anteprima ora ditherizza alla risoluzione di uscita, che su una foto da
+ * ventiquattro megapixel vuol dire quasi due secondi a ogni tasto premuto.
+ * Due megapixel stanno sotto i centocinquanta millisecondi, che e' il punto
+ * in cui una interfaccia smette di sembrare che risponda.
+ */
+const MAX_PREVIEW_MP = 2;
 
 /** Rotellina in braille: gira mentre un'operazione e' in corso. */
 const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
@@ -794,8 +804,12 @@ export class DitherTui {
    */
   #previewCells(innerH, maxInnerW) {
     const m = MODES[this.previewMode];
+    // Le misure d'uscita, non quelle della sorgente: con un rapporto
+    // diverso da quello della foto il riquadro va dimensionato su come
+    // sara' l'immagine, altrimenti resta largo per una forma che non c'e'.
+    const uscita = exportSize(this.source.width, this.source.height, this.options);
     const t = cellTarget(
-      this.source.width, this.source.height,
+      uscita.width, uscita.height,
       Math.max(1, maxInnerW), Math.max(1, innerH), this.previewMode,
     );
     return Math.ceil(t.width / m.cx);
@@ -883,13 +897,10 @@ export class DitherTui {
 
   #exportSize() {
     if (!this.source) return '—';
-    const t = targetSize(this.source.width, this.source.height, this.options.megapixels);
-    let { width: w, height: h } = t;
-    if (!this.options.upscale && this.options.scale > 1) {
-      w = Math.floor(w / this.options.scale);
-      h = Math.floor(h / this.options.scale);
-    }
-    return `${w}×${h}`;
+    const { width, height } = exportSize(
+      this.source.width, this.source.height, this.options,
+    );
+    return `${width}×${height}`;
   }
 
   /** Fascia centrale: anteprima a sinistra, controlli a destra. */
@@ -917,20 +928,64 @@ export class DitherTui {
     const key = `${cols}x${rows}|${this.previewMode}|${this.imagePath}|${JSON.stringify(this.options)}`;
     if (this.cache && this.cache.key === key) return this.cache.result;
 
-    const target = cellTarget(this.source.width, this.source.height, cols, rows, this.previewMode);
-    const small = resampleBox(this.source, target.width, target.height);
-    // I megapixel dichiarati sono quelli che l'immagine ha gia': il
-    // ridimensionamento l'abbiamo fatto noi qui sopra, alla misura esatta
-    // della griglia del terminale, e il motore non deve rifarlo.
-    // upscale resta quello scelto dall'utente: forzandolo a spento, con
-    // Pixel maggiore di uno l'anteprima si rimpiccioliva invece di mostrare
-    // blocchi piu' grossi, e finiva in un angolo del pannello.
-    const result = processImage(small, {
-      ...this.options,
-      megapixels: (small.width * small.height) / 1e6,
-    });
+    // Si elabora alla risoluzione di uscita e poi si rimpicciolisce, che e'
+    // esattamente quello che fa un visualizzatore aprendo il file salvato.
+    //
+    // Prima si faceva il contrario: ricampionare alla griglia del terminale
+    // e ditherare li'. Cosi' una cella di dithering era grossa un carattere
+    // mentre nel file e' grossa un pixel, e a 1x su due megapixel il file
+    // usciva liscio dove l'anteprima era un mosaico. Sembrava rotto il
+    // salvataggio; a mentire era l'anteprima.
+    //
+    // Ricampionare dopo il dithering qui non contraddice la regola di non
+    // farlo mai: quella riguarda il file, e il motivo per cui vale e' che la
+    // media dei pixel richiude i punti in grigio. E' precisamente cio' che
+    // vogliamo riprodurre, perche' e' quello che vede chi guarda.
+    const uscita = this.#exportResult();
+    const target = cellTarget(uscita.image.width, uscita.image.height, cols, rows, this.previewMode);
+    const result = { ...uscita, image: resampleBox(uscita.image, target.width, target.height) };
     this.cache = { key, result };
     return result;
+  }
+
+  /**
+   * L'immagine come verra' salvata.
+   *
+   * In cache per conto suo perche' non dipende dalla griglia: ridimensionare
+   * il terminale non deve ridithera' nulla. La chiave contiene tutto quello
+   * da cui il risultato dipende, quindi non c'e' niente da invalidare a mano.
+   */
+  #exportResult() {
+    const opzioni = this.#previewOptions();
+    const key = `${this.imagePath}|${JSON.stringify(opzioni)}`;
+    if (this.exportCache && this.exportCache.key === key) return this.exportCache.result;
+    const result = processImage(this.source, opzioni);
+    this.exportCache = { key, result };
+    return result;
+  }
+
+  /**
+   * Le opzioni con cui elaborare l'anteprima: quelle vere, con un tetto ai
+   * megapixel perche' l'interfaccia resti reattiva.
+   *
+   * Il tetto da solo falserebbe la trama, che si misura in pixel: rimpicciolita
+   * l'immagine di un fattore, va rimpicciolito dello stesso fattore anche
+   * Pixel, o i blocchi risultano piu' grossi di quanto saranno nel file.
+   * Sotto 1 non si scende, ed e' li' che il tetto smette di essere fedele:
+   * a quel punto pero' un blocco e' gia' molto piu' piccolo di una cella e
+   * la differenza non arriva all'occhio.
+   */
+  #previewOptions() {
+    const propri = effectiveMegapixels(
+      this.source.width, this.source.height, this.options.megapixels,
+    );
+    if (propri <= MAX_PREVIEW_MP) return this.options;
+    const lineare = Math.sqrt(MAX_PREVIEW_MP / propri);
+    return {
+      ...this.options,
+      megapixels: MAX_PREVIEW_MP,
+      scale: Math.max(1, Math.round(this.options.scale * lineare)),
+    };
   }
 
   #previewPanel(W, H) {

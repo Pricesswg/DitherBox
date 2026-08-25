@@ -126,6 +126,24 @@ export const PARAMS = [
   },
 
   {
+    key: 'aspect',
+    group: 'output',
+    type: 'enum',
+    // I rapporti che la gente chiede davvero, dal quadrato del social al
+    // cinemascope, piu' i due verticali. 'source' lascia la foto com'e' ed
+    // e' il default: nessuno vuole che un programma di dithering gli
+    // ritagli la fotografia senza averlo chiesto.
+    values: ['source', '1:1', '5:4', '4:3', '3:2', '16:10', '16:9', '21:9', '4:5', '9:16'],
+    default: 'source',
+  },
+  {
+    key: 'fit',
+    group: 'output',
+    type: 'enum',
+    values: ['crop', 'pad'],
+    default: 'crop',
+  },
+  {
     key: 'megapixels',
     group: 'output',
     type: 'range',
@@ -184,6 +202,20 @@ export function paramHint(param, t = inglese) {
   return hasKey(key) ? t(key) : null;
 }
 
+/**
+ * Il rapporto largh/alt chiesto, o null per 'source'.
+ *
+ * Si legge dal nome invece di tenere una tabella: '16:9' dice gia' tutto, e
+ * una tabella sarebbe una seconda lista da tenere allineata a `values`.
+ */
+export function aspectRatio(value) {
+  const m = /^(\d+):(\d+)$/.exec(String(value));
+  if (!m) return null;
+  const w = Number(m[1]);
+  const h = Number(m[2]);
+  return h > 0 && w > 0 ? w / h : null;
+}
+
 export function paletteLabel(key, t = inglese) {
   return t(`palette.${key}`);
 }
@@ -200,7 +232,12 @@ export function presetLabel(key, t = inglese) {
 export function enumLabel(param, value, t = inglese) {
   if (param.key === 'palette') return paletteLabel(value, t);
   if (param.key === 'algorithm') return algorithmLabel(value, t);
-  return String(value);
+  // Gli altri elenchi si traducono per convenzione, param.<chiave>.value.<v>.
+  // Chi non ha una voce resta com'e': i rapporti come '16:9' sono gia' la
+  // loro etichetta in ogni lingua, e tradurli sarebbe solo un modo di
+  // sbagliarli.
+  const key = `param.${param.key}.value.${value}`;
+  return hasKey(key) ? t(key) : String(value);
 }
 
 export const DEFAULTS = Object.fromEntries(PARAMS.map((p) => [p.key, p.default]));

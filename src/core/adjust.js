@@ -189,6 +189,83 @@ export function resampleBox(img, targetW, targetH) {
   return out;
 }
 
+/**
+ * Le misure del fotogramma che porta `width`x`height` al rapporto `ratio`
+ * senza tagliare niente: si allarga il lato che manca, mai si stringe.
+ *
+ * Serve a misurare le bande prima di averle: il budget di megapixel deve
+ * contarle, altrimenti "2 MP" descrive la fotografia e non il file.
+ */
+export function padFrame(width, height, ratio) {
+  const corrente = width / height;
+  if (corrente > ratio) return { width, height: Math.max(1, Math.round(width / ratio)) };
+  if (corrente < ratio) return { width: Math.max(1, Math.round(height * ratio)), height };
+  return { width, height };
+}
+
+/**
+ * Le misure del ritaglio centrato che porta `width`x`height` a `ratio`.
+ * Gemella di padFrame, e come quella esiste per poter misurare il
+ * fotogramma senza costruirlo.
+ */
+export function cropFrame(width, height, ratio) {
+  const corrente = width / height;
+  if (corrente > ratio) return { width: Math.max(1, Math.round(height * ratio)), height };
+  if (corrente < ratio) return { width, height: Math.max(1, Math.round(width / ratio)) };
+  return { width, height };
+}
+
+/**
+ * Ritaglio centrato al rapporto `ratio` (larghezza / altezza).
+ * Quello che avanza si perde: e' la cosa che ci si aspetta chiedendo 16:9.
+ */
+export function cropToAspect(img, ratio) {
+  const { width: w, height: h } = cropFrame(img.width, img.height, ratio);
+  if (w === img.width && h === img.height) return cloneImage(img);
+
+  const x0 = Math.floor((img.width - w) / 2);
+  const y0 = Math.floor((img.height - h) / 2);
+  const out = createImage(w, h);
+  // Una riga per volta: sono contigue in memoria, quindi si copiano in blocco
+  // invece che pixel per pixel.
+  for (let y = 0; y < h; y++) {
+    const da = ((y + y0) * img.width + x0) * 4;
+    out.data.set(img.data.subarray(da, da + w * 4), y * w * 4);
+  }
+  return out;
+}
+
+/**
+ * Bande centrate fino al rapporto `ratio`, del colore `colour`.
+ *
+ * Va chiamata *dopo* il dithering, e con un colore preso dalla tavolozza:
+ * bande aggiunte prima verrebbero ditherate anche loro, e bande di un colore
+ * qualsiasi introdurrebbero nel file una tinta che la tavolozza non ammette.
+ */
+export function padToAspect(img, ratio, colour) {
+  const frame = padFrame(img.width, img.height, ratio);
+  if (frame.width === img.width && frame.height === img.height) return cloneImage(img);
+
+  const out = createImage(frame.width, frame.height);
+  const [r, g, b] = colour;
+  for (let i = 0; i < out.data.length; i += 4) {
+    out.data[i] = r;
+    out.data[i + 1] = g;
+    out.data[i + 2] = b;
+    out.data[i + 3] = 255;
+  }
+  const x0 = Math.floor((frame.width - img.width) / 2);
+  const y0 = Math.floor((frame.height - img.height) / 2);
+  for (let y = 0; y < img.height; y++) {
+    const da = y * img.width * 4;
+    out.data.set(
+      img.data.subarray(da, da + img.width * 4),
+      ((y + y0) * frame.width + x0) * 4,
+    );
+  }
+  return out;
+}
+
 /** Riduce l'immagine perche' stia dentro maxW x maxH, mantenendo le proporzioni. */
 export function fitWithin(img, maxW, maxH) {
   const scale = Math.min(maxW / img.width, maxH / img.height, 1);
