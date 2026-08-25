@@ -9,4 +9,4 @@
  * test/packaging.test.js controlla che concordi con package.json e con la
  * formula Homebrew.
  */
-export const VERSION = '0.3.0';
+export const VERSION = '0.3.1';
