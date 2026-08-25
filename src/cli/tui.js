@@ -15,7 +15,7 @@ import {
   usefulStepCeiling, effectiveMegapixels,
   groupLabel, paramLabel, presetLabel, enumLabel,
   processImage, exportSize, resampleBox, isCustomPalette,
-  aspectRatio, selectionFrame,
+  aspectRatio, selectionFrame, targetSize,
   createTranslator, normalizeLocale, LOCALES, LOCALE_NAMES,
 } from '../core/index.js';
 
@@ -46,6 +46,9 @@ const NARROW_WIDTH = 78;
  * in cui una interfaccia smette di sembrare che risponda.
  */
 const MAX_PREVIEW_MP = 2;
+
+/** Il gradino piu' alto dei megapixel: vale "non ridurre". */
+const MEGAPIXEL_MAX = paramSteps(PARAMS.find((p) => p.key === 'megapixels')).at(-1);
 
 /** Rotellina in braille: gira mentre un'operazione e' in corso. */
 const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
@@ -1041,13 +1044,16 @@ export class DitherTui {
    * da cui il risultato dipende, quindi non c'e' niente da invalidare a mano.
    */
   #exportResult() {
-    const opzioni = this.#previewOptions();
-    const key = `${this.imagePath}|${JSON.stringify(opzioni)}`;
+    const { sorgente, opzioni } = this.#previewJob();
+    const key = `${this.imagePath}|${sorgente.width}x${sorgente.height}|${JSON.stringify(opzioni)}`;
     if (this.exportCache && this.exportCache.key === key) return this.exportCache.result;
-    const result = processImage(this.source, opzioni);
+    const result = processImage(sorgente, opzioni);
     this.exportCache = { key, result };
     return result;
   }
+
+  /** Ingresso pubblico per la suite di prova. */
+  _previewJob() { return this.#previewJob(); }
 
   /**
    * Le opzioni con cui elaborare l'anteprima: quelle vere, con un tetto ai
@@ -1060,24 +1066,59 @@ export class DitherTui {
    * a quel punto pero' un blocco e' gia' molto piu' piccolo di una cella e
    * la differenza non arriva all'occhio.
    */
-  #previewOptions() {
+  #previewJob() {
+    const o = this.options;
     // Con la cornice accesa e il ritaglio attivo l'anteprima mostra la foto
     // intera: una cornice disegnata sull'immagine gia' ritagliata cadrebbe
     // esattamente sul bordo, e non direbbe niente a nessuno.
-    const opzioni = this.#guideActive() && this.options.fit === 'crop'
-      ? { ...this.options, aspect: 'source', zoom: 100 }
-      : this.options;
+    const intera = this.#guideActive() && o.fit === 'crop';
 
-    const propri = effectiveMegapixels(
-      this.source.width, this.source.height, this.options.megapixels,
-    );
-    if (propri <= MAX_PREVIEW_MP) return opzioni;
-    const lineare = Math.sqrt(MAX_PREVIEW_MP / propri);
-    return {
-      ...opzioni,
-      megapixels: MAX_PREVIEW_MP,
-      scale: Math.max(1, Math.round(this.options.scale * lineare)),
-    };
+    let sorgente = this.source;
+    let opzioni = o;
+
+    if (intera) {
+      // Non basta togliere il ritaglio dalle opzioni. Il tetto dei megapixel
+      // si applicherebbe alla foto intera invece che alla selezione, e la
+      // selezione uscirebbe piu' piccola di quanto sara' nel file: stessi
+      // blocchi di dithering su meno pixel di soggetto vuol dire trama piu'
+      // grossa, e l'anteprima prometterebbe un effetto che il file non ha.
+      //
+      // Si riduce quindi la foto intera del fattore esatto che il file
+      // applica alla selezione, e dentro il motore la riduzione si spegne.
+      const sel = selectionFrame(this.source.width, this.source.height, {
+        ratio: aspectRatio(o.aspect),
+        zoom: o.zoom,
+        alignX: o.alignX,
+        alignY: o.alignY,
+      });
+      const { scale } = targetSize(sel.width, sel.height, o.megapixels);
+      if (scale < 1) {
+        sorgente = resampleBox(
+          this.source, this.source.width * scale, this.source.height * scale,
+        );
+      }
+      opzioni = { ...o, aspect: 'source', zoom: 100, megapixels: MEGAPIXEL_MAX };
+    }
+
+    // Tetto ai megapixel perche' l'interfaccia resti reattiva. Il tetto da
+    // solo falserebbe la trama, che si misura in pixel: rimpicciolita
+    // l'immagine di un fattore, va rimpicciolito dello stesso fattore anche
+    // Pixel, o i blocchi risultano piu' grossi di quanto saranno nel file.
+    // Sotto 1 non si scende, ed e' li' che il tetto smette di essere fedele:
+    // a quel punto pero' un blocco e' gia' molto piu' piccolo di una cella e
+    // la differenza non arriva all'occhio.
+    const lavoro = intera
+      ? (sorgente.width * sorgente.height) / 1e6
+      : effectiveMegapixels(this.source.width, this.source.height, o.megapixels);
+    if (lavoro > MAX_PREVIEW_MP) {
+      const lineare = Math.sqrt(MAX_PREVIEW_MP / lavoro);
+      opzioni = {
+        ...opzioni,
+        megapixels: MAX_PREVIEW_MP,
+        scale: Math.max(1, Math.round(o.scale * lineare)),
+      };
+    }
+    return { sorgente, opzioni };
   }
 
   #previewPanel(W, H) {

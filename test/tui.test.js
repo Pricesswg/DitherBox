@@ -8,6 +8,9 @@ import { loadThemes } from '../src/cli/theme.js';
 import { MODE_KEYS, GUIDES } from '../src/cli/preview.js';
 import { loadImage } from '../src/cli/imageio.js';
 import { VERSION } from '../src/cli/version.js';
+import {
+  processImage, exportSize, selectionFrame, aspectRatio,
+} from '../src/core/index.js';
 import { tempDir, writeSample, mountTui } from './helpers.js';
 
 const press = (tui, s) => tui._handle(parseKey(Buffer.from(s, 'binary')));
@@ -717,4 +720,54 @@ test('la cornice compare anche col solo zoom, senza rapporto scelto', async (t) 
   tui.options = { ...tui.options, zoom: 60 };
   tui.cache = null;
   assert.ok(corniceCelle(render()).length > 8, 'col solo zoom la cornice deve comparire');
+});
+
+/**
+ * Con la cornice accesa l'anteprima mostra la foto intera, e non basta
+ * togliere il ritaglio dalle opzioni: cosi' il tetto dei megapixel si
+ * applica alla foto intera invece che alla selezione, e la selezione esce
+ * piu' piccola di quanto sara' nel file. Stessi blocchi di dithering su meno
+ * pixel di soggetto vuol dire trama piu' grossa, e l'anteprima promette un
+ * effetto che il file non ha. Lo scarto misurato era di 1.47x.
+ *
+ * L'invariante e' che la selezione dentro l'anteprima misuri quanto il file.
+ */
+test('la trama dentro la cornice e alla stessa scala del file', async (t) => {
+  const dir = tempDir(t);
+  const path = await writeSample(dir, 'foto.png', 1868, 1078);
+  const { tui } = await mountTui(DitherTui, { width: 123, height: 60, path, dir });
+
+  const casi = [
+    { aspect: '4:5', zoom: 100, alignX: 50, alignY: 50, megapixels: 0.2, scale: 2 },
+    { aspect: '16:9', zoom: 60, alignX: 20, alignY: 80, megapixels: 0.5, scale: 1 },
+    { aspect: '1:1', zoom: 35, alignX: 0, alignY: 100, megapixels: 0.1, scale: 4 },
+    { aspect: 'source', zoom: 50, alignX: 50, alignY: 50, megapixels: 0.3, scale: 2 },
+  ];
+
+  for (const caso of casi) {
+    tui.options = { ...tui.options, fit: 'crop', upscale: true, ...caso };
+    tui.guide = 'red';
+    tui.cache = null;
+    tui.exportCache = null;
+
+    const { sorgente, opzioni } = tui._previewJob();
+    const { image } = processImage(sorgente, opzioni);
+    const dentro = selectionFrame(image.width, image.height, {
+      ratio: aspectRatio(caso.aspect),
+      zoom: caso.zoom,
+      alignX: caso.alignX,
+      alignY: caso.alignY,
+    });
+    const file = exportSize(1868, 1078, tui.options);
+
+    // Un paio di pixel di tolleranza: le misure sono intere e i fattori no.
+    const scarto = Math.max(
+      Math.abs(dentro.width - file.width), Math.abs(dentro.height - file.height),
+    );
+    assert.ok(
+      scarto <= 2,
+      `${JSON.stringify(caso)}: selezione ${dentro.width}x${dentro.height}, `
+      + `file ${file.width}x${file.height}`,
+    );
+  }
 });
