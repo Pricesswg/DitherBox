@@ -15,7 +15,7 @@ import {
   usefulStepCeiling, effectiveMegapixels,
   groupLabel, paramLabel, presetLabel, enumLabel,
   processImage, exportSize, resampleBox, isCustomPalette,
-  aspectRatio, selectionFrame, targetSize,
+  aspectRatio, selectionFrame, targetSize, cropRect,
   createTranslator, normalizeLocale, LOCALES, LOCALE_NAMES,
 } from '../core/index.js';
 
@@ -102,6 +102,7 @@ export class DitherTui {
     // cornice che sembra rotta. Il braille resta a un tasto di distanza (v)
     // e da' molto piu' dettaglio dove il font lo regge.
     this.previewMode = opts.mode || config.mode || 'halfblock';
+    this.oneToOne = false;
     this.guide = opts.guide || config.guide || 'red';
     if (!GUIDE_KEYS.includes(this.guide)) this.guide = 'red';
     if (!MODES[this.previewMode]) this.previewMode = 'braille';
@@ -280,6 +281,12 @@ export class DitherTui {
     if (name === 'q') return this.stop();
 
     if (name === '?' || (ctrl && name === 'k')) return this.#openHelp();
+    if (name === '1') {
+      this.oneToOne = !this.oneToOne;
+      this.cache = null;
+      this.#say(this.tr(this.oneToOne ? 'tui.oneToOneOn' : 'tui.oneToOneOff'), 'accent');
+      return this.render();
+    }
     if (name === 'c') return this.#openGuidePicker();
     if (name === 't') return this.#openThemePicker();
     if (name === 'p') return this.#openPresetPicker();
@@ -458,6 +465,7 @@ export class DitherTui {
       ['n  N', 'step'],
       ['g  G  home  end', 'ends'],
       ['v', 'mode'],
+      ['1', 'oneToOne'],
       ['c', 'guide'],
       ['t', 'theme'],
       ['p', 'preset'],
@@ -957,7 +965,8 @@ export class DitherTui {
     if (!this.source) return null;
     if (cols === undefined) return this.cache ? this.cache.result : null;
 
-    const key = `${cols}x${rows}|${this.previewMode}|${this.guide}|${this.imagePath}|${JSON.stringify(this.options)}`;
+    const key = `${cols}x${rows}|${this.previewMode}|${this.guide}|${this.oneToOne}`
+      + `|${this.imagePath}|${JSON.stringify(this.options)}`;
     if (this.cache && this.cache.key === key) return this.cache.result;
 
     // Si elabora alla risoluzione di uscita e poi si rimpicciolisce, che e'
@@ -974,8 +983,15 @@ export class DitherTui {
     // media dei pixel richiude i punti in grigio. E' precisamente cio' che
     // vogliamo riprodurre, perche' e' quello che vede chi guarda.
     const uscita = this.#exportResult();
-    const target = cellTarget(uscita.image.width, uscita.image.height, cols, rows, this.previewMode);
-    const image = resampleBox(uscita.image, target.width, target.height);
+    let image;
+    if (this.oneToOne) {
+      image = this.#oneToOneWindow(uscita.image, cols, rows);
+    } else {
+      const target = cellTarget(
+        uscita.image.width, uscita.image.height, cols, rows, this.previewMode,
+      );
+      image = resampleBox(uscita.image, target.width, target.height);
+    }
 
     const guide = this.#guideRect(uscita.image, image);
     // Fuori dal ritaglio c'e' quello che si sta buttando: spegnerlo lo dice
@@ -989,11 +1005,40 @@ export class DitherTui {
   }
 
   /**
+   * Una finestra sul file a risoluzione vera, presa dal centro.
+   *
+   * L'anteprima normale rimpicciolisce il file per farcelo stare, e la media
+   * dei pixel richiude i punti del dithering in tinte piatte: e' quello che
+   * si vede aprendo il file e rimpicciolendolo, non quello che si vede
+   * guardandolo da vicino. Qui non si ricampiona: si ritaglia e basta, un
+   * pixel del file per sotto-cella.
+   *
+   * In mezzi blocchi e in braille i pixel sono quadrati a schermo e il
+   * rapporto e' quello vero. In quadranti e in ASCII la cella non e' quadrata
+   * (`ratio` vale 2) e l'immagine risulta stretta: quei due modi correggono
+   * le proporzioni allungando, e allungare vorrebbe dire ricampionare.
+   */
+  #oneToOneWindow(img, cols, rows) {
+    const m = MODES[this.previewMode] || MODES.halfblock;
+    const w = Math.min(img.width, Math.max(m.cx, cols * m.cx));
+    const h = Math.min(img.height, Math.max(m.cy, rows * m.cy));
+    return cropRect(img, {
+      x: Math.floor((img.width - w) / 2),
+      y: Math.floor((img.height - h) / 2),
+      width: w,
+      height: h,
+    });
+  }
+
+  /**
    * Vero quando la cornice ha qualcosa da mostrare: o le proporzioni non sono
    * quelle della foto, o la selezione e' piu' piccola del massimo possibile.
    */
   #guideActive() {
-    return this.guide !== 'off'
+    // A 1:1 quello che si vede e' gia' il file: non c'e' nessun fuori da
+    // segnare, e una cornice cadrebbe sul bordo del riquadro.
+    return !this.oneToOne
+      && this.guide !== 'off'
       && (aspectRatio(this.options.aspect) !== null || this.options.zoom < 100);
   }
 
@@ -1110,7 +1155,10 @@ export class DitherTui {
     const lavoro = intera
       ? (sorgente.width * sorgente.height) / 1e6
       : effectiveMegapixels(this.source.width, this.source.height, o.megapixels);
-    if (lavoro > MAX_PREVIEW_MP) {
+    // A 1:1 il tetto non si applica: rimpicciolire l'immagine cambierebbe
+    // proprio i pixel che si e' chiesto di vedere. Su una foto enorme si
+    // paga in attesa, ed e' il prezzo dichiarato di quel modo.
+    if (!this.oneToOne && lavoro > MAX_PREVIEW_MP) {
       const lineare = Math.sqrt(MAX_PREVIEW_MP / lavoro);
       opzioni = {
         ...opzioni,

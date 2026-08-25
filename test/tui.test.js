@@ -771,3 +771,64 @@ test('la trama dentro la cornice e alla stessa scala del file', async (t) => {
     );
   }
 });
+
+/**
+ * L'anteprima adattata rimpicciolisce il file, e la media dei pixel richiude
+ * i punti del dithering in grigi: e' quello che si vede aprendo il file e
+ * rimpicciolendolo, non quello che si vede guardandolo da vicino. A 1:1 non
+ * si ricampiona, quindi in bianco e nero devono arrivare solo nero e bianco.
+ */
+test('a 1:1 non si media: la trama arriva intatta', async (t) => {
+  const dir = tempDir(t);
+  const path = await writeSample(dir, 'foto.png', 1200, 900);
+  const { tui, render } = await mountTui(
+    DitherTui, { width: 100, height: 34, path, dir, mode: 'halfblock' },
+  );
+  tui.options = {
+    ...tui.options, palette: 'bw', algorithm: 'bayer8', scale: 1, megapixels: 0.5,
+  };
+  tui.guide = 'off';
+
+  tui.oneToOne = false;
+  tui.cache = null;
+  const adattata = grigiIntermedi(render());
+
+  tui.oneToOne = true;
+  tui.cache = null;
+  const uno = grigiIntermedi(render());
+
+  assert.ok(
+    uno < adattata - 8,
+    `a 1:1 i grigi dovrebbero quasi sparire: ${uno} contro ${adattata}`,
+  );
+});
+
+test('il tasto 1 accende e spegne l anteprima a risoluzione vera', async (t) => {
+  const dir = tempDir(t);
+  const path = await writeSample(dir, 'foto.png', 800, 600);
+  const { tui, render } = await mountTui(DitherTui, { width: 100, height: 30, path, dir });
+  assert.equal(tui.oneToOne, false);
+
+  press(tui, '1');
+  assert.equal(tui.oneToOne, true);
+  assert.match(testo(render()), /1:1/);
+
+  press(tui, '1');
+  assert.equal(tui.oneToOne, false);
+});
+
+/** A 1:1 si vede gia' il file: non c'e' nessun fuori da segnare. */
+test('a 1:1 la cornice non si disegna', async (t) => {
+  const dir = tempDir(t);
+  const path = await writeSample(dir, 'foto.png', 900, 900);
+  const { tui, render } = await mountTui(DitherTui, { width: 110, height: 34, path, dir });
+  tui.options = { ...tui.options, aspect: '16:9', fit: 'crop' };
+  tui.guide = 'red';
+
+  tui.cache = null;
+  assert.ok(corniceCelle(render()).length > 8, 'adattata: la cornice ci deve essere');
+
+  tui.oneToOne = true;
+  tui.cache = null;
+  assert.deepEqual(corniceCelle(render()), []);
+});

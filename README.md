@@ -178,6 +178,7 @@ Arrow keys or vim keys, whichever your hands reach for first.
 | `n` `N` | Next / previous image |
 | `g` `G` `home` `end` | Jump to the top / bottom |
 | `v` | Change preview mode |
+| `1` | Preview at 1:1, no reduction |
 | `c` | Colour of the framing guide, off included |
 | `t` | Pick the theme (live preview while you scroll) |
 | `p` | Apply a preset |
@@ -213,6 +214,22 @@ terminal grid, which is exactly what an image viewer does when it opens the
 file. So a fine dither looks smooth in the preview because it will look smooth
 in the file as well. To see the texture, raise **Pixel** or lower
 **Megapixels**, and it appears in both at once.
+
+There is a limit to that, and `1` is the way past it. A preview panel has a
+few thousand pixels and the file has hundreds of thousands, so fitting the
+whole result into the panel averages the dots into flat tone, exactly as an
+image viewer does when you shrink the file to a thumbnail. `1` stops fitting
+and shows a window on the middle of the file at full resolution, one file
+pixel per sub-cell, nothing resampled. It is the view that answers what the
+texture will actually look like. Press it again to go back.
+
+In `halfblock` and `braille` the pixels are square on screen and the
+proportions are true. In `quadrant` and `ascii` a cell is not square, and
+those modes normally correct for it by stretching, which would mean
+resampling, so at 1:1 the picture reads narrow. The megapixel cap that keeps
+the interface responsive is also off at 1:1, because shrinking the image
+would change the very pixels you asked to see: on a very large output,
+expect a wait.
 
 The crop is a rectangle you place yourself: **Zoom** sets how big it is,
 **Offset X** and **Offset Y** where it sits. At zoom 100 the rectangle already
