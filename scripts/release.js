@@ -141,16 +141,35 @@ async function main() {
 
   if (conTag) {
     if (git('tag', '--list', tag)) {
-      dimmi(`il tag ${tag} c'e' gia', non lo tocco`);
+      dimmi(`il tag ${tag} esiste gia' qui`);
     } else {
       if (git('status', '--porcelain')) {
         git('add', '-A');
         git('commit', '-m', `Version ${nuova}`);
       }
       git('tag', '-a', tag, '-m', `DitherBox ${nuova}`);
-      git('push', 'origin', 'main');
-      git('push', 'origin', tag);
-      dimmi(`tag ${tag} creato e spinto`);
+      dimmi(`tag ${tag} creato`);
+    }
+
+    git('push', 'origin', 'main');
+
+    // Il tag va spinto anche quando esisteva gia': puo' essere rimasto qui
+    // da un tentativo finito male, e in quel caso "c'e' gia'" e' vero solo
+    // in locale, mentre chi installa non lo vede. Succede davvero: e'
+    // capitato spingendo da una rete che rifiuta i tag.
+    if (git('ls-remote', '--tags', 'origin', tag)) {
+      dimmi(`${tag} e' gia' sul remoto`);
+    } else {
+      try {
+        git('push', 'origin', tag);
+        dimmi(`${tag} spinto sul remoto`);
+      } catch (err) {
+        throw new Error(
+          `il tag e' qui ma il push e' stato rifiutato.\n`
+          + `  ${String(err.stderr || err.message).trim().split('\n')[0]}\n`
+          + `  Spingilo da una rete che lo consenta:  git push origin ${tag}`,
+        );
+      }
     }
   } else if (!soloFormula) {
     dimmi('\n(prova a vuoto: niente tag, niente push. Aggiungi --tag per farlo davvero.)\n');
