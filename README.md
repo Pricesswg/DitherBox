@@ -112,25 +112,31 @@ installed from a clone.
 ### macOS
 
 Everything above works on macOS too, with `brew install node` in place of the
-distribution package. If you would rather have Homebrew handle the whole thing,
-including Node, there is a formula in
-[`packaging/homebrew/ditherbox.rb`](packaging/homebrew/ditherbox.rb):
+distribution package. If you would rather have Homebrew handle the whole
+thing, Node included:
 
 ```sh
 brew tap pricesswg/tap
-brew install --HEAD pricesswg/tap/ditherbox
+brew install pricesswg/tap/ditherbox
 ```
 
-That tap does not exist yet. Creating one is a ten-minute job: a public repo
-named `homebrew-tap`, the formula copied into `Formula/ditherbox.rb`, done.
-`--HEAD` builds straight from the main branch; once a version is tagged the
-formula gets a `url` and a `sha256` and the flag is no longer needed. See
-[`packaging/homebrew/README.md`](packaging/homebrew/README.md) for the exact
-steps.
+The formula lives in
+[`packaging/homebrew/ditherbox.rb`](packaging/homebrew/ditherbox.rb) and
+`npm run release` keeps it in step with the tags: it sets the version
+everywhere the program states it, builds, tests, tags, then downloads the
+release tarball, writes the fingerprint into the formula and downloads it a
+second time to check what it wrote. A wrong fingerprint is invisible until
+somebody tries to install.
 
-Getting into Homebrew's own catalogue (so that plain `brew install ditherbox`
-works, with no tap) is a different matter: they ask for a project with a real
-following behind it, so that comes later, if ever.
+The tap itself is a public repo called `homebrew-tap` with the formula in
+`Formula/`, and standing one up is a ten-minute job.
+[`packaging/homebrew/README.md`](packaging/homebrew/README.md) has the exact
+commands, including what to do when a proxy refuses to serve GitHub tarballs.
+
+Plain `brew install ditherbox`, with no tap, would mean getting into
+`homebrew-core`, and their rules rule this out twice over: they do not take
+software that a language's own package manager already installs, and they ask
+for a project with a following rather than one its author has just submitted.
 
 ### Windows
 
@@ -449,6 +455,8 @@ npm install
 npm test          # 108 tests
 npm run build     # regenerate dist/
 npm run docs      # regenerate every image in this README
+npm run presets   # regenerate the preset sheet
+npm run release   # cut a version and update the Homebrew formula
 ```
 
 ```
@@ -456,8 +464,8 @@ src/core/    shared engine, no DOM and no Node
 src/web/     browser widget + stylesheet
 src/cli/     terminal app: TUI, themes, renderer, image I/O
 examples/    demo page, Astro component, the sample photo
-scripts/     build and screenshots
-packaging/   the Homebrew formula
+scripts/     build, screenshots, release
+packaging/   the Homebrew formula and how to serve it from a tap
 ```
 
 The engine is plain JavaScript with no dependencies and no reference to the

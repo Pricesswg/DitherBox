@@ -57,7 +57,8 @@
     "screenshot": "node scripts/screenshot.js",
     "termshot": "node scripts/termshot.js",
     "docs": "node scripts/docs-images.js",
-    "presets": "node scripts/contact-sheet.js"
+    "presets": "node scripts/contact-sheet.js",
+    "release": "node scripts/release.js"
   },
   "dependencies": {
     "jpeg-js": "^0.4.4",

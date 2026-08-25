@@ -1,77 +1,147 @@
 # Installing on macOS with Homebrew
 
-Homebrew does not know about DitherBox, and it will not until someone tells it.
-There are two ways to do that.
+Homebrew does not know about DitherBox, and it will not until someone tells
+it. This folder holds the formula and the steps.
 
-## A personal tap (ten minutes, works today)
+## The short version
 
-A tap is nothing more than a public GitHub repo whose name starts with
-`homebrew-`. Homebrew looks inside it for a `Formula` folder.
-
-1. Create a public repo called **`homebrew-tap`** under the same account,
-   so `github.com/Pricesswg/homebrew-tap`.
-
-2. Put the formula in it:
-
-   ```sh
-   git clone https://github.com/Pricesswg/homebrew-tap.git
-   cd homebrew-tap
-   mkdir -p Formula
-   curl -o Formula/ditherbox.rb \
-     https://raw.githubusercontent.com/Pricesswg/DitherBox/main/packaging/homebrew/ditherbox.rb
-   git add Formula/ditherbox.rb
-   git commit -m "Add ditherbox"
-   git push
-   ```
-
-3. That is it. Anyone on macOS can now run:
-
-   ```sh
-   brew tap pricesswg/tap
-   brew install --HEAD pricesswg/tap/ditherbox
-   ```
-
-   `--HEAD` builds from the main branch. It is needed only because there is no
-   tagged release yet.
-
-### When you tag a release
-
-Once there is a `v0.1.0` tag, the formula can install a fixed version instead
-of the moving branch, which is what most people want.
+Once, to set the tap up:
 
 ```sh
 # in the DitherBox repo
-git tag v0.1.0
-git push origin v0.1.0
+npm run release -- 0.1.0 --tag
+```
 
-# get the checksum of the tarball GitHub generates for the tag
+Then copy `ditherbox.rb` into a public repo of yours named `homebrew-tap`,
+under `Formula/`, and push. From that moment anyone on a Mac can run:
+
+```sh
+brew tap pricesswg/tap
+brew install pricesswg/tap/ditherbox
+```
+
+The rest of this file explains each of those steps and what can go wrong.
+
+## 1. Tag a version
+
+Homebrew installs a fixed version, not a moving branch, so there has to be a
+tag and the formula has to carry the fingerprint of exactly that tag's
+tarball. `npm run release` does the whole thing:
+
+```sh
+npm run release -- 0.1.0 --tag
+```
+
+It refuses to run on a dirty tree or off `main`, sets the version in
+`package.json` and in `src/cli/main.js` so `ditherbox --version` does not lie,
+rebuilds `dist/`, runs the tests, creates and pushes the tag, downloads the
+tarball GitHub generates for it, writes `url`, `sha256` and `version` into the
+formula, and then downloads the tarball a second time to check that what
+landed in the file really matches. A wrong fingerprint is invisible until
+somebody tries to install and Homebrew refuses the download, which is a bad
+place to find out.
+
+Without `--tag` it does everything except touching git, which is the way to
+see what it would do.
+
+### If the download fails
+
+Two things produce the same 404 and it is worth knowing which you have: the
+tag genuinely is not there yet, or the network will not fetch it. Some
+corporate proxies return 404 for every `github.com/.../archive/...` path even
+when the tag exists, so the script names both possibilities rather than
+guessing.
+
+There are two ways round it. If the package is published on npm, use that
+tarball instead, which is immutable and served from a different host:
+
+```sh
+npm run release -- 0.1.0 --from-npm
+```
+
+Otherwise compute the fingerprint by hand and paste it into the `sha256` line:
+
+```sh
 curl -sL https://github.com/Pricesswg/DitherBox/archive/refs/tags/v0.1.0.tar.gz | shasum -a 256
 ```
 
-Then in `Formula/ditherbox.rb`, uncomment the `url` and `sha256` lines and
-paste the checksum in. From that moment `brew install pricesswg/tap/ditherbox`
-works without `--HEAD`, and upgrading is a matter of bumping the tag and the
-checksum.
+## 2. Create the tap
 
-### Checking the formula before pushing it
+A tap is nothing more than a public GitHub repo whose name starts with
+`homebrew-`. Homebrew looks inside it for a `Formula` folder. The name after
+the dash is what people type, so `homebrew-tap` becomes `pricesswg/tap`.
 
 ```sh
-brew install --build-from-source --HEAD ./ditherbox.rb
+# create a public repo called homebrew-tap, then:
+git clone https://github.com/Pricesswg/homebrew-tap.git
+cd homebrew-tap
+mkdir -p Formula
+cp ../DitherBox/packaging/homebrew/ditherbox.rb Formula/ditherbox.rb
+git add Formula/ditherbox.rb
+git commit -m "ditherbox 0.1.0"
+git push
+```
+
+That is the whole tap. There is no registration, no review, nothing to wait
+for.
+
+## 3. Check it before telling anyone
+
+On a Mac, from inside the tap:
+
+```sh
+brew install --build-from-source ./Formula/ditherbox.rb
 brew test ditherbox
 brew audit --strict --new ditherbox
 ```
 
-## Homebrew's own catalogue (later, if ever)
+`brew test` runs the block at the bottom of the formula. It does not just
+print the help: it decodes a sixteen-pixel PNG embedded in the formula itself,
+runs it through the Game Boy palette with Atkinson, and checks that a real PNG
+comes out the other end. A package that installs and then falls over on the
+first actual job would be caught here.
 
-Getting into `homebrew-core`, so that plain `brew install ditherbox` works with
-no tap at all, is a different thing. They will not take a package unless the
-project has a real following behind it: their rule of thumb is something like
-seventy-five stars, forks or watchers, plus a stable release history and no
-duplicate of something already packaged.
+`brew audit` is the one that finds the small stuff: a description that starts
+with an article, a trailing full stop, files landing outside the prefix. Some
+of its rules are already checked by `npm test` in `test/packaging.test.js`, so
+most of the surprises are gone before you get here.
 
-There is also a rule that matters here: `homebrew-core` does not accept
-formulae that are just a wrapper around an npm package. The argument they make
-is that `npm install -g` already does that job. A tap has no such rule, which
-is the other reason to stay on one.
+## Later versions
 
-So: tap now, catalogue only if the thing takes off.
+```sh
+npm run release -- 0.2.0 --tag
+cd ../homebrew-tap
+cp ../DitherBox/packaging/homebrew/ditherbox.rb Formula/ditherbox.rb
+git commit -am "ditherbox 0.2.0"
+git push
+```
+
+Anyone who already installed it gets the new one with `brew upgrade`.
+
+## What the formula does
+
+```ruby
+system "npm", "install", *std_npm_args
+bin.install_symlink Dir["#{libexec}/bin/*"]
+```
+
+Those two lines are the standard shape for a Node program in Homebrew. The
+package and its dependencies go inside `libexec`, and only a symlink goes in
+`bin`, so nothing scatters into the Homebrew prefix. `depends_on "node"` means
+Homebrew installs Node itself if the machine has not got it, which is the
+whole reason to prefer this over `npm install -g` for someone who does not
+otherwise want Node around.
+
+The two dependencies, `jpeg-js` and `pngjs`, are pure JavaScript. There is
+nothing to compile, no native module, no build toolchain.
+
+## Why not plain `brew install ditherbox`
+
+That would mean getting into `homebrew-core`, Homebrew's own catalogue, and
+they will not take this. Their rules on what is acceptable rule out software
+that is already installable through a language's own package manager, which
+covers anything that is an npm package underneath, and separately they ask for
+a project with a real following rather than one its author has just submitted.
+
+A tap has neither rule. The cost to whoever installs is one extra `brew tap`
+line, once.
