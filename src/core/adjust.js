@@ -215,22 +215,50 @@ export function cropFrame(width, height, ratio) {
   return { width, height };
 }
 
-/**
- * Ritaglio centrato al rapporto `ratio` (larghezza / altezza).
- * Quello che avanza si perde: e' la cosa che ci si aspetta chiedendo 16:9.
- */
-export function cropToAspect(img, ratio) {
-  const { width: w, height: h } = cropFrame(img.width, img.height, ratio);
-  if (w === img.width && h === img.height) return cloneImage(img);
+/** Porta un cursore 0..100 nella frazione 0..1, difendendosi dai valori strani. */
+const quota = (v) => Math.min(100, Math.max(0, Number.isFinite(v) ? v : 50)) / 100;
 
-  const x0 = Math.floor((img.width - w) / 2);
-  const y0 = Math.floor((img.height - h) / 2);
+/**
+ * Il rettangolo selezionato dentro l'immagine.
+ *
+ * `ratio` sono le proporzioni volute, `zoom` quanto occupa del piu' grande
+ * rettangolo di quelle proporzioni che ci sta dentro, `alignX` e `alignY`
+ * dove si appoggia: 0 a un bordo, 100 all'altro.
+ *
+ * A zoom 100 il rettangolo tocca gia' due lati e su quell'asse non c'e'
+ * margine: e' il motivo per cui una posizione sola non bastava. Rimpicciolito,
+ * il margine c'e' su tutti e due, e servono due cursori.
+ *
+ * Unica fonte della geometria: la usano il motore, il conto delle misure e la
+ * cornice che la TUI disegna. Tre conti separati che devono coincidere si
+ * scostano al primo cambiamento, e la cornice mostrerebbe un ritaglio mentre
+ * il file ne contiene un altro.
+ */
+export function selectionFrame(width, height, {
+  ratio, zoom = 100, alignX = 50, alignY = 50,
+} = {}) {
+  const massimo = cropFrame(width, height, ratio || width / height);
+  const f = Math.min(100, Math.max(1, Number.isFinite(zoom) ? zoom : 100)) / 100;
+  const w = Math.min(width, Math.max(1, Math.round(massimo.width * f)));
+  const h = Math.min(height, Math.max(1, Math.round(massimo.height * f)));
+  return {
+    x: Math.round((width - w) * quota(alignX)),
+    y: Math.round((height - h) * quota(alignY)),
+    width: w,
+    height: h,
+  };
+}
+
+/** Ritaglia il rettangolo dato. Quello che resta fuori si perde. */
+export function cropRect(img, rect) {
+  const { x, y, width: w, height: h } = rect;
+  if (x === 0 && y === 0 && w === img.width && h === img.height) return cloneImage(img);
   const out = createImage(w, h);
   // Una riga per volta: sono contigue in memoria, quindi si copiano in blocco
   // invece che pixel per pixel.
-  for (let y = 0; y < h; y++) {
-    const da = ((y + y0) * img.width + x0) * 4;
-    out.data.set(img.data.subarray(da, da + w * 4), y * w * 4);
+  for (let riga = 0; riga < h; riga++) {
+    const da = ((riga + y) * img.width + x) * 4;
+    out.data.set(img.data.subarray(da, da + w * 4), riga * w * 4);
   }
   return out;
 }
@@ -242,7 +270,7 @@ export function cropToAspect(img, ratio) {
  * bande aggiunte prima verrebbero ditherate anche loro, e bande di un colore
  * qualsiasi introdurrebbero nel file una tinta che la tavolozza non ammette.
  */
-export function padToAspect(img, ratio, colour) {
+export function padToAspect(img, ratio, colour, alignX = 50, alignY = 50) {
   const frame = padFrame(img.width, img.height, ratio);
   if (frame.width === img.width && frame.height === img.height) return cloneImage(img);
 
@@ -254,8 +282,10 @@ export function padToAspect(img, ratio, colour) {
     out.data[i + 2] = b;
     out.data[i + 3] = 255;
   }
-  const x0 = Math.floor((frame.width - img.width) / 2);
-  const y0 = Math.floor((frame.height - img.height) / 2);
+  // Le bande obbediscono agli stessi cursori: a 0 la fotografia si appoggia
+  // a un bordo e la banda va tutta dall'altra parte.
+  const x0 = Math.round((frame.width - img.width) * quota(alignX));
+  const y0 = Math.round((frame.height - img.height) * quota(alignY));
   for (let y = 0; y < img.height; y++) {
     const da = y * img.width * 4;
     out.data.set(

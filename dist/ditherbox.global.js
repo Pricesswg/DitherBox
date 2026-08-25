@@ -736,22 +736,50 @@ function cropFrame(width, height, ratio) {
   return { width, height };
 }
 
-/**
- * Ritaglio centrato al rapporto `ratio` (larghezza / altezza).
- * Quello che avanza si perde: e' la cosa che ci si aspetta chiedendo 16:9.
- */
-function cropToAspect(img, ratio) {
-  const { width: w, height: h } = cropFrame(img.width, img.height, ratio);
-  if (w === img.width && h === img.height) return cloneImage(img);
+/** Porta un cursore 0..100 nella frazione 0..1, difendendosi dai valori strani. */
+const quota = (v) => Math.min(100, Math.max(0, Number.isFinite(v) ? v : 50)) / 100;
 
-  const x0 = Math.floor((img.width - w) / 2);
-  const y0 = Math.floor((img.height - h) / 2);
+/**
+ * Il rettangolo selezionato dentro l'immagine.
+ *
+ * `ratio` sono le proporzioni volute, `zoom` quanto occupa del piu' grande
+ * rettangolo di quelle proporzioni che ci sta dentro, `alignX` e `alignY`
+ * dove si appoggia: 0 a un bordo, 100 all'altro.
+ *
+ * A zoom 100 il rettangolo tocca gia' due lati e su quell'asse non c'e'
+ * margine: e' il motivo per cui una posizione sola non bastava. Rimpicciolito,
+ * il margine c'e' su tutti e due, e servono due cursori.
+ *
+ * Unica fonte della geometria: la usano il motore, il conto delle misure e la
+ * cornice che la TUI disegna. Tre conti separati che devono coincidere si
+ * scostano al primo cambiamento, e la cornice mostrerebbe un ritaglio mentre
+ * il file ne contiene un altro.
+ */
+function selectionFrame(width, height, {
+  ratio, zoom = 100, alignX = 50, alignY = 50,
+} = {}) {
+  const massimo = cropFrame(width, height, ratio || width / height);
+  const f = Math.min(100, Math.max(1, Number.isFinite(zoom) ? zoom : 100)) / 100;
+  const w = Math.min(width, Math.max(1, Math.round(massimo.width * f)));
+  const h = Math.min(height, Math.max(1, Math.round(massimo.height * f)));
+  return {
+    x: Math.round((width - w) * quota(alignX)),
+    y: Math.round((height - h) * quota(alignY)),
+    width: w,
+    height: h,
+  };
+}
+
+/** Ritaglia il rettangolo dato. Quello che resta fuori si perde. */
+function cropRect(img, rect) {
+  const { x, y, width: w, height: h } = rect;
+  if (x === 0 && y === 0 && w === img.width && h === img.height) return cloneImage(img);
   const out = createImage(w, h);
   // Una riga per volta: sono contigue in memoria, quindi si copiano in blocco
   // invece che pixel per pixel.
-  for (let y = 0; y < h; y++) {
-    const da = ((y + y0) * img.width + x0) * 4;
-    out.data.set(img.data.subarray(da, da + w * 4), y * w * 4);
+  for (let riga = 0; riga < h; riga++) {
+    const da = ((riga + y) * img.width + x) * 4;
+    out.data.set(img.data.subarray(da, da + w * 4), riga * w * 4);
   }
   return out;
 }
@@ -763,7 +791,7 @@ function cropToAspect(img, ratio) {
  * bande aggiunte prima verrebbero ditherate anche loro, e bande di un colore
  * qualsiasi introdurrebbero nel file una tinta che la tavolozza non ammette.
  */
-function padToAspect(img, ratio, colour) {
+function padToAspect(img, ratio, colour, alignX = 50, alignY = 50) {
   const frame = padFrame(img.width, img.height, ratio);
   if (frame.width === img.width && frame.height === img.height) return cloneImage(img);
 
@@ -775,8 +803,10 @@ function padToAspect(img, ratio, colour) {
     out.data[i + 2] = b;
     out.data[i + 3] = 255;
   }
-  const x0 = Math.floor((frame.width - img.width) / 2);
-  const y0 = Math.floor((frame.height - img.height) / 2);
+  // Le bande obbediscono agli stessi cursori: a 0 la fotografia si appoggia
+  // a un bordo e la banda va tutta dall'altra parte.
+  const x0 = Math.round((frame.width - img.width) * quota(alignX));
+  const y0 = Math.round((frame.height - img.height) * quota(alignY));
   for (let y = 0; y < img.height; y++) {
     const da = y * img.width * 4;
     out.data.set(
@@ -807,7 +837,7 @@ function lumaHistogram(img, bins = 16) {
   return Array.from(out, (v) => v / max);
 }
 
-  return { LUMA_B, LUMA_G, LUMA_R, applyAdjustments, cloneImage, createImage, cropFrame, cropToAspect, downscaleByFactor, fitWithin, luma, lumaHistogram, padFrame, padToAspect, resampleBox, sharpen, upscaleByFactor };
+  return { LUMA_B, LUMA_G, LUMA_R, applyAdjustments, cloneImage, createImage, cropFrame, cropRect, downscaleByFactor, fitWithin, luma, lumaHistogram, padFrame, padToAspect, resampleBox, selectionFrame, sharpen, upscaleByFactor };
 })();
 
 const __m_src_core_dither_js = (() => {
@@ -1175,6 +1205,12 @@ const en = {
   'param.fit.hint': 'What to do with whatever does not fit the ratio',
   'param.fit.value.crop': 'Crop',
   'param.fit.value.pad': 'Bars',
+  'param.zoom.label': 'Zoom',
+  'param.zoom.hint': 'Size of the crop rectangle: 100 is the largest that fits, less zooms in',
+  'param.alignX.label': 'Offset X',
+  'param.alignX.hint': 'Moves the crop rectangle sideways, when there is room to move it',
+  'param.alignY.label': 'Offset Y',
+  'param.alignY.hint': 'Moves the crop rectangle up and down, when there is room to move it',
   'param.megapixels.label': 'Megapixels',
   'param.megapixels.hint': 'Output resolution: lower it to coarsen the photo on purpose',
   'param.upscale.label': 'Upscale',
@@ -1420,6 +1456,12 @@ const it = {
   'param.fit.hint': 'Che fare di quello che nel rapporto non entra',
   'param.fit.value.crop': 'Ritaglia',
   'param.fit.value.pad': 'Bande',
+  'param.zoom.label': 'Zoom',
+  'param.zoom.hint': 'Quanto è grande il rettangolo di ritaglio: 100 è il più grande che ci stia, sotto ingrandisce',
+  'param.alignX.label': 'Posizione X',
+  'param.alignX.hint': 'Sposta il rettangolo di ritaglio in orizzontale, quando c’è margine',
+  'param.alignY.label': 'Posizione Y',
+  'param.alignY.hint': 'Sposta il rettangolo di ritaglio in verticale, quando c’è margine',
   'param.megapixels.label': 'Megapixel',
   'param.megapixels.hint': 'Risoluzione del risultato: abbassala per sgranare di proposito la foto',
   'param.upscale.label': 'Ingrandisci',
@@ -1641,6 +1683,12 @@ const es = {
   'param.fit.hint': 'Qué hacer con lo que no cabe en la relación',
   'param.fit.value.crop': 'Recortar',
   'param.fit.value.pad': 'Bandas',
+  'param.zoom.label': 'Zoom',
+  'param.zoom.hint': 'Tamaño del rectángulo de recorte: 100 es el mayor que cabe, menos amplía',
+  'param.alignX.label': 'Posición X',
+  'param.alignX.hint': 'Mueve el rectángulo de recorte en horizontal, cuando hay margen',
+  'param.alignY.label': 'Posición Y',
+  'param.alignY.hint': 'Mueve el rectángulo de recorte en vertical, cuando hay margen',
   'param.megapixels.label': 'Megapíxeles',
   'param.megapixels.hint': 'Resolución del resultado: bájala para pixelar la foto a propósito',
   'param.upscale.label': 'Ampliar',
@@ -1860,6 +1908,12 @@ const fr = {
   'param.fit.hint': 'Que faire de ce qui ne rentre pas dans le format',
   'param.fit.value.crop': 'Rogner',
   'param.fit.value.pad': 'Bandes',
+  'param.zoom.label': 'Zoom',
+  'param.zoom.hint': 'Taille du rectangle de recadrage : 100 est le plus grand possible, moins agrandit',
+  'param.alignX.label': 'Position X',
+  'param.alignX.hint': 'Déplace le rectangle de recadrage horizontalement, quand il y a de la marge',
+  'param.alignY.label': 'Position Y',
+  'param.alignY.hint': 'Déplace le rectangle de recadrage verticalement, quand il y a de la marge',
   'param.megapixels.label': 'Mégapixels',
   'param.megapixels.hint': 'Résolution du résultat : baissez-la pour pixeliser la photo exprès',
   'param.upscale.label': 'Agrandir',
@@ -2079,6 +2133,12 @@ const de = {
   'param.fit.hint': 'Was mit dem geschieht, was nicht ins Format passt',
   'param.fit.value.crop': 'Beschneiden',
   'param.fit.value.pad': 'Balken',
+  'param.zoom.label': 'Zoom',
+  'param.zoom.hint': 'Größe des Ausschnitts: 100 ist der größte, der hineinpasst, weniger vergrößert',
+  'param.alignX.label': 'Position X',
+  'param.alignX.hint': 'Verschiebt den Ausschnitt waagerecht, wenn Spielraum da ist',
+  'param.alignY.label': 'Position Y',
+  'param.alignY.hint': 'Verschiebt den Ausschnitt senkrecht, wenn Spielraum da ist',
   'param.megapixels.label': 'Megapixel',
   'param.megapixels.hint': 'Auflösung des Ergebnisses: absenken, um das Foto absichtlich zu vergröbern',
   'param.upscale.label': 'Vergrößern',
@@ -2650,6 +2710,36 @@ const PARAMS = [
     default: 'crop',
   },
   {
+    key: 'zoom',
+    group: 'output',
+    type: 'range',
+    min: 10,
+    max: 100,
+    step: 5,
+    default: 100,
+    unit: '%',
+  },
+  {
+    key: 'alignX',
+    group: 'output',
+    type: 'range',
+    min: 0,
+    max: 100,
+    step: 5,
+    default: 50,
+    unit: '%',
+  },
+  {
+    key: 'alignY',
+    group: 'output',
+    type: 'range',
+    min: 0,
+    max: 100,
+    step: 5,
+    default: 50,
+    unit: '%',
+  },
+  {
     key: 'megapixels',
     group: 'output',
     type: 'range',
@@ -2988,7 +3078,7 @@ function applyPreset(name, base = DEFAULTS) {
 })();
 
 const __m_src_core_process_js = (() => {
-  const { applyAdjustments, sharpen, downscaleByFactor, upscaleByFactor, resampleBox, cloneImage, cropToAspect, padToAspect, cropFrame, padFrame, luma } = __m_src_core_adjust_js;
+  const { applyAdjustments, sharpen, downscaleByFactor, upscaleByFactor, resampleBox, cloneImage, selectionFrame, cropRect, padToAspect, padFrame, luma } = __m_src_core_adjust_js;
   const { buildQuantizer, ditherImage } = __m_src_core_dither_js;
   const { paletteInfo } = __m_src_core_palettes_js;
   const { normalizeOptions, aspectRatio } = __m_src_core_options_js;
@@ -3016,7 +3106,16 @@ function processImage(source, rawOptions = {}) {
   const ratio = aspectRatio(options.aspect);
   const ritaglia = ratio !== null && options.fit === 'crop';
   const bande = ratio !== null && options.fit === 'pad';
-  const inquadrata = ritaglia ? cropToAspect(source, ratio) : source;
+  // La selezione prende le proporzioni del rapporto quando si ritaglia e
+  // quelle della foto quando si mettono le bande, cosi' zoom e posizioni
+  // hanno un senso in tutti e due i casi.
+  const sel = selectionFrame(source.width, source.height, {
+    ratio: ritaglia ? ratio : null,
+    zoom: options.zoom,
+    alignX: options.alignX,
+    alignY: options.alignY,
+  });
+  const inquadrata = cropRect(source, sel);
 
   // 1. Riduzione alla risoluzione richiesta. E' anche il motivo per cui le
   //    foto da fotocamera non fanno arrancare l'interfaccia: si lavora su
@@ -3056,7 +3155,9 @@ function processImage(source, rawOptions = {}) {
 
   // 6. Le bande, dell'unico colore che si puo' usare senza mentire: uno
   //    di quelli della tavolozza.
-  if (bande) image = padToAspect(image, ratio, coloreBanda(colors));
+  if (bande) {
+    image = padToAspect(image, ratio, coloreBanda(colors), options.alignX, options.alignY);
+  }
 
   return {
     image,
@@ -3085,9 +3186,13 @@ function exportSize(width, height, rawOptions = {}) {
   const ritaglia = ratio !== null && options.fit === 'crop';
   const bande = ratio !== null && options.fit === 'pad';
 
-  let { width: w, height: h } = ritaglia
-    ? cropFrame(width, height, ratio)
-    : { width, height };
+  const sel = selectionFrame(width, height, {
+    ratio: ritaglia ? ratio : null,
+    zoom: options.zoom,
+    alignX: options.alignX,
+    alignY: options.alignY,
+  });
+  let { width: w, height: h } = sel;
 
   const frame = bande ? padFrame(w, h, ratio) : { width: w, height: h };
   const { scale } = targetSize(frame.width, frame.height, options.megapixels);
@@ -4204,7 +4309,7 @@ global.DitherBox = Object.assign(__m_src_web_ditherbox_js.DitherBox, {
   createImage: __m_src_core_index_js.createImage,
   createTranslator: __m_src_core_index_js.createTranslator,
   cropFrame: __m_src_core_index_js.cropFrame,
-  cropToAspect: __m_src_core_index_js.cropToAspect,
+  cropRect: __m_src_core_index_js.cropRect,
   detectLocale: __m_src_core_index_js.detectLocale,
   ditherImage: __m_src_core_index_js.ditherImage,
   downscaleByFactor: __m_src_core_index_js.downscaleByFactor,
@@ -4237,6 +4342,7 @@ global.DitherBox = Object.assign(__m_src_web_ditherbox_js.DitherBox, {
   resampleBox: __m_src_core_index_js.resampleBox,
   resolvePalette: __m_src_core_index_js.resolvePalette,
   rgbToHex: __m_src_core_index_js.rgbToHex,
+  selectionFrame: __m_src_core_index_js.selectionFrame,
   sharpen: __m_src_core_index_js.sharpen,
   stepBy: __m_src_core_index_js.stepBy,
   stepIndex: __m_src_core_index_js.stepIndex,

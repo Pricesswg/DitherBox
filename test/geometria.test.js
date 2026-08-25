@@ -113,3 +113,98 @@ test('senza rapporto la pipeline resta quella di prima', () => {
   assert.equal(senza.image.height, esplicito.image.height);
   assert.deepEqual([...senza.image.data], [...esplicito.image.data]);
 });
+
+/**
+ * Un'immagine con un segno riconoscibile in un angolo: serve a dire quale
+ * parte e' sopravvissuta al ritaglio, che le sole misure non raccontano.
+ */
+function conSegno(w, h, sx, sy, lato = 20) {
+  const img = sampleImage(w, h);
+  for (let y = sy; y < sy + lato; y++) {
+    for (let x = sx; x < sx + lato; x++) {
+      const i = (y * w + x) * 4;
+      img.data[i] = 255; img.data[i + 1] = 0; img.data[i + 2] = 0; img.data[i + 3] = 255;
+    }
+  }
+  return img;
+}
+
+const contiene = (img, [r, g, b]) => {
+  for (let i = 0; i < img.data.length; i += 4) {
+    if (img.data[i] === r && img.data[i + 1] === g && img.data[i + 2] === b) return true;
+  }
+  return false;
+};
+
+test('le posizioni spostano davvero il ritaglio, non solo il numero', () => {
+  // Larga 400 e alta 200: chiedendo 1:1 il taglio e' orizzontale, e resta
+  // un margine di 200 pixel su cui scorrere.
+  const sinistra = conSegno(400, 200, 5, 90);
+  const destra = conSegno(400, 200, 375, 90);
+  const rosso = [255, 0, 0];
+  const opzioni = (alignX) => ({
+    palette: 'bit8', algorithm: 'bayer2', aspect: '1:1', fit: 'crop', alignX, megapixels: 24,
+  });
+
+  assert.ok(contiene(processImage(sinistra, opzioni(0)).image, rosso),
+    'a 0 il ritaglio deve prendere il bordo sinistro');
+  assert.ok(!contiene(processImage(sinistra, opzioni(100)).image, rosso),
+    'a 100 il bordo sinistro deve restare fuori');
+
+  assert.ok(contiene(processImage(destra, opzioni(100)).image, rosso),
+    'a 100 il ritaglio deve prendere il bordo destro');
+  assert.ok(!contiene(processImage(destra, opzioni(0)).image, rosso),
+    'a 0 il bordo destro deve restare fuori');
+
+  assert.ok(!contiene(processImage(sinistra, opzioni(50)).image, rosso));
+  assert.ok(!contiene(processImage(destra, opzioni(50)).image, rosso));
+});
+
+/**
+ * A zoom 100 il rettangolo tocca gia' due lati e su quell'asse non si muove:
+ * e' il motivo per cui una posizione sola non basta. Rimpicciolito, il
+ * margine c'e' su tutti e due, e i due cursori devono lavorare davvero.
+ */
+test('rimpicciolita la selezione, tutte e due le posizioni si muovono', () => {
+  const rosso = [255, 0, 0];
+  const alto = conSegno(300, 300, 140, 5);
+  const basso = conSegno(300, 300, 140, 275);
+  const opzioni = (alignY) => ({
+    palette: 'bit8', algorithm: 'bayer2', aspect: '1:1', fit: 'crop',
+    zoom: 50, alignY, megapixels: 24,
+  });
+
+  assert.ok(contiene(processImage(alto, opzioni(0)).image, rosso), 'a 0 deve prendere in alto');
+  assert.ok(!contiene(processImage(alto, opzioni(100)).image, rosso));
+  assert.ok(contiene(processImage(basso, opzioni(100)).image, rosso), 'a 100 deve prendere in basso');
+  assert.ok(!contiene(processImage(basso, opzioni(0)).image, rosso));
+
+  // Su un'immagine quadrata portata a 1:1, a zoom 100 in verticale non c'e'
+  // margine: la posizione non puo' cambiare niente, ed e' giusto cosi'.
+  const pieno = (alignY) => processImage(alto, {
+    palette: 'bit8', algorithm: 'bayer2', aspect: '1:1', fit: 'crop', zoom: 100, alignY,
+  }).image;
+  assert.deepEqual([...pieno(0).data], [...pieno(100).data]);
+});
+
+test('lo zoom rimpicciolisce la selezione, le posizioni no', () => {
+  for (const fit of ['crop', 'pad']) {
+    const misure = [0, 25, 50, 75, 100].map((v) => {
+      const a = exportSize(400, 200, { aspect: '1:1', fit, alignX: v, alignY: v });
+      return `${a.width}x${a.height}`;
+    });
+    assert.equal(new Set(misure).size, 1, `${fit}: le misure cambiano con la posizione: ${misure}`);
+
+    const pieno = exportSize(400, 200, { aspect: '1:1', fit, zoom: 100 });
+    const meta = exportSize(400, 200, { aspect: '1:1', fit, zoom: 50 });
+    assert.ok(meta.width < pieno.width, `${fit}: lo zoom non ha rimpicciolito niente`);
+  }
+});
+
+/** Senza rapporto lo zoom resta un ritaglio a proporzioni invariate. */
+test('lo zoom funziona anche senza un rapporto scelto', () => {
+  const img = sampleImage(400, 200);
+  const { image } = processImage(img, { aspect: 'source', zoom: 50, megapixels: 24 });
+  assert.equal(image.width, 200);
+  assert.equal(image.height, 100);
+});

@@ -15,7 +15,7 @@ import {
   usefulStepCeiling, effectiveMegapixels,
   groupLabel, paramLabel, presetLabel, enumLabel,
   processImage, exportSize, resampleBox, isCustomPalette,
-  aspectRatio, cropFrame,
+  aspectRatio, selectionFrame,
   createTranslator, normalizeLocale, LOCALES, LOCALE_NAMES,
 } from '../core/index.js';
 
@@ -985,23 +985,37 @@ export class DitherTui {
     return result;
   }
 
-  /** Vero quando la cornice ha davvero qualcosa da mostrare. */
+  /**
+   * Vero quando la cornice ha qualcosa da mostrare: o le proporzioni non sono
+   * quelle della foto, o la selezione e' piu' piccola del massimo possibile.
+   */
   #guideActive() {
-    return this.guide !== 'off' && aspectRatio(this.options.aspect) !== null;
+    return this.guide !== 'off'
+      && (aspectRatio(this.options.aspect) !== null || this.options.zoom < 100);
   }
 
   /**
    * Il rettangolo da sovrapporre, in pixel dell'immagine d'anteprima.
    *
-   * Col ritaglio l'anteprima e' la foto intera e la cornice segna quello che
-   * sopravvive; con le bande l'anteprima e' gia' inquadrata e la cornice
-   * segna dove finisce la fotografia e cominciano le bande.
+   * Col ritaglio l'anteprima e' la foto intera e la cornice e' la selezione,
+   * calcolata con la stessa funzione che usa il motore. Con le bande la
+   * selezione il motore l'ha gia' applicata, e quello che resta da segnare e'
+   * dove finisce la fotografia e cominciano le bande.
    */
   #guideRect(uscita, mostrata) {
     if (!this.#guideActive()) return null;
     const dentro = this.options.fit === 'crop'
-      ? cropFrame(uscita.width, uscita.height, aspectRatio(this.options.aspect))
-      : cropFrame(uscita.width, uscita.height, this.source.width / this.source.height);
+      ? selectionFrame(uscita.width, uscita.height, {
+        ratio: aspectRatio(this.options.aspect),
+        zoom: this.options.zoom,
+        alignX: this.options.alignX,
+        alignY: this.options.alignY,
+      })
+      : selectionFrame(uscita.width, uscita.height, {
+        ratio: this.source.width / this.source.height,
+        alignX: this.options.alignX,
+        alignY: this.options.alignY,
+      });
 
     // Il rettangolo si calcola sull'immagine d'uscita e poi si porta su
     // quella mostrata, che non ha le stesse proporzioni: cellTarget la
@@ -1012,8 +1026,8 @@ export class DitherTui {
     const sx = mostrata.width / uscita.width;
     const sy = mostrata.height / uscita.height;
     return {
-      x: Math.round(((uscita.width - dentro.width) / 2) * sx),
-      y: Math.round(((uscita.height - dentro.height) / 2) * sy),
+      x: Math.round(dentro.x * sx),
+      y: Math.round(dentro.y * sy),
       width: Math.max(1, Math.round(dentro.width * sx)),
       height: Math.max(1, Math.round(dentro.height * sy)),
     };
@@ -1051,7 +1065,7 @@ export class DitherTui {
     // intera: una cornice disegnata sull'immagine gia' ritagliata cadrebbe
     // esattamente sul bordo, e non direbbe niente a nessuno.
     const opzioni = this.#guideActive() && this.options.fit === 'crop'
-      ? { ...this.options, aspect: 'source' }
+      ? { ...this.options, aspect: 'source', zoom: 100 }
       : this.options;
 
     const propri = effectiveMegapixels(

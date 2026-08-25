@@ -652,3 +652,69 @@ test('la versione mostrata e quella che il programma dichiara', async (t) => {
   const riga = senzaColori(frame[frame.length - 1]);
   assert.ok(riga.includes(`ditherbox ${VERSION}`), `riga: ${riga}`);
 });
+
+/** L'ingombro della cornice nel frame, in celle. */
+function riquadro(frame) {
+  const celle = corniceCelle(frame);
+  const xs = celle.map((c) => c.x);
+  const ys = celle.map((c) => c.y);
+  return {
+    n: celle.length,
+    x: Math.min(...xs),
+    y: Math.min(...ys),
+    w: Math.max(...xs) - Math.min(...xs) + 1,
+    h: Math.max(...ys) - Math.min(...ys) + 1,
+  };
+}
+
+/**
+ * I tre comandi del ritaglio devono muovere il rettangolo che si vede, non
+ * solo il file che si salva: e' il rettangolo che dice all'utente dove sta
+ * tagliando, e se resta fermo i cursori sono ciechi.
+ */
+test('zoom e le due posizioni muovono la cornice sullo schermo', async (t) => {
+  const dir = tempDir(t);
+  const path = await writeSample(dir, 'foto.png', 900, 900);
+  const { tui, render } = await mountTui(
+    DitherTui, { width: 120, height: 40, path, dir, mode: 'halfblock' },
+  );
+  const con = (opzioni) => {
+    tui.options = { ...tui.options, aspect: '1:1', fit: 'crop', ...opzioni };
+    tui.guide = 'red';
+    tui.cache = null;
+    return riquadro(render());
+  };
+
+  const pieno = con({ zoom: 100 });
+  const meta = con({ zoom: 50 });
+  assert.ok(meta.w < pieno.w && meta.h < pieno.h,
+    `lo zoom non rimpicciolisce: ${meta.w}x${meta.h} contro ${pieno.w}x${pieno.h}`);
+
+  // Rimpicciolita la selezione c'e' margine su tutti e due gli assi.
+  const aSinistra = con({ zoom: 50, alignX: 0 });
+  const aDestra = con({ zoom: 50, alignX: 100 });
+  assert.ok(aDestra.x > aSinistra.x, `X non si muove: ${aSinistra.x} e ${aDestra.x}`);
+
+  const inAlto = con({ zoom: 50, alignY: 0 });
+  const inBasso = con({ zoom: 50, alignY: 100 });
+  assert.ok(inBasso.y > inAlto.y, `Y non si muove: ${inAlto.y} e ${inBasso.y}`);
+});
+
+/**
+ * Senza rapporto la cornice compariva solo se si sceglieva un rapporto.
+ * Con lo zoom un ritaglio c'e' lo stesso, e va mostrato.
+ */
+test('la cornice compare anche col solo zoom, senza rapporto scelto', async (t) => {
+  const dir = tempDir(t);
+  const path = await writeSample(dir, 'foto.png', 900, 600);
+  const { tui, render } = await mountTui(DitherTui, { width: 110, height: 34, path, dir });
+
+  tui.options = { ...tui.options, aspect: 'source', zoom: 100 };
+  tui.guide = 'red';
+  tui.cache = null;
+  assert.deepEqual(corniceCelle(render()), [], 'a zoom pieno non c e niente da segnare');
+
+  tui.options = { ...tui.options, zoom: 60 };
+  tui.cache = null;
+  assert.ok(corniceCelle(render()).length > 8, 'col solo zoom la cornice deve comparire');
+});

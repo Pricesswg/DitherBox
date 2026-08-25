@@ -214,7 +214,13 @@ file. So a fine dither looks smooth in the preview because it will look smooth
 in the file as well. To see the texture, raise **Pixel** or lower
 **Megapixels**, and it appears in both at once.
 
-When **Aspect** asks for a ratio the photo has not got, `c` draws a framing
+The crop is a rectangle you place yourself: **Zoom** sets how big it is,
+**Offset X** and **Offset Y** where it sits. At zoom 100 the rectangle already
+touches two sides and cannot move along that axis, which is why the size
+control comes first: shrink it and both offsets come alive.
+
+Whenever there is a crop to show, whether because **Aspect** asks for a ratio
+the photo has not got or because **Zoom** is below 100, `c` draws a framing
 guide over the preview in one of five bright colours, red by default. With
 **Fit** on crop the preview goes back to showing the whole photo, dimmed
 outside the guide, so you can see what you are about to lose: drawn over the
@@ -292,7 +298,8 @@ ditherbox --help
 Every engine parameter has its own option: `--palette`, `--algorithm`,
 `--scale`, `--strength`, `--bias`, `--noise`, `--serpentine`, `--brightness`,
 `--contrast`, `--gamma`, `--saturation`, `--sharpen`, `--invert`,
-`--aspect`, `--fit`, `--megapixels`, `--upscale`. Switches are turned off by
+`--aspect`, `--fit`, `--zoom`, `--align-x`, `--align-y`, `--megapixels`,
+`--upscale`. Switches are turned off by
 prefixing `--no-`.
 
 `-l, --lang <code>` picks the language of the messages. Without it the CLI
@@ -352,6 +359,8 @@ background.
 | **Invert** | on/off | Swaps light and dark |
 | **Aspect** | 9 ratios | Frames the result: 1:1, 5:4, 4:3, 3:2, 16:10, 16:9, 21:9, 4:5, 9:16, or as the photo |
 | **Fit** | crop/bars | What happens to what the ratio leaves out: cut it away, or add bars in a palette colour |
+| **Zoom** | 10 to 100% | Size of the crop rectangle: 100 is the largest that fits, less zooms in |
+| **Offset X**, **Offset Y** | 0 to 100% | Move the crop rectangle, when there is room to move it |
 | **Megapixels** | 0.01 to 24 MP | Resolution of the result: lower it to ruin the photo on purpose |
 | **Upscale** | on/off | Brings the result back to the original size with crisp pixels |
 

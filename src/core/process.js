@@ -4,7 +4,7 @@
 
 import {
   applyAdjustments, sharpen, downscaleByFactor, upscaleByFactor,
-  resampleBox, cloneImage, cropToAspect, padToAspect, cropFrame, padFrame, luma,
+  resampleBox, cloneImage, selectionFrame, cropRect, padToAspect, padFrame, luma,
 } from './adjust.js';
 import { buildQuantizer, ditherImage } from './dither.js';
 import { paletteInfo } from './palettes.js';
@@ -25,7 +25,16 @@ export function processImage(source, rawOptions = {}) {
   const ratio = aspectRatio(options.aspect);
   const ritaglia = ratio !== null && options.fit === 'crop';
   const bande = ratio !== null && options.fit === 'pad';
-  const inquadrata = ritaglia ? cropToAspect(source, ratio) : source;
+  // La selezione prende le proporzioni del rapporto quando si ritaglia e
+  // quelle della foto quando si mettono le bande, cosi' zoom e posizioni
+  // hanno un senso in tutti e due i casi.
+  const sel = selectionFrame(source.width, source.height, {
+    ratio: ritaglia ? ratio : null,
+    zoom: options.zoom,
+    alignX: options.alignX,
+    alignY: options.alignY,
+  });
+  const inquadrata = cropRect(source, sel);
 
   // 1. Riduzione alla risoluzione richiesta. E' anche il motivo per cui le
   //    foto da fotocamera non fanno arrancare l'interfaccia: si lavora su
@@ -65,7 +74,9 @@ export function processImage(source, rawOptions = {}) {
 
   // 6. Le bande, dell'unico colore che si puo' usare senza mentire: uno
   //    di quelli della tavolozza.
-  if (bande) image = padToAspect(image, ratio, coloreBanda(colors));
+  if (bande) {
+    image = padToAspect(image, ratio, coloreBanda(colors), options.alignX, options.alignY);
+  }
 
   return {
     image,
@@ -94,9 +105,13 @@ export function exportSize(width, height, rawOptions = {}) {
   const ritaglia = ratio !== null && options.fit === 'crop';
   const bande = ratio !== null && options.fit === 'pad';
 
-  let { width: w, height: h } = ritaglia
-    ? cropFrame(width, height, ratio)
-    : { width, height };
+  const sel = selectionFrame(width, height, {
+    ratio: ritaglia ? ratio : null,
+    zoom: options.zoom,
+    alignX: options.alignX,
+    alignY: options.alignY,
+  });
+  let { width: w, height: h } = sel;
 
   const frame = bande ? padFrame(w, h, ratio) : { width: w, height: h };
   const { scale } = targetSize(frame.width, frame.height, options.megapixels);
