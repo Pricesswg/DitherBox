@@ -103,6 +103,8 @@ export class DitherTui {
     // e da' molto piu' dettaglio dove il font lo regge.
     this.previewMode = opts.mode || config.mode || 'halfblock';
     this.oneToOne = false;
+    this.panX = 50;
+    this.panY = 50;
     this.guide = opts.guide || config.guide || 'red';
     if (!GUIDE_KEYS.includes(this.guide)) this.guide = 'red';
     if (!MODES[this.previewMode]) this.previewMode = 'braille';
@@ -283,6 +285,7 @@ export class DitherTui {
     if (name === '?' || (ctrl && name === 'k')) return this.#openHelp();
     if (name === '1') {
       this.oneToOne = !this.oneToOne;
+      if (!this.oneToOne && this.focus === 'preview') this.focus = 'controls';
       this.cache = null;
       this.#say(this.tr(this.oneToOne ? 'tui.oneToOneOn' : 'tui.oneToOneOff'), 'accent');
       return this.render();
@@ -319,14 +322,35 @@ export class DitherTui {
     if (name === 'i') return this.#setOption('invert', !this.options.invert);
 
     if (name === 'tab' || name === 'shifttab') {
-      if (this.showFiles && this.files.length) {
-        this.focus = this.focus === 'controls' ? 'files' : 'controls';
-      }
+      // L'anteprima entra nel giro solo a 1:1, che e' l'unico caso in cui
+      // ci sia qualcosa da fare standoci sopra: spostare la finestra.
+      const giro = ['controls'];
+      if (this.oneToOne) giro.push('preview');
+      if (this.showFiles && this.files.length) giro.push('files');
+      const i = Math.max(0, giro.indexOf(this.focus));
+      const passo = name === 'shifttab' ? -1 : 1;
+      this.focus = giro[(i + passo + giro.length) % giro.length];
       return this.render();
     }
 
     if (name === 'n' && !ctrl) return this.#step(1);
     if (name === 'N') return this.#step(-1);
+
+    if (this.focus === 'preview') {
+      const passo = shift ? 25 : 5;
+      switch (name) {
+        case 'up': case 'k': return this.#pan(0, -passo);
+        case 'down': case 'j': return this.#pan(0, passo);
+        case 'left': case 'h': return this.#pan(-passo, 0);
+        case 'right': case 'l': return this.#pan(passo, 0);
+        case 'H': return this.#pan(-25, 0);
+        case 'L': return this.#pan(25, 0);
+        case 'home': case 'g': return this.#panTo(0, 0);
+        case 'end': case 'G': return this.#panTo(100, 100);
+        default: break;
+      }
+      return undefined;
+    }
 
     const big = shift ? 5 : 1;
     switch (name) {
@@ -343,6 +367,24 @@ export class DitherTui {
       case 'enter': case 'space': return this.#activate();
       default: break;
     }
+  }
+
+  /**
+   * Sposta la finestra a 1:1 sul file, in percentuale della corsa
+   * disponibile: 0 a un bordo, 100 all'altro. In percentuale e non in pixel
+   * perche' la corsa cambia con la misura del riquadro e con quella del file,
+   * e un passo in pixel su un file piccolo lo attraverserebbe tutto.
+   */
+  #pan(dx, dy) {
+    return this.#panTo(this.panX + dx, this.panY + dy);
+  }
+
+  #panTo(x, y) {
+    const stretto = (v) => Math.min(100, Math.max(0, v));
+    this.panX = stretto(x);
+    this.panY = stretto(y);
+    this.cache = null;
+    return this.render();
   }
 
   /**
@@ -466,6 +508,7 @@ export class DitherTui {
       ['g  G  home  end', 'ends'],
       ['v', 'mode'],
       ['1', 'oneToOne'],
+      ['tab  jk h l', 'pan'],
       ['c', 'guide'],
       ['t', 'theme'],
       ['p', 'preset'],
@@ -965,7 +1008,8 @@ export class DitherTui {
     if (!this.source) return null;
     if (cols === undefined) return this.cache ? this.cache.result : null;
 
-    const key = `${cols}x${rows}|${this.previewMode}|${this.guide}|${this.oneToOne}`
+    const key = `${cols}x${rows}|${this.previewMode}|${this.guide}`
+      + `|${this.oneToOne}|${this.panX},${this.panY}`
       + `|${this.imagePath}|${JSON.stringify(this.options)}`;
     if (this.cache && this.cache.key === key) return this.cache.result;
 
@@ -1023,8 +1067,8 @@ export class DitherTui {
     const w = Math.min(img.width, Math.max(m.cx, cols * m.cx));
     const h = Math.min(img.height, Math.max(m.cy, rows * m.cy));
     return cropRect(img, {
-      x: Math.floor((img.width - w) / 2),
-      y: Math.floor((img.height - h) / 2),
+      x: Math.round((img.width - w) * (this.panX / 100)),
+      y: Math.round((img.height - h) * (this.panY / 100)),
       width: w,
       height: h,
     });
@@ -1197,13 +1241,14 @@ export class DitherTui {
       for (const line of picture) body.push(center(line, inner));
     }
 
+    const active = this.focus === 'preview';
     return panel({
       title: this.tr('tui.preview'),
       lines: body,
       width: W,
       height: H,
-      color: fg(t.fg),
-      titleColor: fg(t.fg),
+      color: fg(active ? t.accent : t.fg),
+      titleColor: fg(active ? t.accent : t.fg),
     });
   }
 
@@ -1329,24 +1374,43 @@ export class DitherTui {
     });
   }
 
+  /**
+   * La riga dei tasti in fondo.
+   *
+   * Prima era una lista fissa tagliata a misura, e tagliare da destra si
+   * portava via per prime le due voci che servono di piu' a chi e' in
+   * difficolta': i tasti e l'uscita. Ora le voci si lasciano cadere dal
+   * fondo finche' la riga non ci sta, e quelle due restano sempre.
+   */
   #helpBar(W) {
     const t = this.theme;
-    const pairs = [
-      ['jk', 'move'], ['hl', 'adjust'], ['tab', 'focus'],
-      ['v', 'preview'], ['p', 'preset'], ['t', 'theme'],
-      ['s', 'save'], ['?', 'keys'], ['q', 'quit'],
-    ].map(([k, id]) => [k, this.tr(`bar.${id}`)]);
-    const text = pairs
-      .map(([k, d]) => `${fg(t.accent)}${k}${RESET}${fg(t.fg)} ${d}${RESET}`)
+    // Col fuoco sull'anteprima gli stessi tasti spostano invece di regolare,
+    // e la riga deve dirlo, altrimenti si preme h e non succede quello che
+    // c'e' scritto.
+    const voci = this.focus === 'preview'
+      ? [['jk hl', 'pan'], ['tab', 'focus'], ['1', 'oneToOne'], ['v', 'preview']]
+      : [
+        ['jk', 'move'], ['hl', 'adjust'], ['tab', 'focus'],
+        ['1', 'oneToOne'], ['v', 'preview'], ['c', 'guide'],
+        ['p', 'preset'], ['t', 'theme'], ['ctrl+l', 'lang'], ['s', 'save'],
+      ];
+    const sempre = [['?', 'keys'], ['q', 'quit']];
+
+    const disegna = (coppie) => coppie
+      .map(([k, id]) => `${fg(t.accent)}${k}${RESET}${fg(t.fg)} ${this.tr(`bar.${id}`)}${RESET}`)
       .join(`${fg(t.fg)}  ${RESET}`);
 
-    // La versione in fondo a destra, e solo se avanza spazio: su un
-    // terminale stretto i tasti servono piu' di lei, e non deve essere lei
-    // a far tagliare "q esci".
+    // La versione sta a destra e solo se avanza spazio: i tasti valgono
+    // piu' di lei.
     const versione = `${fg(t.fg)}${DIM}ditherbox ${VERSION}${RESET}`;
-    const spazio = W - 2 - visibleLength(text) - visibleLength(versione);
-    if (spazio >= 2) return ` ${text}${' '.repeat(spazio)}${versione} `;
-    return ` ${truncate(text, W - 2)}`;
+    for (let n = voci.length; n >= 0; n--) {
+      const riga = disegna([...voci.slice(0, n), ...sempre]);
+      const largo = visibleLength(riga);
+      const spazio = W - 2 - largo - visibleLength(versione);
+      if (spazio >= 2) return ` ${riga}${' '.repeat(spazio)}${versione} `;
+      if (largo <= W - 2) return ` ${riga}`;
+    }
+    return ` ${truncate(disegna(sempre), W - 2)}`;
   }
 
   /** Disegna un pannello sovrapposto al centro dello schermo. */

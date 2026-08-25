@@ -179,6 +179,7 @@ Arrow keys or vim keys, whichever your hands reach for first.
 | `g` `G` `home` `end` | Jump to the top / bottom |
 | `v` | Change preview mode |
 | `1` | Preview at 1:1, no reduction |
+| `tab` then `jk` `hl` | Move the 1:1 window over the file |
 | `c` | Colour of the framing guide, off included |
 | `t` | Pick the theme (live preview while you scroll) |
 | `p` | Apply a preset |
@@ -221,7 +222,10 @@ whole result into the panel averages the dots into flat tone, exactly as an
 image viewer does when you shrink the file to a thumbnail. `1` stops fitting
 and shows a window on the middle of the file at full resolution, one file
 pixel per sub-cell, nothing resampled. It is the view that answers what the
-texture will actually look like. Press it again to go back.
+texture will actually look like. Press it again to go back. `tab` puts the focus on the preview,
+and from there the usual keys move the window over the file instead of
+adjusting a parameter; the panel border lights up so you can see where the
+keys are going.
 
 In `halfblock` and `braille` the pixels are square on screen and the
 proportions are true. In `quadrant` and `ascii` a cell is not square, and

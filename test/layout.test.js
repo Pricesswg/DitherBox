@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve, dirname, join, extname, normalize } from 'node:path';
 
 import { loadImage } from '../src/cli/imageio.js';
+import { PARAMS } from '../src/core/index.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -88,7 +89,16 @@ async function apri() {
   if (!browser) return null;
   try {
     const { base } = await serviRadice();
-    const page = await browser.newPage({ viewportSize: { width: 1280, height: 900 } });
+    // La lingua si dichiara, non si eredita. Il widget la sceglie da
+    // `navigator.language`, e senza fissarla questi confronti su testo
+    // inglese passavano su una macchina in inglese e fallivano su una in
+    // italiano. E' lo stesso difetto che teneva fermo `npm run release`
+    // in test/cli.test.js, e qui e' rimasto nascosto piu' a lungo perche'
+    // senza browser questi test saltano invece di fallire.
+    const page = await browser.newPage({
+      viewportSize: { width: 1280, height: 900 },
+      locale: 'en-US',
+    });
     const errori = [];
     page.on('pageerror', (e) => errori.push(e.message));
     page.on('console', (m) => { if (m.type() === 'error') errori.push(m.text()); });
@@ -426,4 +436,54 @@ test('il cursore dei megapixel si ferma alla misura della foto', async (t) => {
   // Una foto piu' grande riapre la corsa.
   assert.ok(grande.max > piccola.max, `il tetto non si e alzato: ${piccola.max} -> ${grande.max}`);
   assert.deepEqual(errori, []);
+});
+
+/**
+ * La regola del progetto dice che un parametro dichiarato una volta compare
+ * in tutte e tre le interfacce da solo. Nel terminale si vede subito; nel
+ * widget nessuno se ne accorge finche' qualcuno non apre la pagina, e questi
+ * test per molto tempo sono saltati. Qui il conto si fa davvero.
+ */
+test('il widget costruisce un controllo per ogni parametro dichiarato', async (t) => {
+  const sessione = await apri();
+  if (!sessione) return t.skip('Chromium non disponibile');
+  const { browser, page } = sessione;
+  t.after(() => browser.close());
+
+  const mancanti = await page.evaluate((chiavi) => chiavi.filter(
+    (k) => !document.querySelector(`.dbx [data-param="${k}"]`),
+  ), PARAMS.map((p) => p.key));
+
+  assert.deepEqual(mancanti, [], `parametri senza controllo nel widget: ${mancanti}`);
+});
+
+test('inquadratura e ritaglio funzionano anche nel widget', async (t) => {
+  const sessione = await apri();
+  if (!sessione) return t.skip('Chromium non disponibile');
+  const { browser, page } = sessione;
+  t.after(() => browser.close());
+
+  await caricaFoto(page, 1200, 900);
+
+  const misura = async (opzioni) => page.evaluate(async (o) => {
+    window.__boxes[0].set(o);
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const c = document.querySelector('.dbx__canvas');
+    return { w: c.width, h: c.height };
+  }, opzioni);
+
+  const intera = await misura({ aspect: 'source', fit: 'crop', zoom: 100, megapixels: 2 });
+  assert.ok(Math.abs(intera.w / intera.h - 1200 / 900) < 0.05, 'di partenza deve essere 4:3');
+
+  const quadrata = await misura({ aspect: '1:1' });
+  assert.ok(Math.abs(quadrata.w / quadrata.h - 1) < 0.05,
+    `1:1 non ha inquadrato: ${quadrata.w}x${quadrata.h}`);
+
+  const conBande = await misura({ aspect: '1:1', fit: 'pad' });
+  assert.ok(Math.abs(conBande.w / conBande.h - 1) < 0.05,
+    `le bande non hanno inquadrato: ${conBande.w}x${conBande.h}`);
+  assert.ok(conBande.w > quadrata.w, 'con le bande il fotogramma non si accorcia');
+
+  const stretta = await misura({ aspect: '1:1', fit: 'crop', zoom: 50 });
+  assert.ok(stretta.w < quadrata.w, `lo zoom non ha rimpicciolito: ${stretta.w}`);
 });

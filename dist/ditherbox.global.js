@@ -1352,6 +1352,11 @@ const en = {
   'tui.oneToOneOn': '1:1 preview: a window on the file at full resolution',
   'tui.oneToOneOff': 'Fitted preview: the whole result, reduced',
   'key.oneToOne': 'Preview at 1:1, no reduction',
+  'bar.oneToOne': '1:1',
+  'bar.guide': 'guide',
+  'bar.lang': 'lang',
+  'bar.pan': 'pan',
+  'key.pan': 'Move the 1:1 window: tab onto the preview, then the same keys',
   'tui.themeSet': 'Theme: {name}',
   'tui.presetSet': 'Preset: {name}',
   'tui.languageSet': 'Language: {name}',
@@ -1582,6 +1587,11 @@ const it = {
   'tui.oneToOneOn': 'Anteprima 1:1: una finestra sul file a risoluzione vera',
   'tui.oneToOneOff': 'Anteprima adattata: tutto il risultato, rimpicciolito',
   'key.oneToOne': 'Anteprima a 1:1, senza riduzione',
+  'bar.oneToOne': '1:1',
+  'bar.guide': 'cornice',
+  'bar.lang': 'lingua',
+  'bar.pan': 'sposta',
+  'key.pan': 'Sposta la finestra 1:1: tab sull’anteprima, poi gli stessi tasti',
   'tui.themeSet': 'Tema: {name}',
   'tui.presetSet': 'Preset: {name}',
   'tui.languageSet': 'Lingua: {name}',
@@ -1810,6 +1820,11 @@ const es = {
   'tui.oneToOneOn': 'Vista 1:1: una ventana al archivo a resolución real',
   'tui.oneToOneOff': 'Vista ajustada: todo el resultado, reducido',
   'key.oneToOne': 'Vista previa a 1:1, sin reducción',
+  'bar.oneToOne': '1:1',
+  'bar.guide': 'encuadre',
+  'bar.lang': 'idioma',
+  'bar.pan': 'mover',
+  'key.pan': 'Mueve la ventana 1:1: tab sobre la vista, luego las mismas teclas',
   'tui.themeSet': 'Tema: {name}',
   'tui.presetSet': 'Ajuste: {name}',
   'tui.languageSet': 'Idioma: {name}',
@@ -2038,6 +2053,11 @@ const fr = {
   'tui.oneToOneOn': 'Aperçu 1:1 : une fenêtre sur le fichier en pleine résolution',
   'tui.oneToOneOff': 'Aperçu ajusté : tout le résultat, réduit',
   'key.oneToOne': 'Aperçu à 1:1, sans réduction',
+  'bar.oneToOne': '1:1',
+  'bar.guide': 'cadre',
+  'bar.lang': 'langue',
+  'bar.pan': 'déplacer',
+  'key.pan': 'Déplace la fenêtre 1:1 : tab sur l’aperçu, puis les mêmes touches',
   'tui.themeSet': 'Thème : {name}',
   'tui.presetSet': 'Préréglage : {name}',
   'tui.languageSet': 'Langue : {name}',
@@ -2266,6 +2286,11 @@ const de = {
   'tui.oneToOneOn': '1:1-Vorschau: ein Fenster auf die Datei in voller Auflösung',
   'tui.oneToOneOff': 'Angepasste Vorschau: das ganze Ergebnis, verkleinert',
   'key.oneToOne': 'Vorschau in 1:1, ohne Verkleinerung',
+  'bar.oneToOne': '1:1',
+  'bar.guide': 'Rahmen',
+  'bar.lang': 'Sprache',
+  'bar.pan': 'schieben',
+  'key.pan': 'Verschiebt das 1:1-Fenster: mit tab zur Vorschau, dann dieselben Tasten',
   'tui.themeSet': 'Thema: {name}',
   'tui.presetSet': 'Vorlage: {name}',
   'tui.languageSet': 'Sprache: {name}',
@@ -3812,6 +3837,9 @@ class DitherBox {
   #buildPaletteChips() {
     const t = this.t;
     const wrap = el('div', 'dbx__palettes');
+    // La palette ha il suo selettore a campioni invece del controllo
+    // generico, ma resta un parametro come gli altri e si marca uguale.
+    wrap.dataset.param = 'palette';
     this.paletteButtons = new Map();
 
     const aggiungi = (key, label, colors) => {
@@ -3922,6 +3950,10 @@ class DitherBox {
     const t = this.t;
     const id = `dbx-${param.key}-${Math.random().toString(36).slice(2, 7)}`;
     const wrap = el('div', `dbx__control dbx__control--${param.type}`);
+    // Il nome del parametro anche nel DOM: serve a chi vuole dare stile a un
+    // controllo preciso dalla pagina che ospita il widget, e serve ai test
+    // per contare i controlli senza frugare dentro l'oggetto.
+    wrap.dataset.param = param.key;
     const label = el('label', 'dbx__label', { for: id, text: paramLabel(param, t) });
     const hint = paramHint(param, t);
     if (hint) label.title = hint;

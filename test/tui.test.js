@@ -638,9 +638,12 @@ test('la versione si vede in fondo, e su uno schermo stretto cede il posto', asy
     return senzaColori(frame[frame.length - 1]);
   };
 
-  const larga = await ultima(110);
+  // Abbastanza larga da tenere tutte le voci e ancora la versione: quando
+  // le due cose non ci stanno insieme e' la versione a cedere, ed e' quello
+  // che verifica la seconda meta' del test.
+  const larga = await ultima(150);
   assert.match(larga, /ditherbox \d+\.\d+\.\d+\s*$/, 'versione assente sullo schermo largo');
-  assert.ok(larga.length <= 110);
+  assert.ok(larga.length <= 150);
 
   const stretta = await ultima(60);
   assert.ok(stretta.length <= 60, `riga lunga ${stretta.length} su 60`);
@@ -650,7 +653,7 @@ test('la versione si vede in fondo, e su uno schermo stretto cede il posto', asy
 test('la versione mostrata e quella che il programma dichiara', async (t) => {
   const dir = tempDir(t);
   const path = await writeSample(dir, 'foto.png', 400, 300);
-  const { render } = await mountTui(DitherTui, { width: 110, height: 26, path, dir });
+  const { render } = await mountTui(DitherTui, { width: 150, height: 26, path, dir });
   const frame = render();
   const riga = senzaColori(frame[frame.length - 1]);
   assert.ok(riga.includes(`ditherbox ${VERSION}`), `riga: ${riga}`);
@@ -831,4 +834,85 @@ test('a 1:1 la cornice non si disegna', async (t) => {
   tui.oneToOne = true;
   tui.cache = null;
   assert.deepEqual(corniceCelle(render()), []);
+});
+
+test('il fuoco arriva sull anteprima solo quando c e la 1:1', async (t) => {
+  const dir = tempDir(t);
+  const path = await writeSample(dir, 'foto.png', 800, 600);
+  const { tui } = await mountTui(DitherTui, { width: 100, height: 30, path, dir });
+
+  assert.equal(tui.focus, 'controls');
+  press(tui, '\t');
+  assert.equal(tui.focus, 'controls', 'senza 1:1 non c e dove andare');
+
+  press(tui, '1');
+  press(tui, '\t');
+  assert.equal(tui.focus, 'preview');
+  press(tui, '\t');
+  assert.equal(tui.focus, 'controls', 'il giro deve chiudersi');
+
+  // Spegnendo la 1:1 mentre ci si sta sopra, il fuoco non deve restare
+  // su un pannello che non fa piu' niente.
+  press(tui, '\t');
+  assert.equal(tui.focus, 'preview');
+  press(tui, '1');
+  assert.equal(tui.focus, 'controls');
+});
+
+test('col fuoco sull anteprima i tasti spostano la finestra', async (t) => {
+  const dir = tempDir(t);
+  const path = await writeSample(dir, 'foto.png', 1200, 900);
+  const { tui, render } = await mountTui(
+    DitherTui, { width: 90, height: 26, path, dir, mode: 'ascii' },
+  );
+  tui.options = { ...tui.options, palette: 'bw', algorithm: 'atkinson', megapixels: 0.5 };
+  press(tui, '1');
+  press(tui, '\t');
+  assert.equal(tui.focus, 'preview');
+
+  const disegno = () => testo(render());
+  const centro = disegno();
+  assert.equal(tui.panX, 50);
+
+  press(tui, 'h');
+  assert.equal(tui.panX, 45, 'h deve spostare a sinistra, non regolare un parametro');
+  press(tui, 'j');
+  assert.equal(tui.panY, 55);
+
+  press(tui, 'g');
+  assert.deepEqual([tui.panX, tui.panY], [0, 0], 'home porta a un angolo');
+  const angolo = disegno();
+  assert.notEqual(angolo, centro, 'spostando, il disegno deve cambiare');
+
+  press(tui, 'G');
+  assert.deepEqual([tui.panX, tui.panY], [100, 100]);
+  assert.notEqual(disegno(), angolo);
+
+  // Lo spostamento non deve toccare i parametri.
+  assert.equal(tui.options.megapixels, 0.5);
+});
+
+/**
+ * Tagliare la riga da destra si portava via per prime le due voci che
+ * servono di piu' a chi e' in difficolta': i tasti e l'uscita.
+ */
+test('la barra lascia cadere le voci dal fondo, mai tasti e uscita', async (t) => {
+  const dir = tempDir(t);
+  const path = await writeSample(dir, 'foto.png', 400, 300);
+  for (const width of [130, 110, 90, 70, 50, 40]) {
+    const { render } = await mountTui(DitherTui, { width, height: 26, path, dir });
+    const frame = render();
+    const riga = senzaColori(frame[frame.length - 1]);
+    assert.ok(riga.length <= width, `${width}: riga lunga ${riga.length}`);
+    assert.match(riga, /\? keys/, `${width}: sono spariti i tasti`);
+    assert.match(riga, /q quit/, `${width}: e sparita l uscita`);
+  }
+});
+
+test('la barra dice come si cambia lingua, quando c e spazio', async (t) => {
+  const dir = tempDir(t);
+  const path = await writeSample(dir, 'foto.png', 400, 300);
+  const { render } = await mountTui(DitherTui, { width: 130, height: 26, path, dir });
+  const frame = render();
+  assert.match(senzaColori(frame[frame.length - 1]), /ctrl\+l lang/);
 });

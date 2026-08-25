@@ -545,6 +545,9 @@ export class DitherBox {
   #buildPaletteChips() {
     const t = this.t;
     const wrap = el('div', 'dbx__palettes');
+    // La palette ha il suo selettore a campioni invece del controllo
+    // generico, ma resta un parametro come gli altri e si marca uguale.
+    wrap.dataset.param = 'palette';
     this.paletteButtons = new Map();
 
     const aggiungi = (key, label, colors) => {
@@ -655,6 +658,10 @@ export class DitherBox {
     const t = this.t;
     const id = `dbx-${param.key}-${Math.random().toString(36).slice(2, 7)}`;
     const wrap = el('div', `dbx__control dbx__control--${param.type}`);
+    // Il nome del parametro anche nel DOM: serve a chi vuole dare stile a un
+    // controllo preciso dalla pagina che ospita il widget, e serve ai test
+    // per contare i controlli senza frugare dentro l'oggetto.
+    wrap.dataset.param = param.key;
     const label = el('label', 'dbx__label', { for: id, text: paramLabel(param, t) });
     const hint = paramHint(param, t);
     if (hint) label.title = hint;
