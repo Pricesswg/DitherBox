@@ -3,6 +3,40 @@
 Homebrew does not know about DitherBox, and it will not until someone tells
 it. This folder holds the formula and the steps.
 
+## Where these commands run
+
+In the ordinary macOS Terminal, from inside a local clone of this
+repository. Nothing else: no special shell, no container.
+
+From nothing, on a Mac:
+
+```sh
+brew install node                 # if node --version says nothing
+
+mkdir -p ~/progetti && cd ~/progetti
+git clone https://github.com/Pricesswg/DitherBox.git
+cd DitherBox
+npm install --omit=dev            # two packages, nothing to compile
+```
+
+`--omit=dev` skips Playwright, which is only there for the browser layout
+checks. Without it `npm test` runs 118 tests and skips the 7 that need a
+browser, which is all `npm run release` requires. Leave the flag off if you
+want to run those too, and expect a browser download.
+
+The tap wants to sit **next to** this repo, because that is where
+`--push-tap` looks for it:
+
+```
+~/progetti/
+  DitherBox/        <- you run the commands here
+  homebrew-tap/     <- --push-tap writes here
+```
+
+One npm quirk worth knowing: the `--` in `npm run release -- 0.1.0` is what
+makes npm pass `0.1.0` through to the script instead of eating it. Without it
+the script sees no version and falls back to whatever is in `package.json`.
+
 ## The short version
 
 Once, to set the tap up:
