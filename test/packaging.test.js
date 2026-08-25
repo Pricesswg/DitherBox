@@ -152,3 +152,54 @@ test('repoGitHub legge owner e repo, e protesta se non e GitHub', () => {
     /non e un indirizzo GitHub/,
   );
 });
+
+test('aggiornaTap copia la formula, committa e spinge', async (t) => {
+  const { aggiornaTap } = await import('../scripts/release.js');
+  const { mkdtempSync, writeFileSync: scrivi, readFileSync: leggi, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const esegui = promisify(execFile);
+
+  const base = mkdtempSync(join(tmpdir(), 'tap-'));
+  t.after(() => rmSync(base, { recursive: true, force: true }));
+
+  // Un "remoto" vero ma locale, cosi' il push si puo' provare davvero
+  // invece di fidarsi che funzioni.
+  const remoto = join(base, 'remoto.git');
+  const tap = join(base, 'homebrew-tap');
+  await esegui('git', ['init', '--bare', '-b', 'main', remoto]);
+  await esegui('git', ['clone', remoto, tap]);
+  const nelTap = (...a) => esegui('git', a, { cwd: tap });
+  await nelTap('config', 'user.email', 'prova@esempio.invalid');
+  await nelTap('config', 'user.name', 'Prova');
+  scrivi(join(tap, 'README.md'), '# tap\n');
+  await nelTap('add', '-A');
+  await nelTap('commit', '-m', 'primo');
+  await nelTap('push', '-u', 'origin', 'main');
+
+  const finta = join(base, 'ditherbox.rb');
+  scrivi(finta, 'class Ditherbox < Formula\n  version "9.9.9"\nend\n');
+
+  aggiornaTap(tap, '9.9.9', finta);
+
+  // La formula e' arrivata dove deve, con il contenuto giusto.
+  assert.match(leggi(join(tap, 'Formula', 'ditherbox.rb'), 'utf8'), /9\.9\.9/);
+
+  // E soprattutto e' arrivata nel remoto: e quello che vede chi installa.
+  const { stdout } = await esegui('git', ['show', 'main:Formula/ditherbox.rb'], { cwd: remoto });
+  assert.match(stdout, /version "9\.9\.9"/, 'la formula non e stata spinta');
+  const { stdout: log } = await esegui('git', ['log', '-1', '--format=%s', 'main'], { cwd: remoto });
+  assert.equal(log.trim(), 'ditherbox 9.9.9');
+
+  // Rilanciarla senza cambiamenti non deve fare un commit vuoto.
+  aggiornaTap(tap, '9.9.9', finta);
+  const { stdout: quanti } = await esegui('git', ['rev-list', '--count', 'main'], { cwd: remoto });
+  assert.equal(quanti.trim(), '2', 'ha fatto un commit di troppo');
+});
+
+test('aggiornaTap dice dove clonare il tap se non lo trova', async () => {
+  const { aggiornaTap } = await import('../scripts/release.js');
+  assert.throws(
+    () => aggiornaTap('/percorso/che/non/esiste', '1.0.0'),
+    /non trovo il tap[\s\S]*git clone/,
+  );
+});

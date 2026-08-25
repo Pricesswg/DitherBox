@@ -106,17 +106,51 @@ with an article, a trailing full stop, files landing outside the prefix. Some
 of its rules are already checked by `npm test` in `test/packaging.test.js`, so
 most of the surprises are gone before you get here.
 
-## Later versions
+## Later versions, and who has to do what
+
+Worth being clear about this, because it is easy to get the wrong idea from
+the fact that a formula names one fixed version.
+
+Homebrew does not watch your tags. What it watches is the **tap**: `brew
+update` is a `git pull` on every tap, and `brew upgrade` then installs
+whatever is newer there than what is on the machine. So the update is
+automatic on the installing side and manual on yours. Until the formula in
+the tap is bumped, a new tag might as well not exist.
+
+Which makes bumping the tap the step that must not be forgotten, so it is
+part of the script:
 
 ```sh
-npm run release -- 0.2.0 --tag
-cd ../homebrew-tap
-cp ../DitherBox/packaging/homebrew/ditherbox.rb Formula/ditherbox.rb
-git commit -am "ditherbox 0.2.0"
-git push
+npm run release -- 0.2.0 --tag --push-tap
 ```
 
-Anyone who already installed it gets the new one with `brew upgrade`.
+That tags, updates the formula, copies it into `../homebrew-tap`, commits and
+pushes. It expects the tap cloned next to this repo, and says so if it is not
+there rather than cloning things behind your back. It will not make an empty
+commit if the formula has not changed.
+
+Anyone who already has it installed then gets the new version with:
+
+```sh
+brew update && brew upgrade ditherbox
+```
+
+The formula also carries a `livecheck` block, which is how you ask Homebrew
+whether you are behind without installing anything:
+
+```sh
+brew livecheck ditherbox
+```
+
+### Doing it from CI instead
+
+If you would rather the tap updated itself when you push a tag, a GitHub
+Actions workflow in this repo can do it: check out the tap with a personal
+access token that has write access to it, run
+`npm run release -- --formula-only --push-tap`, done. It needs one secret,
+which is the only reason it is not here already: a token with write access to
+another repo is worth deciding on deliberately rather than inheriting from a
+README.
 
 ## What the formula does
 

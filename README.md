@@ -130,6 +130,12 @@ somebody tries to install.
 
 The tap itself is a public repo called `homebrew-tap` with the formula in
 `Formula/`, and standing one up is a ten-minute job.
+
+Updates work the way they do for any Homebrew package, `brew update && brew
+upgrade`, but it is worth knowing where the moving part is: Homebrew watches
+the tap, not this repository's tags. A new tag reaches nobody until the
+formula in the tap is bumped, so `npm run release -- 0.2.0 --tag --push-tap`
+does that too.
 [`packaging/homebrew/README.md`](packaging/homebrew/README.md) has the exact
 commands, including what to do when a proxy refuses to serve GitHub tarballs.
 
@@ -321,7 +327,7 @@ background.
 
 | Parameter | Range | What it does |
 |---|---|---|
-| **Palette** | 18 palettes | The colours the result is allowed to use |
+| **Palette** | 26 palettes | The colours the result is allowed to use |
 | **Algorithm** | 19 algorithms | How the dots get distributed |
 | **Pixel** | 1 to 16 | Reduce before dithering: 1 is full detail, 8 is chunky 8-bit pixels |
 | **Strength** | 0 to 200% | How much of the error (or of the ordered noise) is applied |
@@ -452,7 +458,7 @@ npm run presets          # regenerate that sheet with your own photo
 git clone https://github.com/Pricesswg/DitherBox.git
 cd DitherBox
 npm install
-npm test          # 108 tests
+npm test          # 123 tests
 npm run build     # regenerate dist/
 npm run docs      # regenerate every image in this README
 npm run presets   # regenerate the preset sheet

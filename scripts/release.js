@@ -6,6 +6,11 @@
  *   npm run release -- 0.2.0 --tag       crea e spinge il tag
  *   npm run release -- --formula-only    rifa' solo la formula sul tag attuale
  *   npm run release -- 0.2.0 --from-npm  punta al pacchetto npm invece che al tag
+ *   npm run release -- 0.2.0 --tag --push-tap   e aggiorna anche il tap
+ *
+ * Il tap e' il pezzo che chi installa vede: `brew upgrade` prende quello
+ * che c'e' li' dentro, non i tag di questo repo. Finche' la formula nel
+ * tap resta indietro, la versione nuova non la vede nessuno.
  *
  * Perche' esiste: la formula deve portare l'impronta sha256 del tarball che
  * GitHub genera per quel tag. A mano si sbaglia, e l'errore non si vede
@@ -14,10 +19,10 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, copyFileSync, mkdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { resolve, dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { aggiornaFormula, urlTarball, urlNpm, repoGitHub } from './homebrew-formula.js';
 
@@ -28,6 +33,35 @@ const MAIN = join(ROOT, 'src', 'cli', 'main.js');
 
 const git = (...args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim();
 const dimmi = (s) => process.stdout.write(`${s}\n`);
+
+/**
+ * Copia la formula nel tap e la spinge.
+ *
+ * Il tap si cerca accanto a questo repo, che e' dove finisce clonandolo
+ * come dice il README. Non lo si clona da qui: se non c'e', si dice dove
+ * dovrebbe essere e ci si ferma, invece di scaricare roba di nascosto.
+ */
+export function aggiornaTap(percorso, versione, formula = FORMULA) {
+  if (!existsSync(percorso)) {
+    throw new Error(
+      `non trovo il tap in ${percorso}.\n`
+      + '  Clonalo li accanto:\n'
+      + `    git clone https://github.com/Pricesswg/homebrew-tap.git ${percorso}`,
+    );
+  }
+  const nelTap = (...args) => execFileSync('git', args, { cwd: percorso, encoding: 'utf8' }).trim();
+  mkdirSync(join(percorso, 'Formula'), { recursive: true });
+  copyFileSync(formula, join(percorso, 'Formula', 'ditherbox.rb'));
+
+  if (!nelTap('status', '--porcelain')) {
+    dimmi('il tap ha gia la formula aggiornata, niente da spingere');
+    return;
+  }
+  nelTap('add', 'Formula/ditherbox.rb');
+  nelTap('commit', '-m', `ditherbox ${versione}`);
+  nelTap('push');
+  dimmi(`tap aggiornato e spinto: chi ha gia installato ora prende ${versione} con brew upgrade`);
+}
 
 /** Scarica un tarball e ne restituisce impronta e misura. */
 async function impronta(url) {
@@ -136,19 +170,40 @@ async function main() {
   dimmi("ricontrollata: l'impronta nella formula corrisponde al tarball.\n");
 
   const tapNome = owner.toLowerCase();
-  dimmi(`Ora porta la formula nel tap:
+  const percorsoTap = resolve(ROOT, '..', 'homebrew-tap');
 
-  cp packaging/homebrew/ditherbox.rb ../homebrew-tap/Formula/ditherbox.rb
-  cd ../homebrew-tap && git commit -am "ditherbox ${nuova}" && git push
-
-e chi installa fara':
+  if (argv.includes('--push-tap')) {
+    aggiornaTap(percorsoTap, nuova);
+    dimmi(`
+Chi installa per la prima volta:
 
   brew tap ${tapNome}/tap
-  brew install ${tapNome}/tap/ditherbox`);
+  brew install ${tapNome}/tap/ditherbox
+
+Chi ce l'ha gia':
+
+  brew update && brew upgrade ditherbox`);
+    return;
+  }
+
+  dimmi(`Manca solo il tap, che e' quello che vede chi installa:
+
+  npm run release -- ${nuova} --formula-only --push-tap
+
+oppure a mano:
+
+  cp packaging/homebrew/ditherbox.rb ${percorsoTap}/Formula/ditherbox.rb
+  cd ${percorsoTap} && git commit -am "ditherbox ${nuova}" && git push`);
 }
 
+// Il corpo gira solo quando questo file e' il programma lanciato: cosi'
+// le sue funzioni si possono importare da un test senza che parta un
+// rilascio per sbaglio.
+const lanciatoDaRiga = process.argv[1]
+  && import.meta.url === pathToFileURL(process.argv[1]).href;
+
 try {
-  await main();
+  if (lanciatoDaRiga) await main();
 } catch (err) {
   // Un messaggio, non uno stack: chi lancia questo script vuole sapere che
   // cosa fare, non in che riga di quale file e' successo.

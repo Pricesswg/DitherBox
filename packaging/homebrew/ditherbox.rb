@@ -18,6 +18,14 @@ class Ditherbox < Formula
 
   head "https://github.com/Pricesswg/DitherBox.git", branch: "main"
 
+  # Insegna a Homebrew dove guardare per sapere se e' uscita una versione
+  # nuova. Senza, `brew livecheck ditherbox` non sa rispondere e gli
+  # strumenti che aggiornano le formule da soli non hanno appigli.
+  livecheck do
+    url :stable
+    strategy :github_latest
+  end
+
   depends_on "node"
 
   def install
