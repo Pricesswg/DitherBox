@@ -166,7 +166,7 @@ ${paramLines}
 
 CONFIGURATION
   ~/.config/ditherbox/config.toml     starting values, theme and language
-  ~/.config/ditherbox/themes/*.toml   personal themes (same schema as cliamp)
+  ~/.config/ditherbox/themes/*.toml   personal themes, six colours each
 
 CUSTOM PALETTES
   Instead of a name you can pass a list of colours:

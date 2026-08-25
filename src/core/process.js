@@ -17,7 +17,7 @@ import { normalizeOptions } from './options.js';
  */
 export function processImage(source, rawOptions = {}) {
   const options = normalizeOptions(rawOptions);
-  const { colors, ramp } = paletteInfo(options.palette);
+  const { colors, ramp, bits } = paletteInfo(options.palette);
 
   // 1. Riduzione alla risoluzione richiesta. E' anche il motivo per cui le
   //    foto da fotocamera non fanno arrancare l'interfaccia: si lavora su
@@ -35,7 +35,7 @@ export function processImage(source, rawOptions = {}) {
   const small = downscaleByFactor(img, options.scale);
 
   // 4. Dithering.
-  const quantizer = buildQuantizer(colors, ramp);
+  const quantizer = buildQuantizer(colors, ramp, bits);
   const dithered = ditherImage(small, {
     algorithm: options.algorithm,
     colors,

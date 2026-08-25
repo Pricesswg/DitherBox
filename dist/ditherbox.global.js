@@ -33,6 +33,30 @@ function grayRamp(levels) {
   return out;
 }
 
+/**
+ * Tutti i colori rappresentabili con `rb`, `gb`, `bb` bit per canale.
+ *
+ * E' cosi' che funzionava davvero l'hardware: non una tavolozza scelta a
+ * mano ma un troncamento. Il colore a 8 bit del PC (3 bit di rosso, 3 di
+ * verde, 2 di blu) e i nove bit del Mega Drive sono la stessa idea con
+ * numeri diversi, quindi si scrivono una volta sola.
+ *
+ * Ogni livello viene riportato su tutta la scala 0-255, se no il bianco
+ * non sarebbe bianco: con 3 bit i gradini sono 0, 36, 73 ... 255.
+ */
+function bitDepthPalette(rb, gb, bb) {
+  const scala = (v, bits) => Math.round((v * 255) / ((1 << bits) - 1));
+  const out = [];
+  for (let r = 0; r < (1 << rb); r++) {
+    for (let g = 0; g < (1 << gb); g++) {
+      for (let b = 0; b < (1 << bb); b++) {
+        out.push([scala(r, rb), scala(g, gb), scala(b, bb)]);
+      }
+    }
+  }
+  return out;
+}
+
 /** Monitor a fosfori: dal nero al colore del fosforo, `levels` gradini. */
 function phosphor(color, levels) {
   const [r, g, b] = hex(color);
@@ -119,6 +143,83 @@ const PALETTES = {
     ramp: true,
     colors: ['#04120a', '#0d3b1e', '#1f7a3d', '#3dff7a'].map(hex),
   },
+  // ------------------------------------------------- vecchie console e PC
+
+  // NES / Famicom. La tavolozza non e' RGB: il chip generava il colore
+  // modulando la portante NTSC, quindi ogni conversione in RGB e' una
+  // resa. Questa e' la piu' diffusa, con i quattro livelli di luminosita'
+  // per dodici tinte piu' i grigi.
+  nes: {
+    colors: [
+      '#7c7c7c', '#0000fc', '#0000bc', '#4428bc',
+      '#940084', '#a80020', '#a81000', '#881400',
+      '#503000', '#007800', '#006800', '#005800',
+      '#004058', '#000000',
+      '#bcbcbc', '#0078f8', '#0058f8', '#6844fc',
+      '#d800cc', '#e40058', '#f83800', '#e45c10',
+      '#ac7c00', '#00b800', '#00a800', '#00a844',
+      '#008888',
+      '#f8f8f8', '#3cbcfc', '#6888fc', '#9878f8',
+      '#f878f8', '#f85898', '#f87858', '#fca044',
+      '#f8b800', '#b8f818', '#58d854', '#58f898',
+      '#00e8d8', '#787878',
+      '#fcfcfc', '#a4e4fc', '#b8b8f8', '#d8b8f8',
+      '#f8b8f8', '#f8a4c0', '#f0d0b0', '#fce0a8',
+      '#f8d878', '#d8f878', '#b8f8b8', '#b8f8d8',
+      '#00fcfc', '#d8d8d8',
+    ].map(hex),
+  },
+
+  // IBM EGA, 1984: i sedici colori nati dal cavo digitale a sei fili,
+  // due bit per canale ma solo nelle combinazioni che il monitor accettava.
+  ega: {
+    colors: [
+      '#000000', '#0000aa', '#00aa00', '#00aaaa',
+      '#aa0000', '#aa00aa', '#aa5500', '#aaaaaa',
+      '#555555', '#5555ff', '#55ff55', '#55ffff',
+      '#ff5555', '#ff55ff', '#ffff55', '#ffffff',
+    ].map(hex),
+  },
+
+  // MSX1 e ColecoVision: il TMS9918 di Texas Instruments. Quindici colori
+  // piu' il trasparente, con quei tre verdi che si riconoscono a occhio.
+  msx: {
+    colors: [
+      '#000000', '#3eb849', '#74d07d', '#5955e0',
+      '#8076f1', '#b95e51', '#65dbef', '#db6559',
+      '#ff897d', '#ccc35e', '#ded087', '#3aa241',
+      '#b766b5', '#cccccc', '#ffffff',
+    ].map(hex),
+  },
+
+  // Teletext, Televideo, Ceefax: gli otto angoli del cubo RGB e nient'altro.
+  // Niente mezze tinte, per questo il dithering ci si vede tantissimo.
+  teletext: {
+    colors: [
+      '#000000', '#ff0000', '#00ff00', '#ffff00',
+      '#0000ff', '#ff00ff', '#00ffff', '#ffffff',
+    ].map(hex),
+  },
+
+  // Amiga Workbench 1.3: quattro colori e basta, ed erano il sistema
+  // operativo intero. Il blu e l'arancio insieme sono inconfondibili.
+  amigaWb: {
+    colors: ['#0055aa', '#000000', '#ffffff', '#ff8800'].map(hex),
+  },
+
+  // Virtual Boy: l'unico schermo che facesse solo rosso, in quattro livelli.
+  virtualBoy: { ramp: true, colors: phosphor('#e00000', 4) },
+
+  // Il vero colore a 8 bit: 3 bit di rosso, 3 di verde, 2 di blu. E' quello
+  // che davano le schede prima del colore reale, e il blu piu' povero degli
+  // altri e' voluto, non un errore: l'occhio ci vede meno.
+  bit8: { bits: [3, 3, 2] },
+
+  // Mega Drive / Genesis: nove bit, tre per canale, cioe' 512 colori.
+  // E' la ragione per cui i giochi Sega hanno quel colore un po' spento
+  // rispetto alle console coeve.
+  megadrive: { bits: [3, 3, 3] },
+
   risograph: {
     colors: ['#1d1a2e', '#0078bf', '#ff48b0', '#f5f1e6'].map(hex),
   },
@@ -127,6 +228,15 @@ const PALETTES = {
     colors: ['#0b2545', '#13315c', '#8da9c4', '#eef4ed'].map(hex),
   },
 };
+
+// Le palette dichiarate per profondita' di bit si materializzano subito.
+// Farlo alla prima richiesta sembrava un risparmio, ma lasciava
+// `entry.colors` a undefined per chiunque leggesse la tabella senza
+// passare da resolvePalette: `--list` moriva proprio li'. Sono 768 terne
+// in tutto, il risparmio non esisteva.
+for (const entry of Object.values(PALETTES)) {
+  if (!entry.colors && entry.bits) entry.colors = bitDepthPalette(...entry.bits);
+}
 
 const PALETTE_KEYS = Object.keys(PALETTES);
 
@@ -198,7 +308,10 @@ function paletteInfo(palette) {
     // che cercare il colore piu' vicino.
     ramp = isMonotoneRamp(colors);
   }
-  return { colors, ramp };
+  const bits = typeof palette === 'string' && PALETTES[palette]
+    ? PALETTES[palette].bits
+    : undefined;
+  return { colors, ramp, bits };
 }
 
 /**
@@ -228,7 +341,7 @@ function isMonotoneRamp(colors) {
   return true;
 }
 
-  return { PALETTES, PALETTE_KEYS, grayRamp, hexToRgb: hex, isCustomPalette, paletteInfo, parseCustomPalette, resolvePalette, rgbToHex, stringifyPalette };
+  return { PALETTES, PALETTE_KEYS, bitDepthPalette, grayRamp, hexToRgb: hex, isCustomPalette, paletteInfo, parseCustomPalette, resolvePalette, rgbToHex, stringifyPalette };
 })();
 
 const __m_src_core_matrices_js = (() => {
@@ -654,9 +767,35 @@ const clamp255 = (v) => (v < 0 ? 0 : v > 255 ? 255 : v);
  * `spread` e' la distanza media fra colori adiacenti: e' l'ampiezza naturale
  * del rumore ordinato, quella che riempie esattamente il buco fra due livelli.
  */
-function buildQuantizer(colors, ramp) {
+function buildQuantizer(colors, ramp, bits) {
   const n = colors.length;
   if (n < 2) throw new Error('La palette deve avere almeno due colori');
+
+  // Palette a profondita' di bit: l'indice si calcola, non si cerca.
+  // Con 256 o 512 colori la ricerca esaustiva costerebbe cara, e sarebbe
+  // anche sbagliata: su una griglia regolare il colore piu' vicino e'
+  // sempre quello che si ottiene troncando, non serve confrontarli tutti.
+  if (bits) {
+    const [rb, gb, bb] = bits;
+    const passo = (b) => 255 / ((1 << b) - 1);
+    // Si arrotonda al gradino piu' vicino invece di troncare: troncando,
+    // ogni valore scivolerebbe all'ingiu' e l'immagine uscirebbe piu'
+    // scura di mezzo gradino, che con due bit di blu si vede benissimo.
+    const quant = (v, b) => Math.min((1 << b) - 1, Math.round(clamp255(v) / passo(b)));
+    return {
+      ramp: false,
+      colors,
+      bits,
+      lumas: colors.map(([r, g, b]) => luma(r, g, b)),
+      // I gradini piu' fitti decidono quanto puo' spingere il rumore
+      // ordinato: e' la stessa unita' "per canale" delle altre palette.
+      spread: Math.min(passo(rb), passo(gb), passo(bb)) / Math.sqrt(3),
+      nearestRGB: (r, g, b) => (
+        (quant(r, rb) << (gb + bb)) | (quant(g, gb) << bb) | quant(b, bb)
+      ),
+    };
+  }
+
   const lumas = colors.map(([r, g, b]) => luma(r, g, b));
 
   if (ramp) {
@@ -966,6 +1105,14 @@ const en = {
   'palette.marathonTerm': 'Marathon 94',
   'palette.risograph': 'Risograph',
   'palette.blueprint': 'Blueprint',
+  'palette.nes': 'NES',
+  'palette.ega': 'EGA 16',
+  'palette.msx': 'MSX',
+  'palette.teletext': 'Teletext',
+  'palette.amigaWb': 'Workbench',
+  'palette.virtualBoy': 'Virtual Boy',
+  'palette.bit8': '8-bit colour',
+  'palette.megadrive': 'Mega Drive',
   'palette.custom': 'Custom',
 
   'algorithm.none': 'None (threshold)',
@@ -996,6 +1143,13 @@ const en = {
   'preset.arcade': 'Arcade 16 colours',
   'preset.cga': 'CGA 1981',
   'preset.incisione': 'Engraving',
+  'preset.nes': '8-bit console',
+  'preset.megadrive': '16-bit console',
+  'preset.vga': 'VGA 256 colours',
+  'preset.msx': 'MSX cassette',
+  'preset.workbench': 'Amiga Workbench',
+  'preset.teletext': 'Teletext',
+  'preset.virtualBoy': 'Virtual Boy',
 
   'mode.braille': 'Braille',
   'mode.halfblock': 'Half blocks',
@@ -1164,6 +1318,14 @@ const it = {
   'palette.amberCrt': 'CRT ambra',
   'palette.risograph': 'Risografia',
   'palette.blueprint': 'Cianografia',
+  'palette.nes': 'NES',
+  'palette.ega': 'EGA 16',
+  'palette.msx': 'MSX',
+  'palette.teletext': 'Televideo',
+  'palette.amigaWb': 'Workbench',
+  'palette.virtualBoy': 'Virtual Boy',
+  'palette.bit8': 'Colore 8 bit',
+  'palette.megadrive': 'Mega Drive',
   'palette.custom': 'Su misura',
 
   'algorithm.none': 'Nessuno (soglia)',
@@ -1179,6 +1341,13 @@ const it = {
   'preset.terminale': 'Terminale a fosfori',
   'preset.arcade': 'Arcade 16 colori',
   'preset.incisione': 'Incisione',
+  'preset.nes': 'Console 8 bit',
+  'preset.megadrive': 'Console 16 bit',
+  'preset.vga': 'VGA 256 colori',
+  'preset.msx': 'MSX su cassetta',
+  'preset.workbench': 'Amiga Workbench',
+  'preset.teletext': 'Televideo',
+  'preset.virtualBoy': 'Virtual Boy',
 
   'mode.halfblock': 'Mezzi blocchi',
   'mode.quadrant': 'Quadranti',
@@ -1344,6 +1513,14 @@ const es = {
   'palette.amberCrt': 'CRT ámbar',
   'palette.risograph': 'Risografía',
   'palette.blueprint': 'Cianotipo',
+  'palette.nes': 'NES',
+  'palette.ega': 'EGA 16',
+  'palette.msx': 'MSX',
+  'palette.teletext': 'Teletexto',
+  'palette.amigaWb': 'Workbench',
+  'palette.virtualBoy': 'Virtual Boy',
+  'palette.bit8': 'Color 8 bits',
+  'palette.megadrive': 'Mega Drive',
   'palette.custom': 'A medida',
 
   'algorithm.none': 'Ninguno (umbral)',
@@ -1358,6 +1535,13 @@ const es = {
   'preset.terminale': 'Terminal de fósforo',
   'preset.arcade': 'Arcade 16 colores',
   'preset.incisione': 'Grabado',
+  'preset.nes': 'Consola 8 bits',
+  'preset.megadrive': 'Consola 16 bits',
+  'preset.vga': 'VGA 256 colores',
+  'preset.msx': 'MSX en casete',
+  'preset.workbench': 'Amiga Workbench',
+  'preset.teletext': 'Teletexto',
+  'preset.virtualBoy': 'Virtual Boy',
 
   'mode.halfblock': 'Medios bloques',
   'mode.quadrant': 'Cuadrantes',
@@ -1523,6 +1707,14 @@ const fr = {
   'palette.amberCrt': 'CRT ambre',
   'palette.risograph': 'Risographie',
   'palette.blueprint': 'Cyanotype',
+  'palette.nes': 'NES',
+  'palette.ega': 'EGA 16',
+  'palette.msx': 'MSX',
+  'palette.teletext': 'Télétexte',
+  'palette.amigaWb': 'Workbench',
+  'palette.virtualBoy': 'Virtual Boy',
+  'palette.bit8': 'Couleur 8 bits',
+  'palette.megadrive': 'Mega Drive',
   'palette.custom': 'Sur mesure',
 
   'algorithm.none': 'Aucun (seuil)',
@@ -1537,6 +1729,13 @@ const fr = {
   'preset.terminale': 'Terminal à phosphore',
   'preset.arcade': 'Arcade 16 couleurs',
   'preset.incisione': 'Gravure',
+  'preset.nes': 'Console 8 bits',
+  'preset.megadrive': 'Console 16 bits',
+  'preset.vga': 'VGA 256 couleurs',
+  'preset.msx': 'MSX sur cassette',
+  'preset.workbench': 'Amiga Workbench',
+  'preset.teletext': 'Télétexte',
+  'preset.virtualBoy': 'Virtual Boy',
 
   'mode.halfblock': 'Demi-blocs',
   'mode.quadrant': 'Quadrants',
@@ -1702,6 +1901,14 @@ const de = {
   'palette.amberCrt': 'CRT bernstein',
   'palette.risograph': 'Risografie',
   'palette.blueprint': 'Blaupause',
+  'palette.nes': 'NES',
+  'palette.ega': 'EGA 16',
+  'palette.msx': 'MSX',
+  'palette.teletext': 'Videotext',
+  'palette.amigaWb': 'Workbench',
+  'palette.virtualBoy': 'Virtual Boy',
+  'palette.bit8': '8-Bit-Farbe',
+  'palette.megadrive': 'Mega Drive',
   'palette.custom': 'Eigene',
 
   'algorithm.none': 'Keiner (Schwelle)',
@@ -1716,6 +1923,13 @@ const de = {
   'preset.terminale': 'Phosphor-Terminal',
   'preset.arcade': 'Arcade 16 Farben',
   'preset.incisione': 'Kupferstich',
+  'preset.nes': '8-Bit-Konsole',
+  'preset.megadrive': '16-Bit-Konsole',
+  'preset.vga': 'VGA 256 Farben',
+  'preset.msx': 'MSX-Kassette',
+  'preset.workbench': 'Amiga Workbench',
+  'preset.teletext': 'Videotext',
+  'preset.virtualBoy': 'Virtual Boy',
 
   'mode.halfblock': 'Halbblöcke',
   'mode.quadrant': 'Quadranten',
@@ -2321,6 +2535,75 @@ const PRESETS = {
   incisione: {
     options: { palette: 'bw', algorithm: 'lines4', contrast: 30, sharpen: 60 },
   },
+
+  // ------------------------------------------------- console e computer
+  //
+  // Ogni epoca la fanno tre cose insieme: quanti colori c'erano, quanto
+  // erano grossi i pixel e che trama usava il dithering. La tavolozza da
+  // sola non basta: senza il pixelone e la trama giusta una foto a 55
+  // colori sembra solo una foto sbiadita, non un gioco.
+
+  // NES: pochi colori molto saturi e pixel grossi. La matrice di Bayer e'
+  // storicamente giusta, il rumore a diffusione su quello schermo non
+  // c'era.
+  nes: {
+    options: {
+      palette: 'nes', algorithm: 'bayer4', scale: 3,
+      contrast: 15, saturation: 20,
+    },
+  },
+
+  // Mega Drive: gli stessi 512 colori dell'hardware, pixel medi e una
+  // trama fitta. Il Mega Drive il dithering lo usava eccome, per far
+  // finta di avere sfumature che non poteva permettersi.
+  // Il pixel grosso conta quanto la tavolozza: 512 colori a piena
+  // risoluzione somigliano troppo alla foto, e l'epoca non si riconosce.
+  // A quattro sono i 320x224 di allora, e il retino nel muro si vede.
+  megadrive: {
+    options: {
+      palette: 'megadrive', algorithm: 'bayer8', scale: 4,
+      saturation: 25, contrast: 15,
+    },
+  },
+
+  // VGA 256 colori: il colore a 8 bit vero, con la diffusione dell'errore
+  // che i visualizzatori di immagini DOS facevano davvero. Il pixel doppio
+  // non e' un vezzo: a 256 colori e piena risoluzione il risultato somiglia
+  // troppo alla foto di partenza, e il preset sembra non fare niente.
+  vga: {
+    options: { palette: 'bit8', algorithm: 'floydSteinberg', scale: 2 },
+  },
+
+  // MSX: quindici colori e pixel enormi, come i giochi su cassetta.
+  msx: {
+    options: {
+      palette: 'msx', algorithm: 'bayer2', scale: 4, contrast: 20, saturation: 15,
+    },
+  },
+
+  // Amiga Workbench: quattro colori e il retino a punti grossi. Non e' un
+  // gioco, e' la scrivania, ed e' altrettanto riconoscibile.
+  workbench: {
+    options: {
+      palette: 'amigaWb', algorithm: 'cluster4', scale: 2, contrast: 25,
+    },
+  },
+
+  // Teletext: otto colori puri e blocchi grossissimi, come le pagine del
+  // Televideo.
+  teletext: {
+    options: {
+      palette: 'teletext', algorithm: 'bayer2', scale: 4,
+      contrast: 20, saturation: 40,
+    },
+  },
+
+  // Virtual Boy: rosso e nero, e nient'altro.
+  virtualBoy: {
+    options: {
+      palette: 'virtualBoy', algorithm: 'bayer4', scale: 2, contrast: 25,
+    },
+  },
 };
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
@@ -2486,7 +2769,7 @@ const __m_src_core_process_js = (() => {
  */
 function processImage(source, rawOptions = {}) {
   const options = normalizeOptions(rawOptions);
-  const { colors, ramp } = paletteInfo(options.palette);
+  const { colors, ramp, bits } = paletteInfo(options.palette);
 
   // 1. Riduzione alla risoluzione richiesta. E' anche il motivo per cui le
   //    foto da fotocamera non fanno arrancare l'interfaccia: si lavora su
@@ -2504,7 +2787,7 @@ function processImage(source, rawOptions = {}) {
   const small = downscaleByFactor(img, options.scale);
 
   // 4. Dithering.
-  const quantizer = buildQuantizer(colors, ramp);
+  const quantizer = buildQuantizer(colors, ramp, bits);
   const dithered = ditherImage(small, {
     algorithm: options.algorithm,
     colors,
@@ -3595,6 +3878,7 @@ global.DitherBox = Object.assign(__m_src_web_ditherbox_js.DitherBox, {
   asciiChar: __m_src_core_index_js.asciiChar,
   bayer: __m_src_core_index_js.bayer,
   bayerMatrix: __m_src_core_index_js.bayerMatrix,
+  bitDepthPalette: __m_src_core_index_js.bitDepthPalette,
   brailleCell: __m_src_core_index_js.brailleCell,
   brailleThreshold: __m_src_core_index_js.brailleThreshold,
   buildQuantizer: __m_src_core_index_js.buildQuantizer,

@@ -1,7 +1,7 @@
 {
   "name": "ditherbox",
   "version": "0.1.0",
-  "description": "Adjustable dithering for photos: a drop-in web widget plus a terminal app with a cliamp-style interface",
+  "description": "Adjustable dithering for photos: a terminal app plus a drop-in web widget, with palettes from the Game Boy to the Mega Drive",
   "type": "module",
   "license": "MIT",
   "author": "Alessandro Simonitto",
@@ -14,18 +14,22 @@
   },
   "homepage": "https://github.com/Pricesswg/DitherBox#readme",
   "keywords": [
-    "dithering",
-    "bayer",
-    "floyd-steinberg",
-    "atkinson",
-    "pixel-art",
-    "tui",
-    "astro",
-    "marathon",
-    "palette",
+    "16-bit",
+    "8-bit",
     "ascii-art",
+    "astro",
+    "atkinson",
+    "bayer",
     "braille",
-    "i18n"
+    "dithering",
+    "floyd-steinberg",
+    "i18n",
+    "marathon",
+    "nes",
+    "palette",
+    "pixel-art",
+    "retro",
+    "tui"
   ],
   "bin": {
     "ditherbox": "bin/ditherbox.js"
@@ -52,7 +56,8 @@
     "demo": "node bin/ditherbox.js",
     "screenshot": "node scripts/screenshot.js",
     "termshot": "node scripts/termshot.js",
-    "docs": "node scripts/docs-images.js"
+    "docs": "node scripts/docs-images.js",
+    "presets": "node scripts/contact-sheet.js"
   },
   "dependencies": {
     "jpeg-js": "^0.4.4",

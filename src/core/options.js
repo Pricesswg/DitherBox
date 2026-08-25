@@ -231,6 +231,75 @@ export const PRESETS = {
   incisione: {
     options: { palette: 'bw', algorithm: 'lines4', contrast: 30, sharpen: 60 },
   },
+
+  // ------------------------------------------------- console e computer
+  //
+  // Ogni epoca la fanno tre cose insieme: quanti colori c'erano, quanto
+  // erano grossi i pixel e che trama usava il dithering. La tavolozza da
+  // sola non basta: senza il pixelone e la trama giusta una foto a 55
+  // colori sembra solo una foto sbiadita, non un gioco.
+
+  // NES: pochi colori molto saturi e pixel grossi. La matrice di Bayer e'
+  // storicamente giusta, il rumore a diffusione su quello schermo non
+  // c'era.
+  nes: {
+    options: {
+      palette: 'nes', algorithm: 'bayer4', scale: 3,
+      contrast: 15, saturation: 20,
+    },
+  },
+
+  // Mega Drive: gli stessi 512 colori dell'hardware, pixel medi e una
+  // trama fitta. Il Mega Drive il dithering lo usava eccome, per far
+  // finta di avere sfumature che non poteva permettersi.
+  // Il pixel grosso conta quanto la tavolozza: 512 colori a piena
+  // risoluzione somigliano troppo alla foto, e l'epoca non si riconosce.
+  // A quattro sono i 320x224 di allora, e il retino nel muro si vede.
+  megadrive: {
+    options: {
+      palette: 'megadrive', algorithm: 'bayer8', scale: 4,
+      saturation: 25, contrast: 15,
+    },
+  },
+
+  // VGA 256 colori: il colore a 8 bit vero, con la diffusione dell'errore
+  // che i visualizzatori di immagini DOS facevano davvero. Il pixel doppio
+  // non e' un vezzo: a 256 colori e piena risoluzione il risultato somiglia
+  // troppo alla foto di partenza, e il preset sembra non fare niente.
+  vga: {
+    options: { palette: 'bit8', algorithm: 'floydSteinberg', scale: 2 },
+  },
+
+  // MSX: quindici colori e pixel enormi, come i giochi su cassetta.
+  msx: {
+    options: {
+      palette: 'msx', algorithm: 'bayer2', scale: 4, contrast: 20, saturation: 15,
+    },
+  },
+
+  // Amiga Workbench: quattro colori e il retino a punti grossi. Non e' un
+  // gioco, e' la scrivania, ed e' altrettanto riconoscibile.
+  workbench: {
+    options: {
+      palette: 'amigaWb', algorithm: 'cluster4', scale: 2, contrast: 25,
+    },
+  },
+
+  // Teletext: otto colori puri e blocchi grossissimi, come le pagine del
+  // Televideo.
+  teletext: {
+    options: {
+      palette: 'teletext', algorithm: 'bayer2', scale: 4,
+      contrast: 20, saturation: 40,
+    },
+  },
+
+  // Virtual Boy: rosso e nero, e nient'altro.
+  virtualBoy: {
+    options: {
+      palette: 'virtualBoy', algorithm: 'bayer4', scale: 2, contrast: 25,
+    },
+  },
 };
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);

@@ -81,16 +81,25 @@ function isGrayscale(img) {
  * byte per pixel di cui tre identici: scritta come scala di grigi il file
  * cala di parecchio senza perdere niente.
  */
-export async function savePng(path, img) {
+/**
+ * Codifica un'immagine in PNG e restituisce i byte, senza toccare il disco.
+ * La usa chi il file lo vuole in memoria: le tavole di confronto lo
+ * incorporano nella pagina come data URI.
+ */
+export function encodePng(img) {
   const png = new PNG({ width: img.width, height: img.height });
   png.data = Buffer.from(img.data.buffer, img.data.byteOffset, img.data.length);
   // Le opzioni di scrittura vanno passate a write(), non al costruttore:
   // il costruttore le ignora in silenzio.
-  await writeFile(path, PNG.sync.write(png, {
+  return PNG.sync.write(png, {
     colorType: isGrayscale(img) ? 0 : 6,
     inputColorType: 6,
     inputHasAlpha: true,
-  }));
+  });
+}
+
+export async function savePng(path, img) {
+  await writeFile(path, encodePng(img));
   return path;
 }
 

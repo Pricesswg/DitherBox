@@ -29,9 +29,35 @@ const clamp255 = (v) => (v < 0 ? 0 : v > 255 ? 255 : v);
  * `spread` e' la distanza media fra colori adiacenti: e' l'ampiezza naturale
  * del rumore ordinato, quella che riempie esattamente il buco fra due livelli.
  */
-export function buildQuantizer(colors, ramp) {
+export function buildQuantizer(colors, ramp, bits) {
   const n = colors.length;
   if (n < 2) throw new Error('La palette deve avere almeno due colori');
+
+  // Palette a profondita' di bit: l'indice si calcola, non si cerca.
+  // Con 256 o 512 colori la ricerca esaustiva costerebbe cara, e sarebbe
+  // anche sbagliata: su una griglia regolare il colore piu' vicino e'
+  // sempre quello che si ottiene troncando, non serve confrontarli tutti.
+  if (bits) {
+    const [rb, gb, bb] = bits;
+    const passo = (b) => 255 / ((1 << b) - 1);
+    // Si arrotonda al gradino piu' vicino invece di troncare: troncando,
+    // ogni valore scivolerebbe all'ingiu' e l'immagine uscirebbe piu'
+    // scura di mezzo gradino, che con due bit di blu si vede benissimo.
+    const quant = (v, b) => Math.min((1 << b) - 1, Math.round(clamp255(v) / passo(b)));
+    return {
+      ramp: false,
+      colors,
+      bits,
+      lumas: colors.map(([r, g, b]) => luma(r, g, b)),
+      // I gradini piu' fitti decidono quanto puo' spingere il rumore
+      // ordinato: e' la stessa unita' "per canale" delle altre palette.
+      spread: Math.min(passo(rb), passo(gb), passo(bb)) / Math.sqrt(3),
+      nearestRGB: (r, g, b) => (
+        (quant(r, rb) << (gb + bb)) | (quant(g, gb) << bb) | quant(b, bb)
+      ),
+    };
+  }
+
   const lumas = colors.map(([r, g, b]) => luma(r, g, b));
 
   if (ramp) {

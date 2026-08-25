@@ -12,6 +12,8 @@ import {
   paramLabel,
 } from '../src/core/index.js';
 
+import { sampleImage } from './helpers.js';
+
 /** Sfumatura orizzontale in scala di grigi. */
 function gradient(w = 256, h = 32) {
   const img = createImage(w, h);
@@ -367,4 +369,91 @@ test('processImage non tocca l immagine di partenza', () => {
   const copia = [...img.data];
   processImage(img, { contrast: 60, invert: true, scale: 2 });
   assert.deepEqual([...img.data], copia);
+});
+
+test('le palette a profondita di bit contengono esattamente i colori giusti', () => {
+  for (const [key, bits] of [['bit8', [3, 3, 2]], ['megadrive', [3, 3, 3]]]) {
+    const { colors, bits: dichiarati } = paletteInfo(key);
+    assert.deepEqual(dichiarati, bits, `${key}: bit dichiarati diversi`);
+    assert.equal(
+      colors.length, 2 ** (bits[0] + bits[1] + bits[2]),
+      `${key}: numero di colori sbagliato`,
+    );
+
+    // Nessun doppione, e ogni canale usa tutti i suoi livelli, estremi
+    // compresi: se il bianco non fosse bianco si vedrebbe subito.
+    const visti = new Set(colors.map((c) => c.join(',')));
+    assert.equal(visti.size, colors.length, `${key}: colori ripetuti`);
+    for (let canale = 0; canale < 3; canale++) {
+      const livelli = new Set(colors.map((c) => c[canale]));
+      assert.equal(livelli.size, 2 ** bits[canale], `${key}: livelli sul canale ${canale}`);
+      assert.ok(livelli.has(0) && livelli.has(255), `${key}: canale ${canale} non arriva agli estremi`);
+    }
+  }
+});
+
+test('quantizzare a profondita di bit non inventa colori e non scurisce', () => {
+  const W = 128;
+  const H = 32;
+  const img = createImage(W, H);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      img.data[i] = Math.round((x / (W - 1)) * 255);
+      img.data[i + 1] = 255 - img.data[i];
+      img.data[i + 2] = Math.round((y / (H - 1)) * 255);
+      img.data[i + 3] = 255;
+    }
+  }
+
+  for (const key of ['bit8', 'megadrive']) {
+    const { colors, bits } = paletteInfo(key);
+    const ammessi = new Set(colors.map((c) => c.join(',')));
+    // Soglia secca senza rumore: il risultato deve essere il puro
+    // arrotondamento, cosi' l'errore e' misurabile.
+    const { image } = processImage(img, {
+      palette: key, algorithm: 'none', megapixels: 24, strength: 0,
+    });
+
+    let fuori = 0;
+    let somma = 0;
+    let n = 0;
+    for (let i = 0; i < image.data.length; i += 4) {
+      if (!ammessi.has(`${image.data[i]},${image.data[i + 1]},${image.data[i + 2]}`)) fuori++;
+      for (let c = 0; c < 3; c++) {
+        somma += image.data[i + c] - img.data[i + c];
+        n++;
+      }
+    }
+    assert.equal(fuori, 0, `${key}: sono usciti colori che non stanno nella palette`);
+
+    // Arrotondando, non troncando, lo scarto medio deve girare intorno a
+    // zero. Troncare lo porterebbe a meno mezzo gradino, e l'immagine
+    // uscirebbe visibilmente piu' scura.
+    const mezzoGradino = Math.max(...bits.map((b) => 255 / ((1 << b) - 1))) / 2;
+    const medio = somma / n;
+    assert.ok(
+      Math.abs(medio) < mezzoGradino / 3,
+      `${key}: scarto medio ${medio.toFixed(2)}, segno di troncamento invece di arrotondamento`,
+    );
+  }
+});
+
+test('ogni preset produce un risultato dentro la sua palette', () => {
+  const img = sampleImage(80, 60);
+  for (const key of Object.keys(PRESETS)) {
+    const opzioni = applyPreset(key, {});
+    const { colors } = paletteInfo(opzioni.palette);
+    const ammessi = new Set(colors.map((c) => c.join(',')));
+    const { image } = processImage(img, { ...opzioni, megapixels: 24 });
+
+    const usati = new Set();
+    for (let i = 0; i < image.data.length; i += 4) {
+      usati.add(`${image.data[i]},${image.data[i + 1]},${image.data[i + 2]}`);
+    }
+    for (const c of usati) {
+      assert.ok(ammessi.has(c), `preset ${key}: colore ${c} fuori dalla palette ${opzioni.palette}`);
+    }
+    assert.ok(usati.size >= 2, `preset ${key}: un colore solo, il preset non fa niente`);
+  }
 });

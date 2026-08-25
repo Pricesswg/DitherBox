@@ -27,6 +27,30 @@ export function grayRamp(levels) {
   return out;
 }
 
+/**
+ * Tutti i colori rappresentabili con `rb`, `gb`, `bb` bit per canale.
+ *
+ * E' cosi' che funzionava davvero l'hardware: non una tavolozza scelta a
+ * mano ma un troncamento. Il colore a 8 bit del PC (3 bit di rosso, 3 di
+ * verde, 2 di blu) e i nove bit del Mega Drive sono la stessa idea con
+ * numeri diversi, quindi si scrivono una volta sola.
+ *
+ * Ogni livello viene riportato su tutta la scala 0-255, se no il bianco
+ * non sarebbe bianco: con 3 bit i gradini sono 0, 36, 73 ... 255.
+ */
+export function bitDepthPalette(rb, gb, bb) {
+  const scala = (v, bits) => Math.round((v * 255) / ((1 << bits) - 1));
+  const out = [];
+  for (let r = 0; r < (1 << rb); r++) {
+    for (let g = 0; g < (1 << gb); g++) {
+      for (let b = 0; b < (1 << bb); b++) {
+        out.push([scala(r, rb), scala(g, gb), scala(b, bb)]);
+      }
+    }
+  }
+  return out;
+}
+
 /** Monitor a fosfori: dal nero al colore del fosforo, `levels` gradini. */
 function phosphor(color, levels) {
   const [r, g, b] = hex(color);
@@ -113,6 +137,83 @@ export const PALETTES = {
     ramp: true,
     colors: ['#04120a', '#0d3b1e', '#1f7a3d', '#3dff7a'].map(hex),
   },
+  // ------------------------------------------------- vecchie console e PC
+
+  // NES / Famicom. La tavolozza non e' RGB: il chip generava il colore
+  // modulando la portante NTSC, quindi ogni conversione in RGB e' una
+  // resa. Questa e' la piu' diffusa, con i quattro livelli di luminosita'
+  // per dodici tinte piu' i grigi.
+  nes: {
+    colors: [
+      '#7c7c7c', '#0000fc', '#0000bc', '#4428bc',
+      '#940084', '#a80020', '#a81000', '#881400',
+      '#503000', '#007800', '#006800', '#005800',
+      '#004058', '#000000',
+      '#bcbcbc', '#0078f8', '#0058f8', '#6844fc',
+      '#d800cc', '#e40058', '#f83800', '#e45c10',
+      '#ac7c00', '#00b800', '#00a800', '#00a844',
+      '#008888',
+      '#f8f8f8', '#3cbcfc', '#6888fc', '#9878f8',
+      '#f878f8', '#f85898', '#f87858', '#fca044',
+      '#f8b800', '#b8f818', '#58d854', '#58f898',
+      '#00e8d8', '#787878',
+      '#fcfcfc', '#a4e4fc', '#b8b8f8', '#d8b8f8',
+      '#f8b8f8', '#f8a4c0', '#f0d0b0', '#fce0a8',
+      '#f8d878', '#d8f878', '#b8f8b8', '#b8f8d8',
+      '#00fcfc', '#d8d8d8',
+    ].map(hex),
+  },
+
+  // IBM EGA, 1984: i sedici colori nati dal cavo digitale a sei fili,
+  // due bit per canale ma solo nelle combinazioni che il monitor accettava.
+  ega: {
+    colors: [
+      '#000000', '#0000aa', '#00aa00', '#00aaaa',
+      '#aa0000', '#aa00aa', '#aa5500', '#aaaaaa',
+      '#555555', '#5555ff', '#55ff55', '#55ffff',
+      '#ff5555', '#ff55ff', '#ffff55', '#ffffff',
+    ].map(hex),
+  },
+
+  // MSX1 e ColecoVision: il TMS9918 di Texas Instruments. Quindici colori
+  // piu' il trasparente, con quei tre verdi che si riconoscono a occhio.
+  msx: {
+    colors: [
+      '#000000', '#3eb849', '#74d07d', '#5955e0',
+      '#8076f1', '#b95e51', '#65dbef', '#db6559',
+      '#ff897d', '#ccc35e', '#ded087', '#3aa241',
+      '#b766b5', '#cccccc', '#ffffff',
+    ].map(hex),
+  },
+
+  // Teletext, Televideo, Ceefax: gli otto angoli del cubo RGB e nient'altro.
+  // Niente mezze tinte, per questo il dithering ci si vede tantissimo.
+  teletext: {
+    colors: [
+      '#000000', '#ff0000', '#00ff00', '#ffff00',
+      '#0000ff', '#ff00ff', '#00ffff', '#ffffff',
+    ].map(hex),
+  },
+
+  // Amiga Workbench 1.3: quattro colori e basta, ed erano il sistema
+  // operativo intero. Il blu e l'arancio insieme sono inconfondibili.
+  amigaWb: {
+    colors: ['#0055aa', '#000000', '#ffffff', '#ff8800'].map(hex),
+  },
+
+  // Virtual Boy: l'unico schermo che facesse solo rosso, in quattro livelli.
+  virtualBoy: { ramp: true, colors: phosphor('#e00000', 4) },
+
+  // Il vero colore a 8 bit: 3 bit di rosso, 3 di verde, 2 di blu. E' quello
+  // che davano le schede prima del colore reale, e il blu piu' povero degli
+  // altri e' voluto, non un errore: l'occhio ci vede meno.
+  bit8: { bits: [3, 3, 2] },
+
+  // Mega Drive / Genesis: nove bit, tre per canale, cioe' 512 colori.
+  // E' la ragione per cui i giochi Sega hanno quel colore un po' spento
+  // rispetto alle console coeve.
+  megadrive: { bits: [3, 3, 3] },
+
   risograph: {
     colors: ['#1d1a2e', '#0078bf', '#ff48b0', '#f5f1e6'].map(hex),
   },
@@ -121,6 +222,15 @@ export const PALETTES = {
     colors: ['#0b2545', '#13315c', '#8da9c4', '#eef4ed'].map(hex),
   },
 };
+
+// Le palette dichiarate per profondita' di bit si materializzano subito.
+// Farlo alla prima richiesta sembrava un risparmio, ma lasciava
+// `entry.colors` a undefined per chiunque leggesse la tabella senza
+// passare da resolvePalette: `--list` moriva proprio li'. Sono 768 terne
+// in tutto, il risparmio non esisteva.
+for (const entry of Object.values(PALETTES)) {
+  if (!entry.colors && entry.bits) entry.colors = bitDepthPalette(...entry.bits);
+}
 
 export const PALETTE_KEYS = Object.keys(PALETTES);
 
@@ -192,7 +302,10 @@ export function paletteInfo(palette) {
     // che cercare il colore piu' vicino.
     ramp = isMonotoneRamp(colors);
   }
-  return { colors, ramp };
+  const bits = typeof palette === 'string' && PALETTES[palette]
+    ? PALETTES[palette].bits
+    : undefined;
+  return { colors, ramp, bits };
 }
 
 /**

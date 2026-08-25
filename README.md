@@ -1,15 +1,14 @@
 # DitherBox
 
-Adjustable dithering for photos, with a full-screen terminal interface in the
-style of [cliamp](https://github.com/bjarneo/cliamp): boxed panels, six-colour
-themes, sliders where the equaliser would be, the preview drawn inside the
-terminal itself.
+Adjustable dithering for photos, with a full-screen terminal interface: boxed
+panels, six-colour themes, sliders, and the preview drawn inside the terminal
+itself.
 
-Nineteen dithering algorithms, eighteen palettes (from one-bit black and white
-to the Game Boy, from CGA to the C64 to the colours of Marathon) plus any you
-write yourself, tone adjustments, megapixel control over the output, and eight
-ready-made presets. The interface speaks English, Italian, Spanish, French and
-German.
+Nineteen dithering algorithms and twenty-six palettes, from one-bit black and
+white to the Game Boy, from the NES to the Mega Drive, from CGA and EGA to the
+C64, plus any you write yourself. Tone adjustments, megapixel control over the
+output, and fifteen ready-made presets. The interface speaks English, Italian,
+Spanish, French and German.
 
 ![The terminal interface](docs/tui.png)
 
@@ -158,7 +157,7 @@ The web widget on the demo page starts with the same photo already loaded.
 
 ### Keys
 
-They follow cliamp's, so if you already use that one you are at home.
+Arrow keys or vim keys, whichever your hands reach for first.
 
 | Key | What it does |
 |---|---|
@@ -292,9 +291,8 @@ contrast = 15
 megapixels = 2
 ```
 
-Personal themes go in `~/.config/ditherbox/themes/*.toml` and use the same
-six-colour schema as cliamp, so a theme written for that one works here without
-changes:
+Personal themes go in `~/.config/ditherbox/themes/*.toml`. Six colours and
+nothing else:
 
 ```toml
 bg = "#002b36"
@@ -352,7 +350,39 @@ depends on its position. Regular texture, old-video-game air: `bayer2`,
 
 `bw` (one bit), `gray4` `gray8` `gray16`, `gameboy`, `gameboyPocket`,
 `cgaCyan`, `cgaGreen`, `pico8`, `c64`, `zx`, `greenCrt`, `amberCrt`,
-`marathon`, `marathonDuo`, `marathonTerm`, `risograph`, `blueprint`.
+`marathon`, `marathonDuo`, `marathonTerm`, `risograph`, `blueprint`,
+`nes`, `ega`, `msx`, `teletext`, `amigaWb`, `virtualBoy`, `bit8`,
+`megadrive`.
+
+### Consoles and old computers
+
+`nes` is the Famicom's master palette. The chip did not think in RGB at all,
+it modulated the NTSC carrier, so every RGB version of it is somebody's
+rendering; this is the common one. `msx` is the TMS9918 that MSX and
+ColecoVision shared, and those three greens give it away instantly. `ega` is
+IBM's sixteen, `teletext` the eight corners of the RGB cube and nothing in
+between, `amigaWb` the four colours Workbench 1.3 ran its whole desktop on,
+and `virtualBoy` the only screen ever built that did red and nothing else.
+
+`bit8` and `megadrive` are not hand-picked lists. They are every colour a
+given bit depth can express, which is how the hardware really worked:
+
+| Palette | Bits per channel | Colours | Where it comes from |
+|---|---|---|---|
+| `bit8` | 3 red, 3 green, 2 blue | 256 | True 8-bit colour. Blue gets one bit less on purpose: the eye notices it least |
+| `megadrive` | 3, 3, 3 | 512 | The Mega Drive's nine-bit colour, and the reason Sega games look a shade duller than their rivals |
+
+For these the nearest colour is not searched for, it is calculated: on a
+regular grid, rounding each channel to its closest step *is* the answer, so
+there is nothing to compare against. That is what keeps a 512-colour palette
+as fast as a four-colour one.
+
+A note on what "16-bit" means, since it is asked for more often than it is
+wanted: 16-bit colour proper is 65536 colours, and dithering to it produces an
+image indistinguishable from the original. There is nothing to see. What people
+mean by the 16-bit era is the machines, and what made those recognisable was
+not the colour depth but the low resolution and the visible dither pattern.
+That is what the `megadrive` preset reproduces.
 
 `marathon` takes the colours of the 2025 game: hyper-saturated pinks and
 yellows over cold steel blues and deep blacks. It is treated as a **luminance
@@ -380,9 +410,33 @@ photo land on the two chosen colours, with the dithering making the midtones.
 
 ### Presets
 
-`macintosh` (Mac 1984), `giornale` (print halftone), `gameboy`,
-`fanzine` (high-contrast photocopy), `terminale` (green phosphor),
-`arcade` (16 colours), `cga` (1981), `incisione` (engraving).
+A preset is not just a palette. It is palette, pixel size and dither texture
+together, because that is what makes an era recognisable: a photo reduced to
+fifty-five colours at full resolution looks washed out, not like a game.
+
+![Every preset on the same photo](docs/presets.png)
+
+```sh
+npm run presets          # regenerate that sheet with your own photo
+```
+
+| Preset | What it is |
+|---|---|
+| `macintosh` | The 1984 Mac: one bit, Atkinson, no pixelation |
+| `giornale` | Print halftone, clustered dots |
+| `gameboy` | Four greens, chunky pixels |
+| `fanzine` | High-contrast photocopy, with grain |
+| `terminale` | Green phosphor terminal |
+| `arcade` | PICO-8's sixteen colours |
+| `cga` | CGA 1981, cyan and magenta |
+| `incisione` | Engraving, diagonal lines |
+| `nes` | 8-bit console: the NES palette, ordered dither, fat pixels |
+| `megadrive` | 16-bit console: the Mega Drive's 512 colours at 320x224 |
+| `vga` | 256-colour VGA with error diffusion, the DOS image viewer |
+| `msx` | MSX on cassette: fifteen colours and enormous pixels |
+| `workbench` | Amiga Workbench: four colours, coarse halftone |
+| `teletext` | Eight pure colours, blocks the size of teletext cells |
+| `virtualBoy` | Red and black, nothing else |
 
 ---
 
