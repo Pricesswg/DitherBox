@@ -28,9 +28,6 @@ uploaded anywhere.
 DitherBox is a Node program, so Node is the only real requirement: version 18
 or newer, nothing to compile, no native modules.
 
-> While this repository is private the commands that fetch from GitHub only
-> work for accounts that can see it. Once it is public they work for everyone.
-
 
 ### Linux
 

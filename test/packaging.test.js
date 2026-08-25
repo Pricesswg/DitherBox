@@ -177,7 +177,14 @@ test('aggiornaTap copia la formula, committa e spinge', async (t) => {
   await nelTap('push', '-u', 'origin', 'main');
 
   const finta = join(base, 'ditherbox.rb');
-  scrivi(finta, 'class Ditherbox < Formula\n  version "9.9.9"\nend\n');
+  const corpo = (sha) => `class Ditherbox < Formula\n  sha256 "${sha}"\n  version "9.9.9"\nend\n`;
+
+  // Con l'impronta segnaposto non deve spingere niente: nel tap
+  // diventerebbe un errore di checksum per chi installa.
+  scrivi(finta, corpo('0'.repeat(64)));
+  assert.throws(() => aggiornaTap(tap, '9.9.9', finta), /impronta segnaposto/);
+
+  scrivi(finta, corpo('b'.repeat(64)));
 
   aggiornaTap(tap, '9.9.9', finta);
 

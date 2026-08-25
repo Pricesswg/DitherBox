@@ -49,6 +49,17 @@ export function aggiornaTap(percorso, versione, formula = FORMULA) {
       + `    git clone https://github.com/Pricesswg/homebrew-tap.git ${percorso}`,
     );
   }
+  // Un'impronta segnaposto nel tap e' peggio di nessun tap: chi installa
+  // riceve un errore di checksum, che sembra un download corrotto e manda
+  // a cercare il problema dalla parte sbagliata.
+  const sha = readFileSync(formula, 'utf8').match(/^\s*sha256 "([^"]+)"$/m)?.[1];
+  if (!sha || /^0+$/.test(sha) || sha.length !== 64) {
+    throw new Error(
+      `la formula ha ancora l'impronta segnaposto (${sha}).\n`
+      + '  Lancia prima `npm run release -- <versione>` perche la calcoli.',
+    );
+  }
+
   const nelTap = (...args) => execFileSync('git', args, { cwd: percorso, encoding: 'utf8' }).trim();
   mkdirSync(join(percorso, 'Formula'), { recursive: true });
   copyFileSync(formula, join(percorso, 'Formula', 'ditherbox.rb'));
