@@ -1,6 +1,6 @@
 {
   "name": "ditherbox",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Adjustable dithering for photos: a terminal app plus a drop-in web widget, with palettes from the Game Boy to the Mega Drive",
   "type": "module",
   "license": "MIT",
