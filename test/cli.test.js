@@ -13,7 +13,23 @@ import { tempDir, writeSample } from './helpers.js';
 
 const run = promisify(execFile);
 const BIN = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'ditherbox.js');
-const cli = (args, opts = {}) => run(process.execPath, [BIN, ...args], opts);
+/**
+ * La lingua con cui il CLI viene lanciato dai test, dichiarata e non
+ * ereditata.
+ *
+ * Il programma la sceglie da LC_ALL, LC_MESSAGES e LANG. Prendendoli dalla
+ * macchina, queste stesse asserzioni su testo inglese passavano su un
+ * sistema in inglese e fallivano su uno in italiano: `npm run release`
+ * lancia la suite prima di creare il tag, e si fermava li' senza che il
+ * programma avesse niente che non andasse. Chi vuole provare proprio la
+ * scelta della lingua passa il suo `env`, che vince su questo.
+ */
+const LINGUA_FISSA = { LC_ALL: 'C', LC_MESSAGES: 'C', LANG: 'C' };
+
+const cli = (args, opts = {}) => run(process.execPath, [BIN, ...args], {
+  ...opts,
+  env: { ...process.env, ...LINGUA_FISSA, ...opts.env },
+});
 
 /** Misure di un file immagine, per non ripetere la lettura ogni volta. */
 async function size(path) {
@@ -153,11 +169,30 @@ test('elaborazione in blocco su una cartella', async (t) => {
   assert.ok(files.every((f) => f.includes('gameboy')), files.join(', '));
 });
 
+/**
+ * Senza --lang il programma segue l'ambiente, ed e' una funzionalita' che
+ * nessun test copriva: e' anche il motivo per cui il difetto qui sopra e'
+ * rimasto nascosto finche' qualcuno non ha lanciato la suite su un Mac
+ * italiano.
+ */
+test('senza --lang la lingua la decide l ambiente', async () => {
+  const inglese = await cli(['--help'], { env: { LANG: 'C', LC_ALL: 'C' } });
+  assert.match(inglese.stdout, /USAGE/);
+
+  const italiano = await cli(['--help'], { env: { LANG: 'it_IT.UTF-8', LC_ALL: 'it_IT.UTF-8' } });
+  assert.notEqual(italiano.stdout, inglese.stdout, 'l ambiente non ha cambiato niente');
+
+  // LC_ALL passa davanti a LANG, come vuole POSIX.
+  const tedesco = await cli(['--help'], { env: { LANG: 'it_IT.UTF-8', LC_ALL: 'de_DE.UTF-8' } });
+  const chiesto = await cli(['--lang', 'de', '--help']);
+  assert.equal(tedesco.stdout, chiesto.stdout, 'LC_ALL non ha la precedenza su LANG');
+});
+
 test('--print scrive nel terminale senza salvare niente', async (t) => {
   const dir = tempDir(t);
   const input = await writeSample(dir, 'in.png', 120, 90);
   const { stdout } = await cli([input, '--print', '--mode', 'ascii'], {
-    env: { ...process.env, COLUMNS: '60', LINES: '20' },
+    env: { COLUMNS: '60', LINES: '20' },
   });
   assert.ok(stdout.split('\n').length > 3);
   assert.deepEqual(readdirSync(dir), ['in.png'], 'non deve creare file');
