@@ -24,12 +24,14 @@ import { createHash } from 'node:crypto';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { aggiornaFormula, urlTarball, urlNpm, repoGitHub } from './homebrew-formula.js';
+import {
+  aggiornaFormula, urlTarball, urlNpm, repoGitHub, IMPRONTA_DA_CALCOLARE,
+} from './homebrew-formula.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const FORMULA = join(ROOT, 'packaging', 'homebrew', 'ditherbox.rb');
 const PKG = join(ROOT, 'package.json');
-const MAIN = join(ROOT, 'src', 'cli', 'main.js');
+const VERSIONE = join(ROOT, 'src', 'cli', 'version.js');
 
 const git = (...args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim();
 const dimmi = (s) => process.stdout.write(`${s}\n`);
@@ -96,21 +98,51 @@ async function impronta(url) {
   return { sha: createHash('sha256').update(byte).digest('hex'), byte: byte.length };
 }
 
-/** Allinea la versione dove il programma la dichiara. */
-function allineaVersione(nuova) {
-  const pkg = JSON.parse(readFileSync(PKG, 'utf8'));
+/**
+ * Allinea la versione dovunque il progetto la dichiari, formula compresa.
+ *
+ * La formula ci va anche adesso, che l'impronta non si puo' ancora
+ * calcolare. Lasciarla indietro sembrava innocuo e non lo era:
+ * `test/packaging.test.js` pretende che la formula dichiari la stessa
+ * versione del programma, e i test girano qui sotto, prima del tag. Il
+ * rilascio si fermava li' con la versione gia' scritta a meta' e senza
+ * tag, e il difetto si vedeva solo dal secondo rilascio in poi, perche' al
+ * primo la formula quella versione ce l'aveva gia'.
+ *
+ * L'impronta resta il segnaposto fino a dopo il tag. Non e' una perdita:
+ * nell'albero taggato non potrebbe esserci quella vera comunque.
+ */
+export function allineaVersione(nuova, {
+  pkg: pkgPath = PKG,
+  versione: versionePath = VERSIONE,
+  formula: formulaPath = FORMULA,
+  dillo = dimmi,
+} = {}) {
+  const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
   if (pkg.version !== nuova) {
     pkg.version = nuova;
-    writeFileSync(PKG, `${JSON.stringify(pkg, null, 2)}\n`);
-    dimmi(`package.json portato a ${nuova}`);
+    writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
+    dillo(`package.json portato a ${nuova}`);
   }
   // Se questa resta indietro, `ditherbox --version` mente e la prova della
   // formula, che confronta le due, se ne accorge.
-  const main = readFileSync(MAIN, 'utf8');
-  const dichiarata = main.match(/const VERSION = '([^']+)'/)?.[1];
+  const sorgente = readFileSync(versionePath, 'utf8');
+  const dichiarata = sorgente.match(/const VERSION = '([^']+)'/)?.[1];
   if (dichiarata !== nuova) {
-    writeFileSync(MAIN, main.replace(/const VERSION = '[^']+'/, `const VERSION = '${nuova}'`));
-    dimmi(`src/cli/main.js: VERSION ${dichiarata} -> ${nuova}`);
+    writeFileSync(versionePath, sorgente.replace(/const VERSION = '[^']+'/, `const VERSION = '${nuova}'`));
+    dillo(`src/cli/version.js: VERSION ${dichiarata} -> ${nuova}`);
+  }
+
+  const { owner, repo } = repoGitHub(pkg);
+  const prima = readFileSync(formulaPath, 'utf8');
+  const dopo = aggiornaFormula(prima, {
+    url: urlTarball(owner, repo, `v${nuova}`),
+    sha256: IMPRONTA_DA_CALCOLARE,
+    version: nuova,
+  });
+  if (dopo !== prima) {
+    writeFileSync(formulaPath, dopo);
+    dillo(`formula portata a ${nuova}, impronta da calcolare sul tag`);
   }
 }
 

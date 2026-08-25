@@ -29,6 +29,7 @@ import {
 } from './preview.js';
 import { loadThemes, loadConfig, DEFAULT_THEME } from './theme.js';
 import { loadImage, saveImage, listImages, isSupported } from './imageio.js';
+import { VERSION } from './version.js';
 
 const STATUS_HEIGHT = 1;
 const HELP_HEIGHT = 1;
@@ -1235,6 +1236,13 @@ export class DitherTui {
     const text = pairs
       .map(([k, d]) => `${fg(t.accent)}${k}${RESET}${fg(t.fg)} ${d}${RESET}`)
       .join(`${fg(t.fg)}  ${RESET}`);
+
+    // La versione in fondo a destra, e solo se avanza spazio: su un
+    // terminale stretto i tasti servono piu' di lei, e non deve essere lei
+    // a far tagliare "q esci".
+    const versione = `${fg(t.fg)}${DIM}ditherbox ${VERSION}${RESET}`;
+    const spazio = W - 2 - visibleLength(text) - visibleLength(versione);
+    if (spazio >= 2) return ` ${text}${' '.repeat(spazio)}${versione} `;
     return ` ${truncate(text, W - 2)}`;
   }
 

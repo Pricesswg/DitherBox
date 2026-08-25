@@ -19,8 +19,9 @@ import { loadImage, saveImage, listImages, isSupported } from './imageio.js';
 import { cellTarget, renderImage, modeLabel, MODES, MODE_KEYS } from './preview.js';
 import { loadThemes, loadConfig, DEFAULT_THEME } from './theme.js';
 import { DitherTui } from './tui.js';
+import { VERSION } from './version.js';
 
-const VERSION = '0.2.0';
+
 
 /**
  * Traduttore predefinito per le funzioni che non ne ricevono uno.

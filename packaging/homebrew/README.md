@@ -67,7 +67,8 @@ npm run release -- 0.1.0 --tag
 ```
 
 It refuses to run on a dirty tree or off `main`, sets the version in
-`package.json` and in `src/cli/main.js` so `ditherbox --version` does not lie,
+`package.json`, in `src/cli/version.js` and in the formula so `ditherbox
+--version` does not lie,
 rebuilds `dist/`, runs the tests, creates and pushes the tag, downloads the
 tarball GitHub generates for it, writes `url`, `sha256` and `version` into the
 formula, and then downloads the tarball a second time to check that what

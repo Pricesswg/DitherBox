@@ -11,13 +11,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
   aggiornaFormula, leggiFormula, urlTarball, urlNpm, repoGitHub, CAMPI,
+  IMPRONTA_DA_CALCOLARE,
 } from '../scripts/homebrew-formula.js';
+import { allineaVersione } from '../scripts/release.js';
+import { tempDir } from './helpers.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PERCORSO = join(ROOT, 'packaging', 'homebrew', 'ditherbox.rb');
@@ -115,10 +118,46 @@ test('aggiornaFormula protesta se un campo non c e', () => {
 });
 
 test('la versione della formula e quella che il programma dichiara', () => {
-  const main = readFileSync(join(ROOT, 'src', 'cli', 'main.js'), 'utf8');
-  const dichiarata = main.match(/const VERSION = '([^']+)'/)?.[1];
-  assert.equal(dichiarata, pkg.version, 'src/cli/main.js e package.json non concordano');
+  const sorgente = readFileSync(join(ROOT, 'src', 'cli', 'version.js'), 'utf8');
+  const dichiarata = sorgente.match(/const VERSION = '([^']+)'/)?.[1];
+  assert.equal(dichiarata, pkg.version, 'src/cli/version.js e package.json non concordano');
   assert.equal(campi.version, pkg.version, 'la formula e indietro rispetto al package.json');
+});
+
+/**
+ * Preparare una versione deve portare avanti anche la formula.
+ *
+ * Non e' pignoleria: il test qui sopra pretende che la formula dichiari la
+ * stessa versione del programma, e `npm run release` lancia i test dopo
+ * aver scritto la versione nuova e prima di creare il tag. Con la formula
+ * lasciata indietro il rilascio si fermava li', versione gia' scritta e
+ * nessun tag, e succedeva solo dal secondo rilascio in poi.
+ */
+test('allineare la versione porta avanti package.json, version.js e la formula', (t) => {
+  const dir = tempDir(t);
+  const percorsi = {
+    pkg: join(dir, 'package.json'),
+    versione: join(dir, 'version.js'),
+    formula: join(dir, 'ditherbox.rb'),
+    dillo: () => {},
+  };
+  // Si parte dai file veri, non da finzioni: e' la loro forma che conta.
+  writeFileSync(percorsi.pkg, readFileSync(join(ROOT, 'package.json'), 'utf8'));
+  writeFileSync(percorsi.versione, readFileSync(join(ROOT, 'src', 'cli', 'version.js'), 'utf8'));
+  writeFileSync(percorsi.formula, formula);
+
+  allineaVersione('9.9.9', percorsi);
+
+  const nuovoPkg = JSON.parse(readFileSync(percorsi.pkg, 'utf8'));
+  const nuovaVersione = readFileSync(percorsi.versione, 'utf8');
+  const nuovaFormula = leggiFormula(readFileSync(percorsi.formula, 'utf8'));
+
+  assert.equal(nuovoPkg.version, '9.9.9');
+  assert.equal(nuovaVersione.match(/const VERSION = '([^']+)'/)?.[1], '9.9.9');
+  assert.equal(nuovaFormula.version, '9.9.9', 'la formula e rimasta indietro');
+  assert.match(nuovaFormula.url, /v9\.9\.9\.tar\.gz$/);
+  // L'impronta di quel tarball non esiste ancora: il tag non c'e'.
+  assert.equal(nuovaFormula.sha256, IMPRONTA_DA_CALCOLARE);
 });
 
 test('gli indirizzi delle due sorgenti si costruiscono giusti', () => {

@@ -6,6 +6,16 @@
  * non puo' stare dentro un file cosi'.
  */
 
+/**
+ * L'impronta che vuol dire "non ancora calcolata".
+ *
+ * Un commit non puo' contenere l'hash del proprio tarball: quello lo genera
+ * GitHub dal tag, e il tag punta a quel commit. Nell'albero taggato quindi
+ * l'impronta e' sempre questa, e diventa quella vera solo nel commit dopo e
+ * nella formula che finisce nel tap. `aggiornaTap` si rifiuta di spingerla.
+ */
+export const IMPRONTA_DA_CALCOLARE = '0'.repeat(64);
+
 /** I tre campi che cambiano a ogni versione. */
 export const CAMPI = ['url', 'sha256', 'version'];
 

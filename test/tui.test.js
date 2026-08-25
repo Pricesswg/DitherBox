@@ -7,6 +7,7 @@ import { parseKey, visibleLength } from '../src/cli/term.js';
 import { loadThemes } from '../src/cli/theme.js';
 import { MODE_KEYS, GUIDES } from '../src/cli/preview.js';
 import { loadImage } from '../src/cli/imageio.js';
+import { VERSION } from '../src/cli/version.js';
 import { tempDir, writeSample, mountTui } from './helpers.js';
 
 const press = (tui, s) => tui._handle(parseKey(Buffer.from(s, 'binary')));
@@ -617,4 +618,37 @@ test('la cornice sta sul contenuto in ogni modo, non solo dove ratio e 1', async
       );
     }
   }
+});
+
+/**
+ * Dentro l'interfaccia non si vedeva da nessuna parte quale versione stesse
+ * girando. Sta in fondo a destra, ma non deve mai essere lei a far tagliare
+ * i tasti: su un terminale stretto sparisce invece di rubare spazio a "quit".
+ */
+test('la versione si vede in fondo, e su uno schermo stretto cede il posto', async (t) => {
+  const dir = tempDir(t);
+  const path = await writeSample(dir, 'foto.png', 400, 300);
+
+  const ultima = async (width) => {
+    const { render } = await mountTui(DitherTui, { width, height: 26, path, dir });
+    const frame = render();
+    return senzaColori(frame[frame.length - 1]);
+  };
+
+  const larga = await ultima(110);
+  assert.match(larga, /ditherbox \d+\.\d+\.\d+\s*$/, 'versione assente sullo schermo largo');
+  assert.ok(larga.length <= 110);
+
+  const stretta = await ultima(60);
+  assert.ok(stretta.length <= 60, `riga lunga ${stretta.length} su 60`);
+  assert.doesNotMatch(stretta, /ditherbox \d/, 'la versione non deve stare stretta a forza');
+});
+
+test('la versione mostrata e quella che il programma dichiara', async (t) => {
+  const dir = tempDir(t);
+  const path = await writeSample(dir, 'foto.png', 400, 300);
+  const { render } = await mountTui(DitherTui, { width: 110, height: 26, path, dir });
+  const frame = render();
+  const riga = senzaColori(frame[frame.length - 1]);
+  assert.ok(riga.includes(`ditherbox ${VERSION}`), `riga: ${riga}`);
 });
