@@ -11,9 +11,9 @@
 class Ditherbox < Formula
   desc "Adjustable dithering for photos, with a terminal interface"
   homepage "https://github.com/Pricesswg/DitherBox"
-  url "https://github.com/Pricesswg/DitherBox/archive/refs/tags/v0.2.0.tar.gz"
-  sha256 "e794679c036ac8992cfceb68cc37f4cbc28f9290f8b20accf10561a2d36e7b46"
-  version "0.2.0"
+  url "https://github.com/Pricesswg/DitherBox/archive/refs/tags/v0.3.0.tar.gz"
+  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+  version "0.3.0"
   license "MIT"
 
   head "https://github.com/Pricesswg/DitherBox.git", branch: "main"
