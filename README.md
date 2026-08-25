@@ -490,8 +490,7 @@ the TUI, the command line, the translations and the bundled file. The ones in
 `test/layout.test.js` really do open the widget in Chromium and check the
 layout. If Chromium is not there they skip instead of failing the suite.
 
-The test suite needs Node 22 (it uses `fs.globSync`); the program itself runs
-on 18.
+The test suite runs on the same Node the program does, 18 and up.
 
 ### The images in this README
 
