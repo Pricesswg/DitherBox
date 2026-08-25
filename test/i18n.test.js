@@ -17,7 +17,7 @@ import {
   paramLabel, paletteLabel, algorithmLabel, presetLabel, groupLabel,
 } from '../src/core/index.js';
 
-import { MODE_KEYS, modeLabel } from '../src/cli/preview.js';
+import { MODE_KEYS, modeLabel, GUIDE_KEYS, guideLabel } from '../src/cli/preview.js';
 
 /** I nomi fra graffe dentro una stringa: {name}, {size}, {msg}. */
 const segnaposti = (s) => new Set((s.match(/\{(\w+)\}/g) || []).sort());
@@ -60,6 +60,7 @@ test('tutto quello che l interfaccia mostra ha una chiave', () => {
   for (const a of ALGORITHMS) controlla(`algorithm.${a}`);
   for (const k of Object.keys(PRESETS)) controlla(`preset.${k}`);
   for (const m of MODE_KEYS) controlla(`mode.${m}`);
+  for (const g of GUIDE_KEYS) controlla(`guide.${g}`);
 
   assert.deepEqual(mancanti, [], `chiavi mancanti: ${mancanti.join(', ')}`);
 });
@@ -100,6 +101,9 @@ test('ogni lingua traduce davvero palette, algoritmi, preset e modi', () => {
     }
     for (const m of MODE_KEYS) {
       assert.ok(!modeLabel(m, t).startsWith('mode.'), `${lingua}: modo ${m}`);
+    }
+    for (const g of GUIDE_KEYS) {
+      assert.ok(!guideLabel(g, t).startsWith('guide.'), `${lingua}: cornice ${g}`);
     }
   }
 });

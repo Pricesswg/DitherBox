@@ -4,7 +4,7 @@
  *
  *   npm run termshot -- docs/tui.png foto.jpg
  *   node scripts/termshot.js docs/tui.png foto.jpg 100 32 braille en simonitto \
- *     '{"algorithm":"atkinson"}'
+ *     '{"algorithm":"atkinson"}' red
  *
  * Il motivo per cui esiste: nel README l'interfaccia era incollata come
  * blocco di testo, e su GitHub i glifi braille finivano in un font di
@@ -30,6 +30,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const [
   out = 'tui.png', foto, larghezza = '100', altezza = '32',
   modo = 'halfblock', lingua = 'en', tema = 'simonitto', opzioni,
+  cornice,
 ] = process.argv.slice(2);
 
 const COLS = Number(larghezza);
@@ -62,6 +63,7 @@ async function frameAnsi() {
   const tui = new DitherTui({
     mode: modo, lang: lingua, theme: tema,
     options: opzioni ? JSON.parse(opzioni) : undefined,
+    guide: cornice,
   });
   tui.running = true;
   const righe = [];

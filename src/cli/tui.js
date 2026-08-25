@@ -15,6 +15,7 @@ import {
   usefulStepCeiling, effectiveMegapixels,
   groupLabel, paramLabel, presetLabel, enumLabel,
   processImage, exportSize, resampleBox, isCustomPalette,
+  aspectRatio, cropFrame,
   createTranslator, normalizeLocale, LOCALES, LOCALE_NAMES,
 } from '../core/index.js';
 
@@ -22,7 +23,10 @@ import {
   Screen, parseKey, panel, pad, padStart, center, truncate, visibleLength,
   bar, BLOCKS_V, fg, RESET, BOLD, DIM, REVERSE,
 } from './term.js';
-import { MODES, MODE_KEYS, modeLabel, cellTarget, renderImage } from './preview.js';
+import {
+  MODES, MODE_KEYS, modeLabel, cellTarget, renderImage,
+  GUIDES, GUIDE_KEYS, guideLabel, makeGuide, dimOutside,
+} from './preview.js';
 import { loadThemes, loadConfig, DEFAULT_THEME } from './theme.js';
 import { loadImage, saveImage, listImages, isSupported } from './imageio.js';
 
@@ -94,6 +98,8 @@ export class DitherTui {
     // cornice che sembra rotta. Il braille resta a un tasto di distanza (v)
     // e da' molto piu' dettaglio dove il font lo regge.
     this.previewMode = opts.mode || config.mode || 'halfblock';
+    this.guide = opts.guide || config.guide || 'red';
+    if (!GUIDE_KEYS.includes(this.guide)) this.guide = 'red';
     if (!MODES[this.previewMode]) this.previewMode = 'braille';
 
     this.rows = buildRows();
@@ -270,6 +276,7 @@ export class DitherTui {
     if (name === 'q') return this.stop();
 
     if (name === '?' || (ctrl && name === 'k')) return this.#openHelp();
+    if (name === 'c') return this.#openGuidePicker();
     if (name === 't') return this.#openThemePicker();
     if (name === 'p') return this.#openPresetPicker();
     if (ctrl && name === 'l') return this.#openLanguagePicker();
@@ -447,6 +454,7 @@ export class DitherTui {
       ['n  N', 'step'],
       ['g  G  home  end', 'ends'],
       ['v', 'mode'],
+      ['c', 'guide'],
       ['t', 'theme'],
       ['p', 'preset'],
       ['ctrl+l', 'lang'],
@@ -522,6 +530,26 @@ export class DitherTui {
         this.#say(this.tr('tui.themeSet', { name: item.value }), 'accent');
       },
       onCancel: () => { this.themeName = original; },
+    });
+  }
+
+  /**
+   * Il colore della cornice di inquadratura, spegnimento compreso.
+   * Sotto 'g' non poteva stare: quello porta gia' a inizio e fine corsa.
+   */
+  #openGuidePicker() {
+    const original = this.guide;
+    const cambia = (v) => { this.guide = v; this.cache = null; };
+    this.#listOverlay({
+      title: this.tr('tui.guide'),
+      items: GUIDE_KEYS.map((k) => ({ label: guideLabel(k, this.tr), value: k })),
+      initialIndex: Math.max(0, GUIDE_KEYS.indexOf(this.guide)),
+      onPreview: (item) => cambia(item.value),
+      onConfirm: (item) => {
+        cambia(item.value);
+        this.#say(this.tr('tui.guideSet', { name: item.label }), 'accent');
+      },
+      onCancel: () => cambia(original),
     });
   }
 
@@ -925,7 +953,7 @@ export class DitherTui {
     if (!this.source) return null;
     if (cols === undefined) return this.cache ? this.cache.result : null;
 
-    const key = `${cols}x${rows}|${this.previewMode}|${this.imagePath}|${JSON.stringify(this.options)}`;
+    const key = `${cols}x${rows}|${this.previewMode}|${this.guide}|${this.imagePath}|${JSON.stringify(this.options)}`;
     if (this.cache && this.cache.key === key) return this.cache.result;
 
     // Si elabora alla risoluzione di uscita e poi si rimpicciolisce, che e'
@@ -943,9 +971,51 @@ export class DitherTui {
     // vogliamo riprodurre, perche' e' quello che vede chi guarda.
     const uscita = this.#exportResult();
     const target = cellTarget(uscita.image.width, uscita.image.height, cols, rows, this.previewMode);
-    const result = { ...uscita, image: resampleBox(uscita.image, target.width, target.height) };
+    const image = resampleBox(uscita.image, target.width, target.height);
+
+    const guide = this.#guideRect(uscita.image, image);
+    // Fuori dal ritaglio c'e' quello che si sta buttando: spegnerlo lo dice
+    // meglio di qualsiasi messaggio. Fuori dalle bande invece non c'e'
+    // niente da buttare, e infatti quelle non si spengono.
+    if (guide && this.options.fit === 'crop') dimOutside(image, guide);
+
+    const result = { ...uscita, image, guide };
     this.cache = { key, result };
     return result;
+  }
+
+  /** Vero quando la cornice ha davvero qualcosa da mostrare. */
+  #guideActive() {
+    return this.guide !== 'off' && aspectRatio(this.options.aspect) !== null;
+  }
+
+  /**
+   * Il rettangolo da sovrapporre, in pixel dell'immagine d'anteprima.
+   *
+   * Col ritaglio l'anteprima e' la foto intera e la cornice segna quello che
+   * sopravvive; con le bande l'anteprima e' gia' inquadrata e la cornice
+   * segna dove finisce la fotografia e cominciano le bande.
+   */
+  #guideRect(uscita, mostrata) {
+    if (!this.#guideActive()) return null;
+    const dentro = this.options.fit === 'crop'
+      ? cropFrame(uscita.width, uscita.height, aspectRatio(this.options.aspect))
+      : cropFrame(uscita.width, uscita.height, this.source.width / this.source.height);
+
+    // Il rettangolo si calcola sull'immagine d'uscita e poi si porta su
+    // quella mostrata, che non ha le stesse proporzioni: cellTarget la
+    // deforma del `ratio` della modalita', perche' una cella di terminale
+    // e' alta il doppio di quanto e' larga. Calcolarlo direttamente sulla
+    // mostrata dava una cornice che nei modi a ratio 2 non stava sul
+    // contenuto.
+    const sx = mostrata.width / uscita.width;
+    const sy = mostrata.height / uscita.height;
+    return {
+      x: Math.round(((uscita.width - dentro.width) / 2) * sx),
+      y: Math.round(((uscita.height - dentro.height) / 2) * sy),
+      width: Math.max(1, Math.round(dentro.width * sx)),
+      height: Math.max(1, Math.round(dentro.height * sy)),
+    };
   }
 
   /**
@@ -976,13 +1046,20 @@ export class DitherTui {
    * la differenza non arriva all'occhio.
    */
   #previewOptions() {
+    // Con la cornice accesa e il ritaglio attivo l'anteprima mostra la foto
+    // intera: una cornice disegnata sull'immagine gia' ritagliata cadrebbe
+    // esattamente sul bordo, e non direbbe niente a nessuno.
+    const opzioni = this.#guideActive() && this.options.fit === 'crop'
+      ? { ...this.options, aspect: 'source' }
+      : this.options;
+
     const propri = effectiveMegapixels(
       this.source.width, this.source.height, this.options.megapixels,
     );
-    if (propri <= MAX_PREVIEW_MP) return this.options;
+    if (propri <= MAX_PREVIEW_MP) return opzioni;
     const lineare = Math.sqrt(MAX_PREVIEW_MP / propri);
     return {
-      ...this.options,
+      ...opzioni,
       megapixels: MAX_PREVIEW_MP,
       scale: Math.max(1, Math.round(this.options.scale * lineare)),
     };
@@ -1004,7 +1081,10 @@ export class DitherTui {
       ];
     } else {
       const result = this.#previewResult(inner, innerH);
-      const picture = renderImage(result.image, this.previewMode, t);
+      const cornice = result.guide
+        ? makeGuide(result.guide, this.previewMode, GUIDES[this.guide])
+        : null;
+      const picture = renderImage(result.image, this.previewMode, t, cornice);
       // Centra il disegno nel pannello: un'immagine incollata in alto a
       // sinistra dentro una cornice grande fa un effetto sciatto.
       const padTop = Math.max(0, Math.floor((innerH - picture.length) / 2));

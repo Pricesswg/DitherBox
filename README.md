@@ -178,6 +178,7 @@ Arrow keys or vim keys, whichever your hands reach for first.
 | `n` `N` | Next / previous image |
 | `g` `G` `home` `end` | Jump to the top / bottom |
 | `v` | Change preview mode |
+| `c` | Colour of the framing guide, off included |
 | `t` | Pick the theme (live preview while you scroll) |
 | `p` | Apply a preset |
 | `ctrl+l` | Pick the language (live preview while you scroll) |
@@ -212,6 +213,16 @@ terminal grid, which is exactly what an image viewer does when it opens the
 file. So a fine dither looks smooth in the preview because it will look smooth
 in the file as well. To see the texture, raise **Pixel** or lower
 **Megapixels**, and it appears in both at once.
+
+When **Aspect** asks for a ratio the photo has not got, `c` draws a framing
+guide over the preview in one of five bright colours, red by default. With
+**Fit** on crop the preview goes back to showing the whole photo, dimmed
+outside the guide, so you can see what you are about to lose: drawn over the
+already cropped image the guide would sit exactly on the border and tell you
+nothing. With **Fit** on bars the preview is framed already, and the guide
+marks where the photograph ends and the bars begin. The colour is not taken
+from the theme, because a guide is worth most on the images that theme suits
+best, which is where a theme colour would disappear.
 
 From the command line the destination is explicit instead:
 
@@ -297,6 +308,7 @@ the choice.
 ```toml
 theme = "gruvbox"
 mode = "braille"
+guide = "cyan"
 lang = "it"
 palette = "bw"
 algorithm = "atkinson"

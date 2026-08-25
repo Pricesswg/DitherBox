@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { DitherTui } from '../src/cli/tui.js';
 import { parseKey, visibleLength } from '../src/cli/term.js';
 import { loadThemes } from '../src/cli/theme.js';
-import { MODE_KEYS } from '../src/cli/preview.js';
+import { MODE_KEYS, GUIDES } from '../src/cli/preview.js';
 import { loadImage } from '../src/cli/imageio.js';
 import { tempDir, writeSample, mountTui } from './helpers.js';
 
@@ -479,4 +479,142 @@ test("l'intestazione dichiara la misura d'uscita col rapporto chiesto", async (t
   tui.options = { ...tui.options, aspect: '16:9', fit: 'pad' };
   tui.cache = null;
   assert.match(testo(render()), /1778×1000/);
+});
+
+const COLORI_GUIDA = new Set(Object.values(GUIDES).map((c) => c.join(',')));
+
+/**
+ * Le celle di cornice presenti in un frame, col loro colore.
+ * Si filtra sui colori della guida perche' i caratteri di cornice li usano
+ * anche i pannelli della TUI, e senza il filtro si contavano quelli.
+ */
+function corniceNelFrame(frame) {
+  const out = [];
+  for (const riga of frame) {
+    for (const m of riga.matchAll(/\x1b\[38;2;(\d+);(\d+);(\d+)m([┌┐└┘─│])/g)) {
+      const colore = `${m[1]},${m[2]},${m[3]}`;
+      if (COLORI_GUIDA.has(colore)) out.push(colore);
+    }
+  }
+  return out;
+}
+
+/**
+ * La cornice serve a far vedere che cosa si perde, e per vederlo l'anteprima
+ * deve mostrare la foto intera: disegnata sull'immagine gia' ritagliata
+ * cadrebbe sul bordo del riquadro e non direbbe niente.
+ */
+test('col ritaglio la cornice compare sopra l anteprima, nel colore scelto', async (t) => {
+  const dir = tempDir(t);
+  const path = await writeSample(dir, 'foto.png', 900, 900);
+  const { tui, render } = await mountTui(
+    DitherTui, { width: 110, height: 34, path, dir, mode: 'halfblock' },
+  );
+
+  tui.options = { ...tui.options, aspect: '16:9', fit: 'crop' };
+  tui.guide = 'off';
+  tui.cache = null;
+  assert.deepEqual(corniceNelFrame(render()), [], 'spenta non deve disegnare niente');
+
+  tui.guide = 'red';
+  tui.cache = null;
+  const rossa = corniceNelFrame(render());
+  assert.ok(rossa.length > 8, `cornice assente: ${rossa.length} celle`);
+  assert.ok(rossa.every((c) => c === '255,45,45'), `colori diversi dal rosso: ${[...new Set(rossa)]}`);
+
+  tui.guide = 'cyan';
+  tui.cache = null;
+  assert.ok(corniceNelFrame(render()).every((c) => c === '0,229,255'), 'il ciano non ha preso');
+});
+
+test('senza un rapporto scelto non c e niente da inquadrare', async (t) => {
+  const dir = tempDir(t);
+  const path = await writeSample(dir, 'foto.png', 900, 900);
+  const { tui, render } = await mountTui(DitherTui, { width: 110, height: 34, path, dir });
+  tui.options = { ...tui.options, aspect: 'source' };
+  tui.guide = 'red';
+  tui.cache = null;
+  assert.deepEqual(corniceNelFrame(render()), []);
+});
+
+/**
+ * Col ritaglio l'anteprima torna a mostrare la foto intera, quindi resta
+ * quadrata come la sorgente; con le bande e' gia' inquadrata e la cornice
+ * segna la fotografia dentro le bande, senza spegnere niente.
+ */
+test('la cornice si disegna in tutti i modi di anteprima', async (t) => {
+  const dir = tempDir(t);
+  const path = await writeSample(dir, 'foto.png', 900, 900);
+  for (const mode of MODE_KEYS) {
+    for (const fit of ['crop', 'pad']) {
+      const { tui, render } = await mountTui(
+        DitherTui, { width: 110, height: 34, path, dir, mode },
+      );
+      tui.options = { ...tui.options, aspect: '16:9', fit };
+      tui.guide = 'yellow';
+      tui.cache = null;
+      const celle = corniceNelFrame(render());
+      assert.ok(celle.length > 8, `${mode}/${fit}: solo ${celle.length} celle di cornice`);
+      assert.ok(celle.every((c) => c === '255,226,0'), `${mode}/${fit}: colore sbagliato`);
+    }
+  }
+});
+
+/** Posizione in celle di ogni tratto di cornice trovato nel frame. */
+function corniceCelle(frame) {
+  const out = [];
+  frame.forEach((riga, y) => {
+    for (const m of riga.matchAll(/\x1b\[38;2;(\d+);(\d+);(\d+)m([┌┐└┘─│])/g)) {
+      if (!COLORI_GUIDA.has(`${m[1]},${m[2]},${m[3]}`)) continue;
+      const prima = riga.slice(0, m.index).replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '');
+      out.push({ x: [...prima].length, y });
+    }
+  });
+  return out;
+}
+
+/**
+ * Le proporzioni della cornice come appaiono a schermo, dove una cella e'
+ * alta il doppio di quanto e' larga.
+ */
+function rapportoAVista(celle) {
+  const xs = celle.map((c) => c.x);
+  const ys = celle.map((c) => c.y);
+  const w = Math.max(...xs) - Math.min(...xs) + 1;
+  const h = Math.max(...ys) - Math.min(...ys) + 1;
+  return w / (h * 2);
+}
+
+/**
+ * La cornice va calcolata sull'immagine d'uscita e poi portata su quella
+ * mostrata, che ha proporzioni diverse: cellTarget la deforma del `ratio`
+ * della modalita'. Calcolandola sulla mostrata la cornice sembrava giusta
+ * in mezzi blocchi, dove ratio e' 1, e cadeva fuori dal contenuto in
+ * quadranti e in ASCII, dove ratio e' 2. Un test che si limitasse a
+ * contare le celle di cornice non se ne accorgerebbe.
+ */
+test('la cornice sta sul contenuto in ogni modo, non solo dove ratio e 1', async (t) => {
+  const dir = tempDir(t);
+  const path = await writeSample(dir, 'wide.png', 1600, 900);
+
+  for (const mode of MODE_KEYS) {
+    // Col ritaglio la cornice segna il rapporto chiesto; con le bande segna
+    // la fotografia, che ha il rapporto della sorgente.
+    for (const [fit, atteso] of [['crop', 1], ['pad', 1600 / 900]]) {
+      const { tui, render } = await mountTui(
+        DitherTui, { width: 120, height: 40, path, dir, mode },
+      );
+      tui.options = { ...tui.options, aspect: '1:1', fit };
+      tui.guide = 'red';
+      tui.cache = null;
+
+      const celle = corniceCelle(render());
+      assert.ok(celle.length > 8, `${mode}/${fit}: cornice assente`);
+      const visto = rapportoAVista(celle);
+      assert.ok(
+        Math.abs(visto - atteso) / atteso < 0.25,
+        `${mode}/${fit}: cornice a ${visto.toFixed(2)}, atteso ${atteso.toFixed(2)}`,
+      );
+    }
+  }
 });
