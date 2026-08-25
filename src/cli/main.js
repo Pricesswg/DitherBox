@@ -20,7 +20,7 @@ import { cellTarget, renderImage, modeLabel, MODES, MODE_KEYS } from './preview.
 import { loadThemes, loadConfig, DEFAULT_THEME } from './theme.js';
 import { DitherTui } from './tui.js';
 
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
 
 /**
  * Traduttore predefinito per le funzioni che non ne ricevono uno.
