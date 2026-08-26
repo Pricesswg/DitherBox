@@ -186,7 +186,8 @@ Arrow keys or vim keys, whichever your hands reach for first.
 | `ctrl+l` | Pick the language (live preview while you scroll) |
 | `i` | Invert |
 | `r` | Reset every parameter |
-| `o` | Open a path |
+| `o` | Browse folders and images, with a preview beside the list |
+| `O` | Type a path instead |
 | `s` / `ctrl+s` | Save at full resolution |
 | `ctrl+x` | Show or hide the file list |
 | `?` / `ctrl+k` | List of keys |
@@ -207,6 +208,14 @@ That path is just text, and you edit it however you like. `~` expands to your
 home directory, `ctrl+u` clears everything before the cursor, `ctrl+w` deletes
 a word backwards, `esc` cancels. Only `.png` and `.jpg` are accepted, and the
 extension decides the format.
+
+`o` opens a browser: the folder you are in at the top, folders and images
+below, and a thumbnail of whatever is highlighted on the right, so you can
+see what you are about to open rather than recognise it by filename. `enter`
+goes into a folder or opens an image, `h` goes back up, `~` jumps home, `q`
+closes, and `p` switches to typing a path when you already know where you are
+going. From the save field, `ctrl+o` opens the same browser to pick the
+destination folder and comes back with the filename already in place.
 
 The saved file is processed at **full resolution**, at whatever megapixel count
 the **Megapixels** parameter is set to. The preview shows that same result,

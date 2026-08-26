@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
+import { mkdirSync } from 'node:fs';
 
 import { DitherTui } from '../src/cli/tui.js';
 import { parseKey, visibleLength } from '../src/cli/term.js';
@@ -989,4 +990,114 @@ test('svuotare il campo riporta la misura ad auto', async (t) => {
   for (let i = 0; i < 6; i++) press(tui, '\x7f');
   press(tui, '\r');
   assert.equal(tui.options.width, 0, 'vuoto deve voler dire auto');
+});
+
+/** Attende che l'anteprima asincrona dello sfogliatore arrivi. */
+const respira = (ms = 400) => new Promise((r) => { setTimeout(r, ms); });
+
+/**
+ * Per cambiare cartella l'unico modo era scrivere il percorso a memoria.
+ * Lo sfogliatore mostra dove si e' e che cosa c'e' dentro, con l'anteprima
+ * di quello che si sta guardando.
+ */
+test('o apre lo sfogliatore e mostra cartelle e immagini', async (t) => {
+  const dir = tempDir(t);
+  mkdirSync(join(dir, 'sottocartella'));
+  await writeSample(dir, 'una.png', 60, 40);
+  await writeSample(dir, 'due.png', 60, 40);
+  const { tui, render } = await mountTui(DitherTui, { width: 120, height: 34, dir });
+
+  press(tui, 'o');
+  await respira(150);
+  const schermo = testo(render());
+  assert.match(schermo, /sottocartella/);
+  assert.match(schermo, /una\.png/);
+  assert.match(schermo, /due\.png/);
+  assert.match(schermo, /\.\./, 'deve esserci il modo di risalire');
+});
+
+test('lo sfogliatore entra nelle cartelle e ne risale', async (t) => {
+  const dir = tempDir(t);
+  mkdirSync(join(dir, 'dentro'));
+  await writeSample(join(dir, 'dentro'), 'nascosta.png', 40, 40);
+  const { tui, render } = await mountTui(DitherTui, { width: 120, height: 34, dir });
+
+  press(tui, 'o');
+  await respira(150);
+  assert.doesNotMatch(testo(render()), /nascosta\.png/);
+
+  // Giu' fino a "dentro", poi invio.
+  press(tui, 'j');
+  press(tui, '\r');
+  await respira(150);
+  assert.match(testo(render()), /nascosta\.png/, 'non e entrato nella cartella');
+
+  press(tui, 'h');
+  await respira(150);
+  assert.doesNotMatch(testo(render()), /nascosta\.png/, 'non e risalito');
+});
+
+/**
+ * L'anteprima e' il motivo per cui sfogliare serve piu' di un elenco di nomi:
+ * i colori che compaiono a destra sono l'immagine, non la cornice.
+ */
+test('lo sfogliatore mostra l anteprima di quello che si sta guardando', async (t) => {
+  const dir = tempDir(t);
+  await writeSample(dir, 'foto.png', 200, 150);
+  const { tui, render } = await mountTui(
+    DitherTui, { width: 120, height: 34, dir, mode: 'halfblock' },
+  );
+
+  press(tui, 'o');
+  await respira(150);
+  const prima = coloriDelFrame(render()).size;
+
+  press(tui, 'j'); // sulla foto
+  await respira(700); // caricamento e ridisegno
+  tui.render();
+  const dopo = coloriDelFrame(render()).size;
+
+  assert.ok(dopo > prima + 4, `nessuna anteprima: ${prima} colori prima, ${dopo} dopo`);
+});
+
+test('invio su un immagine la apre davvero', async (t) => {
+  const dir = tempDir(t);
+  await writeSample(dir, 'scelta.png', 80, 60);
+  const { tui, render } = await mountTui(DitherTui, { width: 120, height: 34, dir });
+
+  press(tui, 'o');
+  await respira(150);
+  press(tui, 'j');
+  press(tui, '\r');
+  await respira(400);
+
+  assert.match(tui.imagePath || '', /scelta\.png$/, `aperta invece: ${tui.imagePath}`);
+  assert.equal(tui.overlay, null, 'la sovrapposta doveva chiudersi');
+  assert.match(testo(render()), /scelta\.png/);
+});
+
+/** Il salvataggio deve poter scegliere la cartella sfogliando, non a memoria. */
+test('dal campo di salvataggio ctrl+o sfoglia e torna col percorso composto', async (t) => {
+  const dir = tempDir(t);
+  mkdirSync(join(dir, 'esiti'));
+  const path = await writeSample(dir, 'foto.png', 80, 60);
+  const { tui, render } = await mountTui(DitherTui, { width: 120, height: 34, path, dir });
+
+  press(tui, 's');
+  assert.ok(tui.overlay, 'il campo di salvataggio deve aprirsi');
+
+  tui._handle({ name: 'o', ctrl: true, shift: false });
+  await respira(200);
+  assert.match(testo(render()), /esiti/, 'doveva passare a sfogliare le cartelle');
+
+  // La prima voce sceglie la cartella in cui si e'; si scende su "esiti".
+  press(tui, 'j');
+  press(tui, 'j');
+  press(tui, '\r');
+  await respira(200);
+  press(tui, '\r');
+  await respira(200);
+
+  assert.ok(tui.overlay, 'deve tornare al campo di salvataggio');
+  assert.match(testo(render()), /esiti/, 'il percorso proposto deve stare dentro la cartella scelta');
 });

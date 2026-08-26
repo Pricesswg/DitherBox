@@ -4,7 +4,7 @@
  * librerie native da compilare, l'installazione resta un npm install secco.
  */
 
-import { readFile, writeFile, readdir } from 'node:fs/promises';
+import { readFile, writeFile, readdir, stat } from 'node:fs/promises';
 import { extname, basename, join } from 'node:path';
 import { PNG } from 'pngjs';
 import * as jpeg from 'jpeg-js';
@@ -118,6 +118,41 @@ export async function saveImage(path, img, quality) {
   const ext = extname(path).toLowerCase();
   if (ext === '.jpg' || ext === '.jpeg') return saveJpeg(path, img, quality);
   return savePng(path, img);
+}
+
+/**
+ * Il contenuto di una cartella: prima le sottocartelle, poi le immagini
+ * che il programma sa aprire. I nomi che cominciano per punto restano fuori.
+ *
+ * I collegamenti si seguono con `stat`: una cartella raggiunta per
+ * collegamento e' comunissima (iCloud, cartelle condivise) e senza questo
+ * comparirebbe come una voce che non si apre.
+ */
+export async function listEntries(dir) {
+  const voci = (await readdir(dir, { withFileTypes: true }))
+    .filter((e) => !e.name.startsWith('.'));
+
+  const decise = await Promise.all(voci.map(async (e) => {
+    const path = join(dir, e.name);
+    let cartella = e.isDirectory();
+    if (e.isSymbolicLink()) {
+      try {
+        cartella = (await stat(path)).isDirectory();
+      } catch {
+        return null; // collegamento rotto: non serve a nessuno vederlo
+      }
+    }
+    if (!cartella && !(e.isFile() || e.isSymbolicLink())) return null;
+    if (!cartella && !isSupported(e.name)) return null;
+    return { name: e.name, path, dir: cartella };
+  }));
+
+  const buone = decise.filter(Boolean);
+  const ordina = (a, b) => a.name.localeCompare(b.name, 'it');
+  return [
+    ...buone.filter((v) => v.dir).sort(ordina),
+    ...buone.filter((v) => !v.dir).sort(ordina),
+  ];
 }
 
 /** Elenca le immagini apribili dentro una cartella, in ordine alfabetico. */

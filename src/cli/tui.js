@@ -25,11 +25,13 @@ import {
   bar, BLOCKS_V, fg, RESET, BOLD, DIM, REVERSE,
 } from './term.js';
 import {
-  MODES, MODE_KEYS, modeLabel, cellTarget, renderImage,
+  MODES, MODE_KEYS, modeLabel, cellTarget, renderImage, renderFitted,
   GUIDES, GUIDE_KEYS, guideLabel, makeGuide, dimOutside,
 } from './preview.js';
 import { loadThemes, loadConfig, DEFAULT_THEME } from './theme.js';
-import { loadImage, saveImage, listImages, isSupported } from './imageio.js';
+import {
+  loadImage, saveImage, listImages, listEntries, isSupported,
+} from './imageio.js';
 import { VERSION } from './version.js';
 
 const STATUS_HEIGHT = 1;
@@ -295,7 +297,8 @@ export class DitherTui {
     if (name === 't') return this.#openThemePicker();
     if (name === 'p') return this.#openPresetPicker();
     if (ctrl && name === 'l') return this.#openLanguagePicker();
-    if (name === 'o') return this.#openPathPrompt();
+    if (name === 'o') return this.#openOpenBrowser();
+    if (name === 'O') return this.#openPathPrompt();
     if (name === 's' || (ctrl && name === 's')) return this.#openSavePrompt();
 
     if (name === 'v') {
@@ -567,7 +570,8 @@ export class DitherTui {
       ['ctrl+l', 'lang'],
       ['i', 'invert'],
       ['r', 'reset'],
-      ['o', 'openPath'],
+      ['o', 'browse'],
+      ['O', 'typePath'],
       ['s  ctrl+s', 'save'],
       ['ctrl+x', 'files'],
       ['?  ctrl+k', 'help'],
@@ -698,8 +702,185 @@ export class DitherTui {
     return this.locale;
   }
 
+  /**
+   * Sfoglia le cartelle, con l'anteprima di quello che si sta guardando.
+   *
+   * Serve perche' l'unico modo di cambiare cartella era scrivere il percorso
+   * a memoria, e nessuno ricorda dove ha messo le foto. Le anteprime si
+   * caricano quando la riga si illumina e restano in cache: scorrere una
+   * cartella di trecento file non deve leggerli tutti.
+   *
+   * @param {'open'|'folder'} mode  'open' sceglie un'immagine, 'folder' una cartella
+   */
+  #openBrowser({ mode = 'open', start, onPick }) {
+    const stato = {
+      dir: resolve(start || this.dir || process.cwd()),
+      voci: [],
+      index: 0,
+      caricando: true,
+      anteprime: new Map(),
+    };
+
+    const overlay = {
+      title: this.tr(mode === 'folder' ? 'tui.browseFolder' : 'tui.browse'),
+      // Piu' larga delle altre: qui dentro ci stanno due colonne.
+      width: 96,
+      render: (w) => this.#browserLines(stato, overlay, w, mode),
+      onKey: (key) => this.#browserKey(stato, overlay, key, mode, onPick),
+    };
+    this.overlay = overlay;
+    this.#browserLoad(stato, overlay);
+  }
+
+  /** Legge la cartella corrente e ridisegna quando ha finito. */
+  async #browserLoad(stato, overlay, seleziona) {
+    stato.caricando = true;
+    try {
+      stato.voci = await listEntries(stato.dir);
+    } catch {
+      stato.voci = [];
+    }
+    stato.caricando = false;
+    const i = seleziona ? stato.voci.findIndex((v) => v.path === seleziona) : -1;
+    stato.index = i >= 0 ? i : 0;
+    if (this.overlay === overlay) this.render();
+  }
+
+  /** Le voci mostrate: la cartella stessa, quella sopra, e quello che c'e' dentro. */
+  #browserRows(stato, mode) {
+    const righe = [];
+    if (mode === 'folder') {
+      righe.push({ kind: 'here', name: this.tr('tui.useFolder') });
+    }
+    if (dirname(stato.dir) !== stato.dir) {
+      righe.push({ kind: 'up', name: '..' });
+    }
+    for (const v of stato.voci) righe.push({ kind: v.dir ? 'dir' : 'file', ...v });
+    return righe;
+  }
+
+  #browserLines(stato, overlay, w, mode) {
+    const t = this.theme;
+    const righe = this.#browserRows(stato, mode);
+    stato.righe = righe;
+    if (stato.index >= righe.length) stato.index = Math.max(0, righe.length - 1);
+
+    // L'anteprima solo se avanza spazio: su un terminale stretto l'elenco
+    // vale piu' di lei.
+    const largaAnteprima = w >= 56 ? Math.min(30, Math.floor(w * 0.4)) : 0;
+    const largaLista = w - largaAnteprima - (largaAnteprima ? 2 : 0);
+    const alte = Math.max(6, Math.min(16, righe.length || 1));
+
+    // Finestra scorrevole attorno alla riga scelta.
+    const da = Math.max(0, Math.min(stato.index - Math.floor(alte / 2), righe.length - alte));
+    const viste = righe.slice(Math.max(0, da), Math.max(0, da) + alte);
+
+    const elenco = viste.map((r, i) => {
+      const scelta = Math.max(0, da) + i === stato.index;
+      const segno = r.kind === 'dir' ? '▸ ' : r.kind === 'up' ? '↑ ' : r.kind === 'here' ? '· ' : '  ';
+      const testo = truncate(`${segno}${r.name}`, largaLista - 1);
+      return scelta
+        ? `${REVERSE}${fg(t.accent)}${pad(testo, largaLista - 1)}${RESET}`
+        : `${fg(r.kind === 'file' ? t.bright_fg : t.fg)}${pad(testo, largaLista - 1)}${RESET}`;
+    });
+    while (elenco.length < alte) elenco.push(pad('', largaLista - 1));
+
+    const anteprima = largaAnteprima
+      ? this.#browserPreview(stato, overlay, largaAnteprima, alte)
+      : [];
+
+    const corpo = elenco.map((riga, i) => (largaAnteprima
+      ? `${riga}  ${anteprima[i] || ''}`
+      : riga));
+
+    const dove = truncate(`${fg(t.accent)}${stato.dir}${RESET}`, w);
+    const aiuto = truncate(
+      `${fg(t.fg)}${this.tr(mode === 'folder' ? 'tui.browseHelpFolder' : 'tui.browseHelp')}${RESET}`,
+      w,
+    );
+    return [dove, '', ...corpo, '', aiuto];
+  }
+
+  /**
+   * Le righe dell'anteprima per la voce scelta.
+   *
+   * Il caricamento parte da qui, che e' un effetto dentro il disegno: si
+   * scopre solo disegnando quanto spazio c'e', e quindi a che misura serve.
+   * Parte una volta sola per chiave, e quando finisce ridisegna.
+   */
+  #browserPreview(stato, overlay, cols, rows) {
+    const riga = stato.righe[stato.index];
+    if (!riga || riga.kind !== 'file') return [];
+
+    const chiave = `${riga.path}|${cols}x${rows}|${this.previewMode}`;
+    if (!stato.anteprime.has(chiave)) {
+      stato.anteprime.set(chiave, null);
+      loadImage(riga.path)
+        .then((img) => {
+          stato.anteprime.set(chiave, renderFitted(img, cols, rows, this.previewMode, this.theme));
+        })
+        .catch(() => stato.anteprime.set(chiave, []))
+        .then(() => { if (this.overlay === overlay) this.render(); });
+    }
+    return stato.anteprime.get(chiave) || [];
+  }
+
+  #browserKey(stato, overlay, key, mode, onPick) {
+    const righe = stato.righe || this.#browserRows(stato, mode);
+    const { name, ctrl } = key;
+
+    if (name === 'escape' || name === 'q' || (ctrl && name === 'c')) {
+      this.overlay = null;
+      return;
+    }
+    if (name === 'up' || name === 'k') {
+      stato.index = (stato.index - 1 + righe.length) % righe.length;
+      return;
+    }
+    if (name === 'down' || name === 'j') {
+      stato.index = (stato.index + 1) % righe.length;
+      return;
+    }
+    if (name === 'home' || name === 'g') { stato.index = 0; return; }
+    if (name === 'end' || name === 'G') { stato.index = righe.length - 1; return; }
+    if (name === 'left' || name === 'h' || name === 'backspace') {
+      const sopra = dirname(stato.dir);
+      if (sopra !== stato.dir) {
+        const lasciata = stato.dir;
+        stato.dir = sopra;
+        this.#browserLoad(stato, overlay, lasciata);
+      }
+      return;
+    }
+    if (name === '~') {
+      stato.dir = process.env.HOME || stato.dir;
+      this.#browserLoad(stato, overlay);
+      return;
+    }
+    // Scrivere il percorso resta possibile: certe cartelle si raggiungono
+    // prima a memoria che sfogliando.
+    if (name === 'p') {
+      this.#openPathPrompt(stato.dir);
+      return;
+    }
+    if (name === 'enter' || name === 'space' || name === 'right' || name === 'l') {
+      const riga = righe[stato.index];
+      if (!riga) return;
+      if (riga.kind === 'here') { this.overlay = null; onPick(stato.dir); return; }
+      if (riga.kind === 'up' || riga.kind === 'dir') {
+        const lasciata = stato.dir;
+        stato.dir = riga.kind === 'up' ? dirname(stato.dir) : riga.path;
+        this.#browserLoad(stato, overlay, riga.kind === 'up' ? lasciata : undefined);
+        return;
+      }
+      if (mode === 'folder') { this.overlay = null; onPick(stato.dir); return; }
+      this.overlay = null;
+      onPick(riga.path);
+    }
+  }
+
   /** Campo di testo su una riga, con i tasti di editing essenziali. */
-  #promptOverlay({ title, hint, initial, onConfirm }) {
+  #promptOverlay({ title, hint, initial, onConfirm, onBrowse }) {
     let text = initial || '';
     let caret = text.length;
     this.overlay = {
@@ -728,6 +909,9 @@ export class DitherTui {
       onKey: (key) => {
         const { name, ctrl } = key;
         if (name === 'escape') { this.overlay = null; return; }
+        // ctrl+o passa a sfogliare, portandosi dietro quello che c'e' scritto:
+        // cercare una cartella e' molto piu' facile vedendola che scrivendola.
+        if (ctrl && name === 'o' && onBrowse) { onBrowse(text.trim()); return; }
         if (name === 'enter') {
           this.overlay = null;
           onConfirm(text.trim());
@@ -766,11 +950,26 @@ export class DitherTui {
     this.render();
   }
 
-  #openPathPrompt() {
+  /** Sfoglia per aprire un'immagine. */
+  #openOpenBrowser(start) {
+    this.#openBrowser({
+      mode: 'open',
+      start,
+      onPick: async (path) => {
+        this.dir = dirname(path);
+        await this.#scanDir();
+        await this.openImage(path);
+        this.render();
+      },
+    });
+  }
+
+  #openPathPrompt(start) {
     this.#promptOverlay({
       title: this.tr('tui.open'),
       hint: this.tr('tui.openHint'),
-      initial: this.imagePath ? dirname(this.imagePath) + '/' : `${this.dir}/`,
+      initial: start ? `${start}/` : (this.imagePath ? `${dirname(this.imagePath)}/` : `${this.dir}/`),
+      onBrowse: (scritto) => this.#openOpenBrowser(scritto || undefined),
       onConfirm: async (input) => {
         if (!input) return;
         const path = resolve(input.replace(/^~/, process.env.HOME || '~'));
@@ -794,6 +993,12 @@ export class DitherTui {
     });
   }
 
+  /** Riapre il campo di salvataggio con un percorso gia' composto. */
+  #openSavePromptIn(path) {
+    this.savePathOverride = path;
+    this.#openSavePrompt();
+  }
+
   #openSavePrompt() {
     if (!this.source) return this.#say(this.tr('tui.noImageLoaded'), 'red');
     const base = basename(this.imagePath || 'ditherbox').replace(/\.[^.]+$/, '');
@@ -805,11 +1010,23 @@ export class DitherTui {
     const cartella = this.imagePath && this.imagePath !== SAMPLE_PATH
       ? dirname(this.imagePath)
       : this.dir;
-    const suggested = join(cartella, `${base}-${palette}-${this.options.algorithm}.png`);
+    const suggested = this.savePathOverride
+      || join(cartella, `${base}-${palette}-${this.options.algorithm}.png`);
+    this.savePathOverride = null;
     this.#promptOverlay({
       title: this.tr('tui.save'),
       hint: this.tr('tui.saveHint'),
       initial: suggested,
+      // Scegliere la cartella sfogliando e poi tornare qui col nome del file
+      // gia' pronto: il nome si scrive volentieri, la cartella no.
+      onBrowse: (scritto) => this.#openBrowser({
+        mode: 'folder',
+        start: scritto ? dirname(resolve(scritto.replace(/^~/, process.env.HOME || '~'))) : cartella,
+        onPick: (dove) => {
+          const nome = basename(scritto || suggested) || basename(suggested);
+          this.#openSavePromptIn(join(dove, nome));
+        },
+      }),
       onConfirm: async (input) => {
         if (!input) return;
         const path = resolve(input.replace(/^~/, process.env.HOME || '~'));
@@ -1468,7 +1685,7 @@ export class DitherTui {
   /** Disegna un pannello sovrapposto al centro dello schermo. */
   #applyOverlay(lines, W, H) {
     const t = this.theme;
-    const boxW = Math.min(Math.max(30, W - 8), 66);
+    const boxW = Math.min(Math.max(30, W - 8), this.overlay.width || 66);
     const content = this.overlay.render(boxW - 2);
     const boxH = Math.min(content.length + 2, H - 4);
     const boxed = panel({
