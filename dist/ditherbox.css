@@ -615,6 +615,29 @@
   border-radius: var(--dbx-radius-small);
 }
 
+.dbx__number {
+  min-width: 0;
+  width: 100%;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--dbx-fg);
+  background: var(--dbx-bg);
+  border: 1px solid var(--dbx-border);
+  border-radius: var(--dbx-radius-small);
+  /* Le frecce del campo numerico rubano spazio in una colonna gia' stretta,
+     e qui il valore si scrive: chi vuole un passo alla volta usa i tasti. */
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.dbx__number::-webkit-outer-spin-button,
+.dbx__number::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 .dbx__checkbox {
   width: 15px;
   height: 15px;
@@ -667,6 +690,7 @@
 .dbx__palette:focus-visible,
 .dbx__drop-button:focus-visible,
 .dbx__select:focus-visible,
+.dbx__number:focus-visible,
 .dbx__range:focus-visible {
   outline: 2px solid var(--dbx-accent);
   outline-offset: 2px;

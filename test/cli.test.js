@@ -223,3 +223,32 @@ test('gli errori sono comprensibili e escono con codice 1', async (t) => {
     );
   }
 });
+
+/**
+ * I parametri numerici sono un tipo nuovo, e il parser li trattava come un
+ * elenco di nomi: `--width 1920` moriva su `param.values.includes`, cioe'
+ * su un elenco che un numero non ha.
+ */
+test('--width e --height chiedono una misura esatta e la ottengono', async (t) => {
+  const dir = tempDir(t);
+  const input = await writeSample(dir, 'in.png', 1868, 1078);
+
+  const misura = async (args) => {
+    const out = join(dir, `${args.join('_').replace(/\W+/g, '')}.png`);
+    await cli([input, ...args, '-o', out]);
+    return (await size(out)).join('×');
+  };
+
+  assert.equal(await misura(['--aspect', '16:9', '--width', '1920']), '1920×1080');
+  assert.equal(await misura(['--aspect', '16:9', '--height', '720']), '1280×720');
+  assert.equal(await misura(['--width', '800', '--height', '600']), '800×600');
+  // Anche con i blocchi: 1920 e 1080 sono multipli di quattro.
+  assert.equal(await misura(['--width', '1920', '--height', '1080', '--scale', '4']), '1920×1080');
+  // E una misura chiesta ingrandisce, dove i megapixel si fermerebbero.
+  assert.equal(await misura(['--aspect', '1:1', '--width', '2400']), '2400×2400');
+
+  await assert.rejects(
+    cli([input, '--width', 'abc', '-o', join(dir, 'x.png')]),
+    /wants a number/,
+  );
+});

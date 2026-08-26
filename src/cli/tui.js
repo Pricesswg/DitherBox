@@ -13,7 +13,8 @@ import {
   PARAMS, PRESETS, DEFAULTS,
   normalizeOptions, formatValue, applyPreset, paramSteps, stepIndex, stepBy,
   usefulStepCeiling, effectiveMegapixels,
-  groupLabel, paramLabel, presetLabel, enumLabel,
+  groupLabel, paramLabel, paramHint, presetLabel, enumLabel,
+  linkedDimensions,
   processImage, exportSize, resampleBox, isCustomPalette,
   aspectRatio, selectionFrame, targetSize, cropRect,
   createTranslator, normalizeLocale, LOCALES, LOCALE_NAMES,
@@ -464,6 +465,16 @@ export class DitherTui {
       const next = (base + steps + param.values.length * 10) % param.values.length;
       return this.#setOption(param.key, param.values[next]);
     }
+    if (param.type === 'number') {
+      const attuale = Math.round(Number(current) || 0);
+      // Da "auto" il primo passo si posa sulla misura che il file ha adesso:
+      // partire da dieci pixel non servirebbe a nessuno, e cosi' invece si
+      // comincia da dove si e' e si aggiusta.
+      if (attuale === 0) return this.#setOption(param.key, this.#autoDimension(param.key));
+      const n = attuale + steps * param.step;
+      return this.#setOption(param.key, Math.max(0, Math.min(param.max, n)));
+    }
+
     // Gli stessi gradini che usa il cursore del widget: cosi' un passo di
     // tastiera qui e uno di mouse la' portano allo stesso valore.
     let prossimo = stepBy(param, current, steps);
@@ -487,10 +498,51 @@ export class DitherTui {
     if (!param) return;
     if (param.type === 'bool') return this.#setOption(param.key, !this.options[param.key]);
     if (param.type === 'enum') return this.#adjust(1);
+    if (param.type === 'number') return this.#openNumberPrompt(param);
+    return undefined;
+  }
+
+  /**
+   * La misura che il file ha adesso, per il lato chiesto. E' il valore da cui
+   * conviene partire quando il campo e' su "auto".
+   */
+  #autoDimension(key) {
+    if (!this.source) return 0;
+    const { width, height } = exportSize(this.source.width, this.source.height, this.options);
+    return key === 'width' ? width : height;
+  }
+
+  /**
+   * Un campo per scrivere il numero, perche' 1920 con le frecce non si
+   * raggiunge. Vuoto vuol dire "torna ad auto".
+   */
+  #openNumberPrompt(param) {
+    const attuale = Math.round(Number(this.options[param.key]) || 0);
+    this.#promptOverlay({
+      title: this.tr('tui.numberPrompt', { name: paramLabel(param, this.tr) }),
+      hint: paramHint(param, this.tr) || '',
+      initial: attuale ? String(attuale) : '',
+      onConfirm: (input) => {
+        const scritto = String(input == null ? '' : input).trim();
+        if (scritto === '') return this.#setOption(param.key, 0);
+        const n = Number(scritto);
+        if (!Number.isFinite(n)) {
+          this.#say(this.tr('tui.notANumber'), 'red');
+          return this.render();
+        }
+        return this.#setOption(param.key, Math.max(0, Math.min(param.max, Math.round(n))));
+      },
+    });
   }
 
   #setOption(key, value) {
-    this.options = normalizeOptions({ ...this.options, [key]: value });
+    // Larghezza e altezza non sono indipendenti col rapporto bloccato:
+    // scriverne una riempie l'altra. Si fa qui e non nei singoli comandi,
+    // cosi' vale per le frecce come per il valore scritto a mano.
+    const cambio = (key === 'width' || key === 'height') && this.source
+      ? linkedDimensions(this.source.width, this.source.height, this.options, key, value)
+      : { [key]: value };
+    this.options = normalizeOptions({ ...this.options, ...cambio });
     this.cache = null;
     this.render();
   }

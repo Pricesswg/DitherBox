@@ -10,10 +10,10 @@
  */
 
 import {
-  PARAMS, PRESETS, DEFAULTS, PALETTES,
+  PARAMS, PRESETS, DEFAULTS, PALETTES, linkedDimensions,
   normalizeOptions, formatValue, applyPreset, paramSteps, stepIndex, usefulStepCeiling, effectiveMegapixels,
   groupLabel, paramLabel, paramHint, presetLabel, paletteLabel, enumLabel,
-  processImage, targetSize, resampleBox, fitWithin,
+  processImage, exportSize, requestedSize, targetSize, resampleBox, fitWithin,
   paletteInfo, rgbToHex, stringifyPalette, isCustomPalette,
   imageToText, TEXT_MODES,
   createTranslator, detectLocale, normalizeLocale, LOCALES, LOCALE_NAMES,
@@ -209,10 +209,26 @@ export class DitherBox {
 
   /** Aggiorna una o piu' opzioni e ridisegna. */
   set(patch) {
-    this.options = normalizeOptions({ ...this.options, ...patch });
+    this.options = normalizeOptions({ ...this.options, ...this.#collega(patch) });
     this.#syncControls();
     this.render();
     this.#emit('change', this.getOptions());
+  }
+
+  /**
+   * Larghezza e altezza non sono indipendenti col rapporto bloccato:
+   * scriverne una riempie l'altra. Lo stesso conto lo fa la TUI, dalla
+   * stessa funzione: due versioni si scostano, e il campo riempito qui non
+   * corrisponderebbe a quello riempito la'.
+   */
+  #collega(patch) {
+    if (!this.source) return patch;
+    const lato = ['width', 'height'].find((k) => k in patch);
+    if (!lato) return patch;
+    return {
+      ...patch,
+      ...linkedDimensions(this.source.width, this.source.height, this.options, lato, patch[lato]),
+    };
   }
 
   getOptions() {
@@ -679,6 +695,17 @@ export class DitherBox {
     } else if (param.type === 'bool') {
       input = el('input', 'dbx__checkbox', { id, type: 'checkbox' });
       input.addEventListener('change', () => this.set({ [param.key]: input.checked }));
+    } else if (param.type === 'number') {
+      // Un campo da scrivere, non un cursore: 1920 a gradini non si mette.
+      // Vuoto vuol dire "decidila tu", che nelle opzioni e' zero.
+      input = el('input', 'dbx__number', {
+        id, type: 'number', min: param.min, max: param.max, step: 1,
+      });
+      input.placeholder = this.t('value.auto');
+      input.addEventListener('change', () => {
+        const scritto = input.value.trim();
+        this.set({ [param.key]: scritto === '' ? 0 : Number(scritto) });
+      });
     } else {
       // Il cursore lavora sull'indice del passo, non sul valore: e' l'unico
       // modo per far scorrere allo stesso modo una scala regolare e una a
@@ -785,6 +812,10 @@ export class DitherBox {
         input.checked = Boolean(v);
       } else if (param.type === 'range') {
         input.value = stepIndex(param, v);
+      } else if (param.type === 'number') {
+        // Zero e' "auto": si mostra come campo vuoto col suggerimento, non
+        // come uno zero, che sembrerebbe una misura di zero pixel.
+        input.value = v > 0 ? String(v) : '';
       } else {
         input.value = v;
       }
@@ -850,17 +881,24 @@ export class DitherBox {
   #draw() {
     if (this.view !== 'image') return this.#drawText();
     const started = performance.now();
-    const source = this.#previewSource();
-    // I megapixel li ha gia' applicati #previewSource: qui si dice al motore
-    // di non ridurre una seconda volta.
-    const { image } = processImage(source, {
+    // Con una misura chiesta a mano non si pre-riduce: la riduzione la fa il
+    // motore per arrivare esatto a quella misura, e farla due volte con due
+    // arrotondamenti diversi fa mancare il bersaglio di un pixel.
+    const chieste = requestedSize(this.source.width, this.source.height, this.options);
+    const source = chieste ? this.source : this.#previewSource();
+    // Senza misura chiesta i megapixel li ha gia' applicati #previewSource, e
+    // qui si dice al motore di non ridurre una seconda volta.
+    const { image } = processImage(source, chieste ? this.options : {
       ...this.options,
       megapixels: (source.width * source.height) / 1e6,
     });
     this.ctx.putImageData(new ImageData(image.data, image.width, image.height), 0, 0);
     this.#showCanvas(image);
 
-    const out = targetSize(this.source.width, this.source.height, this.options.megapixels);
+    // La misura vera del file, non solo quella che deciderebbero i megapixel:
+    // con un ritaglio, un rapporto o una misura chiesta a mano le due cose
+    // non coincidono, e questa riga diceva l'altra.
+    const out = exportSize(this.source.width, this.source.height, this.options);
     const mp = ((out.width * out.height) / 1e6).toFixed(2);
     const ms = Math.round(performance.now() - started);
     this.#status(

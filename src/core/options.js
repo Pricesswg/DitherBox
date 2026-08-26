@@ -8,7 +8,7 @@ import { ALGORITHMS } from './dither.js';
 import { PALETTE_KEYS, isCustomPalette } from './palettes.js';
 import { createTranslator, hasKey } from './i18n.js';
 
-/** @typedef {'enum'|'range'|'bool'} ParamType */
+/** @typedef {'enum'|'range'|'bool'|'number'} ParamType */
 
 export const PARAMS = [
   {
@@ -174,6 +174,35 @@ export const PARAMS = [
     unit: '%',
   },
   {
+    key: 'width',
+    group: 'output',
+    // Non un cursore: 1920 non si mette a gradini, si scrive. Zero vuol dire
+    // "decidila tu", ed e' il default perche' la maggior parte delle volte
+    // la misura esatta non interessa a nessuno.
+    type: 'number',
+    min: 0,
+    max: 20000,
+    step: 10,
+    default: 0,
+    format: formatDimension,
+  },
+  {
+    key: 'height',
+    group: 'output',
+    type: 'number',
+    min: 0,
+    max: 20000,
+    step: 10,
+    default: 0,
+    format: formatDimension,
+  },
+  {
+    key: 'lockRatio',
+    group: 'output',
+    type: 'bool',
+    default: true,
+  },
+  {
     key: 'megapixels',
     group: 'output',
     type: 'range',
@@ -244,6 +273,37 @@ export function aspectRatio(value) {
   const w = Number(m[1]);
   const h = Number(m[2]);
   return h > 0 && w > 0 ? w / h : null;
+}
+
+/** "1920 px", oppure la parola per "la decidi tu" quando vale zero. */
+export function formatDimension(v, t = inglese) {
+  return v > 0 ? `${Math.round(v)} px` : t('value.auto');
+}
+
+/**
+ * Le misure da salvare dopo che se n'e' toccata una.
+ *
+ * Col rapporto bloccato scrivere un lato riempie l'altro, che e' l'unico modo
+ * per cui due campi separati non finiscano per litigare fra loro. Restituisce
+ * le chiavi da scrivere, non l'intero oggetto: chi chiama fa il merge.
+ *
+ * La usano la TUI e il widget: due versioni dello stesso conto si scostano, e
+ * il campo riempito da una non corrisponderebbe a quello riempito dall'altra.
+ */
+export function linkedDimensions(sourceWidth, sourceHeight, options, key, value) {
+  const v = Math.max(0, Math.round(Number(value) || 0));
+  if (!options.lockRatio) return { [key]: v };
+  // Bloccati i due lati vanno insieme anche nel tornare ad auto: lasciarne
+  // uno scritto vorrebbe dire un campo che dice "auto" mentre quella misura
+  // resta vincolata dall'altro, che e' peggio di non poterla svuotare.
+  if (v === 0) return { width: 0, height: 0 };
+
+  const ratio = aspectRatio(options.aspect) || (sourceWidth / sourceHeight);
+  if (!Number.isFinite(ratio) || ratio <= 0) return { [key]: v };
+
+  return key === 'width'
+    ? { width: v, height: Math.max(1, Math.round(v / ratio)) }
+    : { height: v, width: Math.max(1, Math.round(v * ratio)) };
 }
 
 export function paletteLabel(key, t = inglese) {
@@ -476,6 +536,10 @@ export function normalizeOptions(input = {}) {
       // arriva da un attributo HTML o da un file di configurazione e' sempre
       // uno dei valori che i cursori sanno rappresentare.
       out[p.key] = Number.isFinite(n) ? stepBy(p, clamp(n, p.min, p.max), 0) : p.default;
+    } else if (p.type === 'number') {
+      // Numero libero, non agganciato a un passo: e' il punto di questo tipo.
+      const n = Math.round(Number(v));
+      out[p.key] = Number.isFinite(n) ? clamp(n, p.min, p.max) : p.default;
     } else if (p.type === 'bool') {
       out[p.key] = Boolean(v);
     } else if (p.type === 'enum') {
@@ -495,7 +559,7 @@ export function formatValue(param, value, t = inglese) {
     if (isCustomPalette(value)) return t('palette.custom');
     return enumLabel(param, value, t);
   }
-  if (param.format) return param.format(Number(value));
+  if (param.format) return param.format(Number(value), t);
   const n = Number(value);
   const text = param.decimals ? n.toFixed(param.decimals) : String(Math.round(n));
   return param.unit ? `${text}${param.unit}` : text;

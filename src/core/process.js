@@ -15,6 +15,51 @@ import { normalizeOptions, aspectRatio } from './options.js';
  * @param {object} rawOptions vedi PARAMS in options.js
  * @returns {{image:object, options:object, palette:Array, ditherWidth:number, ditherHeight:number}}
  */
+/**
+ * Le misure chieste a mano, col lato mancante dedotto, o null se non se ne
+ * e' chiesta nessuna.
+ *
+ * Chiedere una misura decide anche il rapporto: 1920x1080 e' 16:9, e non
+ * avrebbe senso ritagliare a 4:3 per poi stiracchiare. Quando c'e', quindi,
+ * il rapporto lo detta lei.
+ */
+export function requestedSize(sourceWidth, sourceHeight, options) {
+  const w = Math.max(0, Math.round(options.width || 0));
+  const h = Math.max(0, Math.round(options.height || 0));
+  if (!w && !h) return null;
+
+  const ratio = aspectRatio(options.aspect) || (sourceWidth / sourceHeight);
+  if (w && h) return { width: w, height: h };
+  if (w) return { width: w, height: Math.max(1, Math.round(w / ratio)) };
+  return { width: Math.max(1, Math.round(h * ratio)), height: h };
+}
+
+/**
+ * Le misure a cui portare l'immagine prima che Pixel la riduca a blocchi.
+ *
+ * Con una misura chiesta a mano non si passa dai megapixel, e si ingrandisce
+ * anche: chi scrive 1920 su una foto piccola quel numero lo vuole.
+ *
+ * Pixel complica: a 3x il file esce per forza multiplo di tre, perche' i
+ * blocchi sono interi. Si punta quindi al multiplo piu' vicino invece di
+ * mancare la misura sempre per difetto. A Pixel 1, che e' il caso normale,
+ * la misura chiesta si ottiene esatta.
+ */
+export function resampleTarget(frameWidth, frameHeight, chieste, options) {
+  if (!chieste) return targetSize(frameWidth, frameHeight, options.megapixels);
+
+  const f = Math.max(1, Math.round(options.scale));
+  // Senza ingrandimento il file e' l'immagine a blocchi, quindi per ottenere
+  // la misura chiesta bisogna partire da f volte tanto.
+  const quantizza = (v) => (options.upscale || f === 1
+    ? Math.max(f, Math.round(v / f) * f)
+    : Math.max(1, v * f));
+
+  const width = quantizza(chieste.width);
+  const height = quantizza(chieste.height);
+  return { scale: width / frameWidth, width, height };
+}
+
 export function processImage(source, rawOptions = {}) {
   const options = normalizeOptions(rawOptions);
   const { colors, ramp, bits } = paletteInfo(options.palette);
@@ -22,7 +67,9 @@ export function processImage(source, rawOptions = {}) {
   // 0. Inquadratura. Il ritaglio si fa subito, perche' quello che si butta
   //    via non deve consumare ne' megapixel ne' tempo; le bande si mettono
   //    invece alla fine, dopo il dithering, per non ditherarle.
-  const ratio = aspectRatio(options.aspect);
+  const chieste = requestedSize(source.width, source.height, options);
+  // Una misura chiesta a mano detta anche il rapporto: 1920x1080 e' 16:9.
+  const ratio = chieste ? chieste.width / chieste.height : aspectRatio(options.aspect);
   const ritaglia = ratio !== null && options.fit === 'crop';
   const bande = ratio !== null && options.fit === 'pad';
   // La selezione prende le proporzioni del rapporto quando si ritaglia e
@@ -42,8 +89,10 @@ export function processImage(source, rawOptions = {}) {
   //    Il budget si misura sul fotogramma con le bande gia' contate: senza,
   //    "2 MP" descriverebbe la fotografia e il file ne peserebbe di piu'.
   const frame = bande ? padFrame(inquadrata.width, inquadrata.height, ratio) : inquadrata;
-  const target = targetSize(frame.width, frame.height, options.megapixels);
-  let img = target.scale < 1
+  const target = resampleTarget(frame.width, frame.height, chieste, options);
+  // Coi megapixel non si ingrandisce mai; con una misura chiesta a mano si',
+  // perche' e' stata chiesta.
+  let img = target.scale < 1 || chieste
     ? resampleBox(inquadrata, inquadrata.width * target.scale, inquadrata.height * target.scale)
     : cloneImage(inquadrata);
 
@@ -101,7 +150,8 @@ export function processImage(source, rawOptions = {}) {
  */
 export function exportSize(width, height, rawOptions = {}) {
   const options = normalizeOptions(rawOptions);
-  const ratio = aspectRatio(options.aspect);
+  const chieste = requestedSize(width, height, options);
+  const ratio = chieste ? chieste.width / chieste.height : aspectRatio(options.aspect);
   const ritaglia = ratio !== null && options.fit === 'crop';
   const bande = ratio !== null && options.fit === 'pad';
 
@@ -114,8 +164,8 @@ export function exportSize(width, height, rawOptions = {}) {
   let { width: w, height: h } = sel;
 
   const frame = bande ? padFrame(w, h, ratio) : { width: w, height: h };
-  const { scale } = targetSize(frame.width, frame.height, options.megapixels);
-  if (scale < 1) {
+  const { scale } = resampleTarget(frame.width, frame.height, chieste, options);
+  if (scale < 1 || chieste) {
     w = Math.max(1, Math.round(w * scale));
     h = Math.max(1, Math.round(h * scale));
   }

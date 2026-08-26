@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve, dirname, join, extname, normalize } from 'node:path';
 
 import { loadImage } from '../src/cli/imageio.js';
-import { PARAMS } from '../src/core/index.js';
+import { PARAMS, exportSize } from '../src/core/index.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -486,4 +486,92 @@ test('inquadratura e ritaglio funzionano anche nel widget', async (t) => {
 
   const stretta = await misura({ aspect: '1:1', fit: 'crop', zoom: 50 });
   assert.ok(stretta.w < quadrata.w, `lo zoom non ha rimpicciolito: ${stretta.w}`);
+});
+
+/**
+ * I due campi delle misure devono comportarsi nel widget come nel terminale:
+ * scriverne uno riempie l'altro, e il file esce della misura chiesta. Il
+ * conto lo fa la stessa funzione del motore, ma che il campo sullo schermo
+ * si aggiorni davvero e' un'altra cosa, e si vede solo qui.
+ */
+test('scrivere una misura nel widget riempie l altra e la ottiene esatta', async (t) => {
+  const sessione = await apri();
+  if (!sessione) return t.skip('Chromium non disponibile');
+  const { browser, page } = sessione;
+  t.after(() => browser.close());
+
+  await caricaFoto(page, 1200, 900);
+
+  const scrivi = async (chiave, valore) => page.evaluate(async ([k, v]) => {
+    const campo = document.querySelector(`.dbx [data-param="${k}"] .dbx__number`);
+    campo.value = v;
+    campo.dispatchEvent(new Event('change', { bubbles: true }));
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const leggi = (n) => document.querySelector(`.dbx [data-param="${n}"] .dbx__number`).value;
+    const c = document.querySelector('.dbx__canvas');
+    return { width: leggi('width'), height: leggi('height'), w: c.width, h: c.height };
+  }, [chiave, valore]);
+
+  await page.evaluate(() => window.__boxes[0].set({
+    aspect: '16:9', fit: 'crop', lockRatio: true, scale: 1, upscale: true,
+  }));
+
+  const dopoLarghezza = await scrivi('width', '1920');
+  assert.equal(dopoLarghezza.height, '1080', 'il campo dell altezza non si e riempito');
+  assert.equal(`${dopoLarghezza.w}×${dopoLarghezza.h}`, '1920×1080');
+
+  const dopoAltezza = await scrivi('height', '720');
+  assert.equal(dopoAltezza.width, '1280', 'il campo della larghezza non ha seguito');
+  assert.equal(`${dopoAltezza.w}×${dopoAltezza.h}`, '1280×720');
+
+  // Svuotare il campo torna ad auto, e la misura la decidono i megapixel.
+  // Bloccati, i due lati tornano ad auto insieme: lasciarne uno scritto
+  // vorrebbe dire un campo che dice "auto" mentre l'altro gli detta ancora
+  // la misura.
+  const dopoVuoto = await scrivi('width', '');
+  assert.equal(dopoVuoto.width, '', 'il campo doveva restare vuoto');
+  assert.equal(dopoVuoto.height, '', 'bloccati si svuotano tutti e due');
+  assert.notEqual(`${dopoVuoto.w}×${dopoVuoto.h}`, '1280×720');
+});
+
+/**
+ * La riga di stato del widget diceva la misura che deciderebbero i soli
+ * megapixel, e ignorava rapporto, ritaglio, zoom e misure chieste a mano.
+ * Su una foto inquadrata annunciava un file che non esisteva.
+ *
+ * Non si confronta con la tela, che e' l'anteprima ridotta e non il file:
+ * si confronta con quello che `exportSize` dice da qui, cioe' con la stessa
+ * verita' che usa il terminale.
+ */
+test('la riga di stato del widget dichiara la misura vera del file', async (t) => {
+  const sessione = await apri();
+  if (!sessione) return t.skip('Chromium non disponibile');
+  const { browser, page } = sessione;
+  t.after(() => browser.close());
+
+  await caricaFoto(page, 1200, 900);
+
+  const stato = async (opzioni) => page.evaluate(async (o) => {
+    window.__boxes[0].set(o);
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    return {
+      testo: document.querySelector('.dbx__status').textContent,
+      opzioni: window.__boxes[0].getOptions(),
+    };
+  }, opzioni);
+
+  for (const opzioni of [
+    { aspect: 'source', fit: 'crop', zoom: 100, width: 0, height: 0, megapixels: 2, scale: 1 },
+    { aspect: '1:1', zoom: 100 },
+    { aspect: '16:9', zoom: 50 },
+    { aspect: '4:5', fit: 'pad', zoom: 100 },
+    { aspect: '16:9', fit: 'crop', zoom: 100, width: 1920, height: 1080 },
+  ]) {
+    const { testo, opzioni: complete } = await stato(opzioni);
+    const atteso = exportSize(1200, 900, complete);
+    assert.ok(
+      testo.includes(`→ ${atteso.width}×${atteso.height}`),
+      `${JSON.stringify(opzioni)}: lo stato dice "${testo}", il file sara ${atteso.width}×${atteso.height}`,
+    );
+  }
 });

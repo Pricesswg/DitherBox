@@ -1211,6 +1211,15 @@ const en = {
   'param.alignX.hint': 'Moves the crop rectangle sideways, when there is room to move it',
   'param.alignY.label': 'Offset Y',
   'param.alignY.hint': 'Moves the crop rectangle up and down, when there is room to move it',
+  'param.width.label': 'Width',
+  'param.width.hint': 'Exact width of the file in pixels; 0 lets the megapixels decide',
+  'param.height.label': 'Height',
+  'param.height.hint': 'Exact height of the file in pixels; 0 lets the megapixels decide',
+  'param.lockRatio.label': 'Lock ratio',
+  'param.lockRatio.hint': 'Writing one side fills in the other, keeping the ratio',
+  'value.auto': 'auto',
+  'tui.numberPrompt': 'Value for {name}',
+  'tui.notANumber': 'A number, please',
   'param.megapixels.label': 'Megapixels',
   'param.megapixels.hint': 'Output resolution: lower it to coarsen the photo on purpose',
   'param.upscale.label': 'Upscale',
@@ -1470,6 +1479,15 @@ const it = {
   'param.alignX.hint': 'Sposta il rettangolo di ritaglio in orizzontale, quando c’è margine',
   'param.alignY.label': 'Posizione Y',
   'param.alignY.hint': 'Sposta il rettangolo di ritaglio in verticale, quando c’è margine',
+  'param.width.label': 'Larghezza',
+  'param.width.hint': 'Larghezza esatta del file in pixel; 0 la fa decidere ai megapixel',
+  'param.height.label': 'Altezza',
+  'param.height.hint': 'Altezza esatta del file in pixel; 0 la fa decidere ai megapixel',
+  'param.lockRatio.label': 'Blocca',
+  'param.lockRatio.hint': 'Scrivendo un lato si riempie l’altro, tenendo il rapporto',
+  'value.auto': 'auto',
+  'tui.numberPrompt': 'Valore per {name}',
+  'tui.notANumber': 'Ci vuole un numero',
   'param.megapixels.label': 'Megapixel',
   'param.megapixels.hint': 'Risoluzione del risultato: abbassala per sgranare di proposito la foto',
   'param.upscale.label': 'Ingrandisci',
@@ -1705,6 +1723,15 @@ const es = {
   'param.alignX.hint': 'Mueve el rectángulo de recorte en horizontal, cuando hay margen',
   'param.alignY.label': 'Posición Y',
   'param.alignY.hint': 'Mueve el rectángulo de recorte en vertical, cuando hay margen',
+  'param.width.label': 'Ancho',
+  'param.width.hint': 'Ancho exacto del archivo en píxeles; 0 lo deciden los megapíxeles',
+  'param.height.label': 'Alto',
+  'param.height.hint': 'Alto exacto del archivo en píxeles; 0 lo deciden los megapíxeles',
+  'param.lockRatio.label': 'Bloquear',
+  'param.lockRatio.hint': 'Al escribir un lado se rellena el otro, manteniendo la relación',
+  'value.auto': 'auto',
+  'tui.numberPrompt': 'Valor de {name}',
+  'tui.notANumber': 'Hace falta un número',
   'param.megapixels.label': 'Megapíxeles',
   'param.megapixels.hint': 'Resolución del resultado: bájala para pixelar la foto a propósito',
   'param.upscale.label': 'Ampliar',
@@ -1938,6 +1965,15 @@ const fr = {
   'param.alignX.hint': 'Déplace le rectangle de recadrage horizontalement, quand il y a de la marge',
   'param.alignY.label': 'Position Y',
   'param.alignY.hint': 'Déplace le rectangle de recadrage verticalement, quand il y a de la marge',
+  'param.width.label': 'Largeur',
+  'param.width.hint': 'Largeur exacte du fichier en pixels ; 0 laisse décider les mégapixels',
+  'param.height.label': 'Hauteur',
+  'param.height.hint': 'Hauteur exacte du fichier en pixels ; 0 laisse décider les mégapixels',
+  'param.lockRatio.label': 'Verrouiller',
+  'param.lockRatio.hint': 'Écrire un côté remplit l’autre, en gardant le format',
+  'value.auto': 'auto',
+  'tui.numberPrompt': 'Valeur de {name}',
+  'tui.notANumber': 'Il faut un nombre',
   'param.megapixels.label': 'Mégapixels',
   'param.megapixels.hint': 'Résolution du résultat : baissez-la pour pixeliser la photo exprès',
   'param.upscale.label': 'Agrandir',
@@ -2171,6 +2207,15 @@ const de = {
   'param.alignX.hint': 'Verschiebt den Ausschnitt waagerecht, wenn Spielraum da ist',
   'param.alignY.label': 'Position Y',
   'param.alignY.hint': 'Verschiebt den Ausschnitt senkrecht, wenn Spielraum da ist',
+  'param.width.label': 'Breite',
+  'param.width.hint': 'Genaue Breite der Datei in Pixeln; 0 überlässt es den Megapixeln',
+  'param.height.label': 'Höhe',
+  'param.height.hint': 'Genaue Höhe der Datei in Pixeln; 0 überlässt es den Megapixeln',
+  'param.lockRatio.label': 'Sperren',
+  'param.lockRatio.hint': 'Eine Seite eintragen füllt die andere, das Verhältnis bleibt',
+  'value.auto': 'auto',
+  'tui.numberPrompt': 'Wert für {name}',
+  'tui.notANumber': 'Bitte eine Zahl',
   'param.megapixels.label': 'Megapixel',
   'param.megapixels.hint': 'Auflösung des Ergebnisses: absenken, um das Foto absichtlich zu vergröbern',
   'param.upscale.label': 'Vergrößern',
@@ -2614,7 +2659,7 @@ const __m_src_core_options_js = (() => {
 
 
 
-/** @typedef {'enum'|'range'|'bool'} ParamType */
+/** @typedef {'enum'|'range'|'bool'|'number'} ParamType */
 
 const PARAMS = [
   {
@@ -2780,6 +2825,35 @@ const PARAMS = [
     unit: '%',
   },
   {
+    key: 'width',
+    group: 'output',
+    // Non un cursore: 1920 non si mette a gradini, si scrive. Zero vuol dire
+    // "decidila tu", ed e' il default perche' la maggior parte delle volte
+    // la misura esatta non interessa a nessuno.
+    type: 'number',
+    min: 0,
+    max: 20000,
+    step: 10,
+    default: 0,
+    format: formatDimension,
+  },
+  {
+    key: 'height',
+    group: 'output',
+    type: 'number',
+    min: 0,
+    max: 20000,
+    step: 10,
+    default: 0,
+    format: formatDimension,
+  },
+  {
+    key: 'lockRatio',
+    group: 'output',
+    type: 'bool',
+    default: true,
+  },
+  {
     key: 'megapixels',
     group: 'output',
     type: 'range',
@@ -2850,6 +2924,37 @@ function aspectRatio(value) {
   const w = Number(m[1]);
   const h = Number(m[2]);
   return h > 0 && w > 0 ? w / h : null;
+}
+
+/** "1920 px", oppure la parola per "la decidi tu" quando vale zero. */
+function formatDimension(v, t = inglese) {
+  return v > 0 ? `${Math.round(v)} px` : t('value.auto');
+}
+
+/**
+ * Le misure da salvare dopo che se n'e' toccata una.
+ *
+ * Col rapporto bloccato scrivere un lato riempie l'altro, che e' l'unico modo
+ * per cui due campi separati non finiscano per litigare fra loro. Restituisce
+ * le chiavi da scrivere, non l'intero oggetto: chi chiama fa il merge.
+ *
+ * La usano la TUI e il widget: due versioni dello stesso conto si scostano, e
+ * il campo riempito da una non corrisponderebbe a quello riempito dall'altra.
+ */
+function linkedDimensions(sourceWidth, sourceHeight, options, key, value) {
+  const v = Math.max(0, Math.round(Number(value) || 0));
+  if (!options.lockRatio) return { [key]: v };
+  // Bloccati i due lati vanno insieme anche nel tornare ad auto: lasciarne
+  // uno scritto vorrebbe dire un campo che dice "auto" mentre quella misura
+  // resta vincolata dall'altro, che e' peggio di non poterla svuotare.
+  if (v === 0) return { width: 0, height: 0 };
+
+  const ratio = aspectRatio(options.aspect) || (sourceWidth / sourceHeight);
+  if (!Number.isFinite(ratio) || ratio <= 0) return { [key]: v };
+
+  return key === 'width'
+    ? { width: v, height: Math.max(1, Math.round(v / ratio)) }
+    : { height: v, width: Math.max(1, Math.round(v * ratio)) };
 }
 
 function paletteLabel(key, t = inglese) {
@@ -3082,6 +3187,10 @@ function normalizeOptions(input = {}) {
       // arriva da un attributo HTML o da un file di configurazione e' sempre
       // uno dei valori che i cursori sanno rappresentare.
       out[p.key] = Number.isFinite(n) ? stepBy(p, clamp(n, p.min, p.max), 0) : p.default;
+    } else if (p.type === 'number') {
+      // Numero libero, non agganciato a un passo: e' il punto di questo tipo.
+      const n = Math.round(Number(v));
+      out[p.key] = Number.isFinite(n) ? clamp(n, p.min, p.max) : p.default;
     } else if (p.type === 'bool') {
       out[p.key] = Boolean(v);
     } else if (p.type === 'enum') {
@@ -3101,7 +3210,7 @@ function formatValue(param, value, t = inglese) {
     if (isCustomPalette(value)) return t('palette.custom');
     return enumLabel(param, value, t);
   }
-  if (param.format) return param.format(Number(value));
+  if (param.format) return param.format(Number(value), t);
   const n = Number(value);
   const text = param.decimals ? n.toFixed(param.decimals) : String(Math.round(n));
   return param.unit ? `${text}${param.unit}` : text;
@@ -3114,7 +3223,7 @@ function applyPreset(name, base = DEFAULTS) {
   return normalizeOptions({ ...base, ...preset.options });
 }
 
-  return { DEFAULTS, PARAMS, PARAM_BY_KEY, PRESETS, algorithmLabel, applyPreset, aspectRatio, effectiveMegapixels, enumLabel, formatValue, groupLabel, normalizeOptions, paletteLabel, paramHint, paramLabel, paramSteps, presetLabel, stepBy, stepIndex, usefulStepCeiling };
+  return { DEFAULTS, PARAMS, PARAM_BY_KEY, PRESETS, algorithmLabel, applyPreset, aspectRatio, effectiveMegapixels, enumLabel, formatDimension, formatValue, groupLabel, linkedDimensions, normalizeOptions, paletteLabel, paramHint, paramLabel, paramSteps, presetLabel, stepBy, stepIndex, usefulStepCeiling };
 })();
 
 const __m_src_core_process_js = (() => {
@@ -3136,6 +3245,51 @@ const __m_src_core_process_js = (() => {
  * @param {object} rawOptions vedi PARAMS in options.js
  * @returns {{image:object, options:object, palette:Array, ditherWidth:number, ditherHeight:number}}
  */
+/**
+ * Le misure chieste a mano, col lato mancante dedotto, o null se non se ne
+ * e' chiesta nessuna.
+ *
+ * Chiedere una misura decide anche il rapporto: 1920x1080 e' 16:9, e non
+ * avrebbe senso ritagliare a 4:3 per poi stiracchiare. Quando c'e', quindi,
+ * il rapporto lo detta lei.
+ */
+function requestedSize(sourceWidth, sourceHeight, options) {
+  const w = Math.max(0, Math.round(options.width || 0));
+  const h = Math.max(0, Math.round(options.height || 0));
+  if (!w && !h) return null;
+
+  const ratio = aspectRatio(options.aspect) || (sourceWidth / sourceHeight);
+  if (w && h) return { width: w, height: h };
+  if (w) return { width: w, height: Math.max(1, Math.round(w / ratio)) };
+  return { width: Math.max(1, Math.round(h * ratio)), height: h };
+}
+
+/**
+ * Le misure a cui portare l'immagine prima che Pixel la riduca a blocchi.
+ *
+ * Con una misura chiesta a mano non si passa dai megapixel, e si ingrandisce
+ * anche: chi scrive 1920 su una foto piccola quel numero lo vuole.
+ *
+ * Pixel complica: a 3x il file esce per forza multiplo di tre, perche' i
+ * blocchi sono interi. Si punta quindi al multiplo piu' vicino invece di
+ * mancare la misura sempre per difetto. A Pixel 1, che e' il caso normale,
+ * la misura chiesta si ottiene esatta.
+ */
+function resampleTarget(frameWidth, frameHeight, chieste, options) {
+  if (!chieste) return targetSize(frameWidth, frameHeight, options.megapixels);
+
+  const f = Math.max(1, Math.round(options.scale));
+  // Senza ingrandimento il file e' l'immagine a blocchi, quindi per ottenere
+  // la misura chiesta bisogna partire da f volte tanto.
+  const quantizza = (v) => (options.upscale || f === 1
+    ? Math.max(f, Math.round(v / f) * f)
+    : Math.max(1, v * f));
+
+  const width = quantizza(chieste.width);
+  const height = quantizza(chieste.height);
+  return { scale: width / frameWidth, width, height };
+}
+
 function processImage(source, rawOptions = {}) {
   const options = normalizeOptions(rawOptions);
   const { colors, ramp, bits } = paletteInfo(options.palette);
@@ -3143,7 +3297,9 @@ function processImage(source, rawOptions = {}) {
   // 0. Inquadratura. Il ritaglio si fa subito, perche' quello che si butta
   //    via non deve consumare ne' megapixel ne' tempo; le bande si mettono
   //    invece alla fine, dopo il dithering, per non ditherarle.
-  const ratio = aspectRatio(options.aspect);
+  const chieste = requestedSize(source.width, source.height, options);
+  // Una misura chiesta a mano detta anche il rapporto: 1920x1080 e' 16:9.
+  const ratio = chieste ? chieste.width / chieste.height : aspectRatio(options.aspect);
   const ritaglia = ratio !== null && options.fit === 'crop';
   const bande = ratio !== null && options.fit === 'pad';
   // La selezione prende le proporzioni del rapporto quando si ritaglia e
@@ -3163,8 +3319,10 @@ function processImage(source, rawOptions = {}) {
   //    Il budget si misura sul fotogramma con le bande gia' contate: senza,
   //    "2 MP" descriverebbe la fotografia e il file ne peserebbe di piu'.
   const frame = bande ? padFrame(inquadrata.width, inquadrata.height, ratio) : inquadrata;
-  const target = targetSize(frame.width, frame.height, options.megapixels);
-  let img = target.scale < 1
+  const target = resampleTarget(frame.width, frame.height, chieste, options);
+  // Coi megapixel non si ingrandisce mai; con una misura chiesta a mano si',
+  // perche' e' stata chiesta.
+  let img = target.scale < 1 || chieste
     ? resampleBox(inquadrata, inquadrata.width * target.scale, inquadrata.height * target.scale)
     : cloneImage(inquadrata);
 
@@ -3222,7 +3380,8 @@ function processImage(source, rawOptions = {}) {
  */
 function exportSize(width, height, rawOptions = {}) {
   const options = normalizeOptions(rawOptions);
-  const ratio = aspectRatio(options.aspect);
+  const chieste = requestedSize(width, height, options);
+  const ratio = chieste ? chieste.width / chieste.height : aspectRatio(options.aspect);
   const ritaglia = ratio !== null && options.fit === 'crop';
   const bande = ratio !== null && options.fit === 'pad';
 
@@ -3235,8 +3394,8 @@ function exportSize(width, height, rawOptions = {}) {
   let { width: w, height: h } = sel;
 
   const frame = bande ? padFrame(w, h, ratio) : { width: w, height: h };
-  const { scale } = targetSize(frame.width, frame.height, options.megapixels);
-  if (scale < 1) {
+  const { scale } = resampleTarget(frame.width, frame.height, chieste, options);
+  if (scale < 1 || chieste) {
     w = Math.max(1, Math.round(w * scale));
     h = Math.max(1, Math.round(h * scale));
   }
@@ -3291,13 +3450,13 @@ function coloreBanda(colors) {
   return scelto;
 }
 
-  return { exportSize, processImage, targetSize };
+  return { exportSize, processImage, requestedSize, resampleTarget, targetSize };
 })();
 
 const __m_src_core_index_js = Object.assign({}, __m_src_core_i18n_js, __m_src_core_palettes_js, __m_src_core_matrices_js, __m_src_core_adjust_js, __m_src_core_dither_js, __m_src_core_textart_js, __m_src_core_options_js, __m_src_core_process_js);
 
 const __m_src_web_ditherbox_js = (() => {
-  const { PARAMS, PRESETS, DEFAULTS, PALETTES, normalizeOptions, formatValue, applyPreset, paramSteps, stepIndex, usefulStepCeiling, effectiveMegapixels, groupLabel, paramLabel, paramHint, presetLabel, paletteLabel, enumLabel, processImage, targetSize, resampleBox, fitWithin, paletteInfo, rgbToHex, stringifyPalette, isCustomPalette, imageToText, TEXT_MODES, createTranslator, detectLocale, normalizeLocale, LOCALES, LOCALE_NAMES } = __m_src_core_index_js;
+  const { PARAMS, PRESETS, DEFAULTS, PALETTES, linkedDimensions, normalizeOptions, formatValue, applyPreset, paramSteps, stepIndex, usefulStepCeiling, effectiveMegapixels, groupLabel, paramLabel, paramHint, presetLabel, paletteLabel, enumLabel, processImage, exportSize, requestedSize, targetSize, resampleBox, fitWithin, paletteInfo, rgbToHex, stringifyPalette, isCustomPalette, imageToText, TEXT_MODES, createTranslator, detectLocale, normalizeLocale, LOCALES, LOCALE_NAMES } = __m_src_core_index_js;
 /**
  * DitherBox - widget per il browser.
  *
@@ -3501,10 +3660,26 @@ class DitherBox {
 
   /** Aggiorna una o piu' opzioni e ridisegna. */
   set(patch) {
-    this.options = normalizeOptions({ ...this.options, ...patch });
+    this.options = normalizeOptions({ ...this.options, ...this.#collega(patch) });
     this.#syncControls();
     this.render();
     this.#emit('change', this.getOptions());
+  }
+
+  /**
+   * Larghezza e altezza non sono indipendenti col rapporto bloccato:
+   * scriverne una riempie l'altra. Lo stesso conto lo fa la TUI, dalla
+   * stessa funzione: due versioni si scostano, e il campo riempito qui non
+   * corrisponderebbe a quello riempito la'.
+   */
+  #collega(patch) {
+    if (!this.source) return patch;
+    const lato = ['width', 'height'].find((k) => k in patch);
+    if (!lato) return patch;
+    return {
+      ...patch,
+      ...linkedDimensions(this.source.width, this.source.height, this.options, lato, patch[lato]),
+    };
   }
 
   getOptions() {
@@ -3971,6 +4146,17 @@ class DitherBox {
     } else if (param.type === 'bool') {
       input = el('input', 'dbx__checkbox', { id, type: 'checkbox' });
       input.addEventListener('change', () => this.set({ [param.key]: input.checked }));
+    } else if (param.type === 'number') {
+      // Un campo da scrivere, non un cursore: 1920 a gradini non si mette.
+      // Vuoto vuol dire "decidila tu", che nelle opzioni e' zero.
+      input = el('input', 'dbx__number', {
+        id, type: 'number', min: param.min, max: param.max, step: 1,
+      });
+      input.placeholder = this.t('value.auto');
+      input.addEventListener('change', () => {
+        const scritto = input.value.trim();
+        this.set({ [param.key]: scritto === '' ? 0 : Number(scritto) });
+      });
     } else {
       // Il cursore lavora sull'indice del passo, non sul valore: e' l'unico
       // modo per far scorrere allo stesso modo una scala regolare e una a
@@ -4077,6 +4263,10 @@ class DitherBox {
         input.checked = Boolean(v);
       } else if (param.type === 'range') {
         input.value = stepIndex(param, v);
+      } else if (param.type === 'number') {
+        // Zero e' "auto": si mostra come campo vuoto col suggerimento, non
+        // come uno zero, che sembrerebbe una misura di zero pixel.
+        input.value = v > 0 ? String(v) : '';
       } else {
         input.value = v;
       }
@@ -4142,17 +4332,24 @@ class DitherBox {
   #draw() {
     if (this.view !== 'image') return this.#drawText();
     const started = performance.now();
-    const source = this.#previewSource();
-    // I megapixel li ha gia' applicati #previewSource: qui si dice al motore
-    // di non ridurre una seconda volta.
-    const { image } = processImage(source, {
+    // Con una misura chiesta a mano non si pre-riduce: la riduzione la fa il
+    // motore per arrivare esatto a quella misura, e farla due volte con due
+    // arrotondamenti diversi fa mancare il bersaglio di un pixel.
+    const chieste = requestedSize(this.source.width, this.source.height, this.options);
+    const source = chieste ? this.source : this.#previewSource();
+    // Senza misura chiesta i megapixel li ha gia' applicati #previewSource, e
+    // qui si dice al motore di non ridurre una seconda volta.
+    const { image } = processImage(source, chieste ? this.options : {
       ...this.options,
       megapixels: (source.width * source.height) / 1e6,
     });
     this.ctx.putImageData(new ImageData(image.data, image.width, image.height), 0, 0);
     this.#showCanvas(image);
 
-    const out = targetSize(this.source.width, this.source.height, this.options.megapixels);
+    // La misura vera del file, non solo quella che deciderebbero i megapixel:
+    // con un ritaglio, un rapporto o una misura chiesta a mano le due cose
+    // non coincidono, e questa riga diceva l'altra.
+    const out = exportSize(this.source.width, this.source.height, this.options);
     const mp = ((out.width * out.height) / 1e6).toFixed(2);
     const ms = Math.round(performance.now() - started);
     this.#status(
@@ -4365,6 +4562,7 @@ global.DitherBox = Object.assign(__m_src_web_ditherbox_js.DitherBox, {
   exportSize: __m_src_core_index_js.exportSize,
   fitForText: __m_src_core_index_js.fitForText,
   fitWithin: __m_src_core_index_js.fitWithin,
+  formatDimension: __m_src_core_index_js.formatDimension,
   formatValue: __m_src_core_index_js.formatValue,
   grayRamp: __m_src_core_index_js.grayRamp,
   groupLabel: __m_src_core_index_js.groupLabel,
@@ -4372,6 +4570,7 @@ global.DitherBox = Object.assign(__m_src_web_ditherbox_js.DitherBox, {
   hexToRgb: __m_src_core_index_js.hexToRgb,
   imageToText: __m_src_core_index_js.imageToText,
   isCustomPalette: __m_src_core_index_js.isCustomPalette,
+  linkedDimensions: __m_src_core_index_js.linkedDimensions,
   luma: __m_src_core_index_js.luma,
   lumaHistogram: __m_src_core_index_js.lumaHistogram,
   normalizeLocale: __m_src_core_index_js.normalizeLocale,
@@ -4386,7 +4585,9 @@ global.DitherBox = Object.assign(__m_src_web_ditherbox_js.DitherBox, {
   parseCustomPalette: __m_src_core_index_js.parseCustomPalette,
   presetLabel: __m_src_core_index_js.presetLabel,
   processImage: __m_src_core_index_js.processImage,
+  requestedSize: __m_src_core_index_js.requestedSize,
   resampleBox: __m_src_core_index_js.resampleBox,
+  resampleTarget: __m_src_core_index_js.resampleTarget,
   resolvePalette: __m_src_core_index_js.resolvePalette,
   rgbToHex: __m_src_core_index_js.rgbToHex,
   selectionFrame: __m_src_core_index_js.selectionFrame,

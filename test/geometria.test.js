@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  processImage, exportSize, PARAMS, paletteInfo, aspectRatio,
+  processImage, exportSize, PARAMS, paletteInfo, aspectRatio, linkedDimensions,
 } from '../src/core/index.js';
 import { sampleImage } from './helpers.js';
 
@@ -15,10 +15,24 @@ function* combinazioni() {
       for (const fit of ADATTAMENTI) {
         for (const scale of [1, 3]) {
           for (const upscale of [true, false]) {
-            yield {
-              source,
-              options: { aspect, fit, scale, upscale, megapixels: 0.01, algorithm: 'bayer4' },
-            };
+            // Anche le misure chieste a mano: e' l'altra strada per decidere
+            // quanto grande esce il file, e deve restare prevedibile come
+            // quella dei megapixel.
+            for (const misure of [
+              { width: 0, height: 0 },
+              { width: 64, height: 0 },
+              { width: 0, height: 48 },
+              { width: 64, height: 48 },
+              { width: 200, height: 0 },
+            ]) {
+              yield {
+                source,
+                options: {
+                  aspect, fit, scale, upscale, ...misure,
+                  megapixels: 0.01, algorithm: 'bayer4',
+                },
+              };
+            }
           }
         }
       }
@@ -207,4 +221,88 @@ test('lo zoom funziona anche senza un rapporto scelto', () => {
   const { image } = processImage(img, { aspect: 'source', zoom: 50, megapixels: 24 });
   assert.equal(image.width, 200);
   assert.equal(image.height, 100);
+});
+
+/**
+ * Chiedere una misura esatta e' l'altra strada per decidere quanto grande
+ * esce il file, e deve arrivarci al pixel: chi scrive 1920x1080 quel numero
+ * lo vuole, non un'approssimazione.
+ */
+test('una misura chiesta a mano si ottiene esatta', () => {
+  const img = sampleImage(1868, 1078);
+  for (const opzioni of [
+    { width: 1920, height: 1080 },
+    { width: 1920, height: 0, aspect: '16:9' },
+    { width: 0, height: 1080, aspect: '16:9' },
+    { width: 800, height: 600, aspect: '4:3' },
+    { width: 1080, height: 1080, aspect: '1:1' },
+  ]) {
+    const { image } = processImage(img, { palette: 'bw', algorithm: 'bayer4', ...opzioni });
+    const atteso = exportSize(1868, 1078, opzioni);
+    assert.equal(`${image.width}x${image.height}`, `${atteso.width}x${atteso.height}`);
+    if (opzioni.width && opzioni.height) {
+      assert.equal(image.width, opzioni.width, JSON.stringify(opzioni));
+      assert.equal(image.height, opzioni.height, JSON.stringify(opzioni));
+    }
+  }
+});
+
+/**
+ * I megapixel non ingrandiscono mai, e per loro e' giusto: sono un tetto.
+ * Una misura chiesta a mano non e' un tetto, e' una richiesta.
+ */
+test('una misura chiesta a mano ingrandisce, i megapixel no', () => {
+  const piccola = sampleImage(320, 240);
+
+  const chiesta = processImage(piccola, { width: 1600, height: 1200, algorithm: 'bayer4' });
+  assert.equal(chiesta.image.width, 1600);
+  assert.equal(chiesta.image.height, 1200);
+
+  const soloMegapixel = processImage(piccola, { megapixels: 24, algorithm: 'bayer4' });
+  assert.equal(soloMegapixel.image.width, 320, 'i megapixel non devono ingrandire');
+});
+
+/**
+ * A Pixel maggiore di uno i blocchi sono interi, quindi il file e' per forza
+ * un multiplo del fattore. Si punta al multiplo piu' vicino invece di
+ * mancare la misura sempre per difetto.
+ */
+test('con Pixel maggiore di uno la misura si posa sul multiplo piu vicino', () => {
+  const img = sampleImage(1000, 1000);
+  for (const scale of [2, 3, 5, 7]) {
+    const { width, height } = exportSize(1000, 1000, {
+      width: 1920, height: 1080, scale, upscale: true,
+    });
+    assert.equal(width % scale, 0, `Pixel ${scale}: ${width} non e multiplo`);
+    assert.ok(Math.abs(width - 1920) <= scale, `Pixel ${scale}: ${width} troppo lontano da 1920`);
+    assert.ok(Math.abs(height - 1080) <= scale, `Pixel ${scale}: ${height} troppo lontano da 1080`);
+  }
+});
+
+test('col rapporto bloccato scrivere un lato riempie l altro', () => {
+  const bloccato = { aspect: '16:9', lockRatio: true };
+  assert.deepEqual(linkedDimensions(1868, 1078, bloccato, 'width', 1920), { width: 1920, height: 1080 });
+  assert.deepEqual(linkedDimensions(1868, 1078, bloccato, 'height', 1080), { width: 1920, height: 1080 });
+
+  // Senza rapporto scelto il vincolo e' quello della foto.
+  const daFoto = { aspect: 'source', lockRatio: true };
+  const { width, height } = linkedDimensions(1000, 500, daFoto, 'width', 800);
+  assert.equal(height, 400, `800 su una foto 2:1 deve dare 400, non ${height}`);
+  assert.equal(width, 800);
+
+  // Sbloccato i due lati sono indipendenti.
+  assert.deepEqual(
+    linkedDimensions(1868, 1078, { aspect: '16:9', lockRatio: false }, 'width', 1920),
+    { width: 1920 },
+  );
+
+  // Zero vuol dire "decidila tu", e bloccati si torna ad auto in due: un
+  // campo che dice "auto" mentre l'altro gli detta ancora la misura non
+  // direbbe la verita'.
+  assert.deepEqual(linkedDimensions(1868, 1078, bloccato, 'width', 0), { width: 0, height: 0 });
+  assert.deepEqual(
+    linkedDimensions(1868, 1078, { aspect: '16:9', lockRatio: false }, 'width', 0),
+    { width: 0 },
+    'sbloccati invece restano indipendenti anche nello svuotarsi',
+  );
 });

@@ -98,7 +98,7 @@ function optionsFromFlags(flags, t = inglese) {
     const key = kebab(param.key);
     if (flags[key] === undefined) continue;
     const raw = flags[key];
-    if (param.type === 'range') {
+    if (param.type === 'range' || param.type === 'number') {
       const n = Number(raw);
       if (!Number.isFinite(n)) throw new Error(t('cli.wantsNumber', { name: key, value: raw }));
       out[param.key] = n;
@@ -134,7 +134,9 @@ function optionsFromFlags(flags, t = inglese) {
 export function helpText(t = inglese) {
   const paramLines = PARAMS.map((p) => {
     const name = `--${kebab(p.key)}`;
-    const spec = p.type === 'range'
+    // Un numero non e' un nome: scrivere <name> accanto a --width manderebbe
+    // a cercare un elenco di valori ammessi che non esiste.
+    const spec = p.type === 'range' || p.type === 'number'
       ? `<${p.min}..${p.max}>`
       : p.type === 'bool' ? '' : '<name>';
     const off = p.type === 'bool' ? ` ${t('cli.offSwitch', { name: kebab(p.key) })}` : '';

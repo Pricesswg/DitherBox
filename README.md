@@ -235,6 +235,16 @@ the interface responsive is also off at 1:1, because shrinking the image
 would change the very pixels you asked to see: on a very large output,
 expect a wait.
 
+When the file has to come out at one exact size, **Width** and **Height**
+take it in pixels and the megapixel slider steps aside. With **Lock ratio**
+on, writing one side fills in the other from the chosen aspect, so 1920 gives
+you 1080 without doing the arithmetic, and clearing one clears both back to
+automatic. Unlike the megapixel budget, which is a ceiling and never enlarges,
+an exact size is a request: ask for 1920 on a smaller photo and you get 1920.
+One caveat, and it is arithmetic rather than a choice: at **Pixel** above 1 the
+blocks are whole, so the file lands on the nearest multiple of that factor.
+At Pixel 1, which is the usual case, the number you type is the number you get.
+
 The crop is a rectangle you place yourself: **Zoom** sets how big it is,
 **Offset X** and **Offset Y** where it sits. At zoom 100 the rectangle already
 touches two sides and cannot move along that axis, which is why the size
@@ -319,8 +329,8 @@ ditherbox --help
 Every engine parameter has its own option: `--palette`, `--algorithm`,
 `--scale`, `--strength`, `--bias`, `--noise`, `--serpentine`, `--brightness`,
 `--contrast`, `--gamma`, `--saturation`, `--sharpen`, `--invert`,
-`--aspect`, `--fit`, `--zoom`, `--align-x`, `--align-y`, `--megapixels`,
-`--upscale`. Switches are turned off by
+`--aspect`, `--fit`, `--zoom`, `--align-x`, `--align-y`, `--width`,
+`--height`, `--lock-ratio`, `--megapixels`, `--upscale`. Switches are turned off by
 prefixing `--no-`.
 
 `-l, --lang <code>` picks the language of the messages. Without it the CLI
@@ -381,6 +391,8 @@ background.
 | **Aspect** | 9 ratios | Frames the result: 1:1, 5:4, 4:3, 3:2, 16:10, 16:9, 21:9, 4:5, 9:16, or as the photo |
 | **Fit** | crop/bars | What happens to what the ratio leaves out: cut it away, or add bars in a palette colour |
 | **Zoom** | 10 to 100% | Size of the crop rectangle: 100 is the largest that fits, less zooms in |
+| **Width**, **Height** | pixels | Exact size of the file; empty lets the megapixels decide |
+| **Lock ratio** | on/off | Writing one side fills in the other, keeping the ratio |
 | **Offset X**, **Offset Y** | 0 to 100% | Move the crop rectangle, when there is room to move it |
 | **Megapixels** | 0.01 to 24 MP | Resolution of the result: lower it to ruin the photo on purpose |
 | **Upscale** | on/off | Brings the result back to the original size with crisp pixels |

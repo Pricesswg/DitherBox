@@ -916,3 +916,77 @@ test('la barra dice come si cambia lingua, quando c e spazio', async (t) => {
   const frame = render();
   assert.match(senzaColori(frame[frame.length - 1]), /ctrl\+l lang/);
 });
+
+/** Porta il cursore sul parametro con quella chiave. */
+function vaiA(tui, key) {
+  const i = tui.rows.findIndex((r) => r.kind === 'param' && r.param.key === key);
+  assert.ok(i >= 0, `parametro ${key} non presente fra i controlli`);
+  tui.cursor = i;
+  return tui.rows[i].param;
+}
+
+/**
+ * Larghezza e altezza sono due campi, ma non due valori indipendenti: col
+ * rapporto bloccato scriverne uno riempie l'altro. Senza, i due finiscono
+ * per litigare e il file esce di una misura che non e' nessuna delle due.
+ */
+test('col rapporto bloccato scrivere un lato riempie l altro anche nella TUI', async (t) => {
+  const dir = tempDir(t);
+  const path = await writeSample(dir, 'foto.png', 1868, 1078);
+  const { tui, render } = await mountTui(DitherTui, { width: 110, height: 40, path, dir });
+
+  tui.options = { ...tui.options, aspect: '16:9', lockRatio: true, width: 0, height: 0 };
+  tui.cache = null;
+
+  vaiA(tui, 'width');
+  press(tui, 'l');
+  assert.ok(tui.options.width > 0, 'da auto il primo passo deve posarsi su una misura');
+  assert.ok(tui.options.height > 0, 'l altro lato deve essersi riempito');
+  assert.ok(
+    Math.abs(tui.options.width / tui.options.height - 16 / 9) < 0.02,
+    `il rapporto non e 16:9: ${tui.options.width}x${tui.options.height}`,
+  );
+
+  // E la misura dichiarata nell'intestazione deve essere quella chiesta.
+  const attesa = `${tui.options.width}×${tui.options.height}`;
+  assert.match(testo(render()), new RegExp(attesa.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+
+  // Sbloccando, i due tornano indipendenti.
+  tui.options = { ...tui.options, lockRatio: false };
+  const altezzaPrima = tui.options.height;
+  vaiA(tui, 'width');
+  press(tui, 'l');
+  assert.equal(tui.options.height, altezzaPrima, 'sbloccato non deve trascinare l altro lato');
+});
+
+test('scrivere una misura a mano la ottiene esatta', async (t) => {
+  const dir = tempDir(t);
+  const path = await writeSample(dir, 'foto.png', 1868, 1078);
+  const { tui, render } = await mountTui(DitherTui, { width: 110, height: 40, path, dir });
+  tui.options = { ...tui.options, aspect: '16:9', lockRatio: true, scale: 1 };
+  tui.cache = null;
+
+  vaiA(tui, 'width');
+  press(tui, '\r');
+  assert.ok(tui.overlay, 'enter deve aprire il campo per scrivere');
+  for (const c of '1920') press(tui, c);
+  press(tui, '\r');
+
+  assert.equal(tui.options.width, 1920);
+  assert.equal(tui.options.height, 1080, 'l altro lato deve seguire il rapporto');
+  assert.match(testo(render()), /1920×1080/, 'l intestazione deve dichiarare la misura chiesta');
+});
+
+test('svuotare il campo riporta la misura ad auto', async (t) => {
+  const dir = tempDir(t);
+  const path = await writeSample(dir, 'foto.png', 800, 600);
+  const { tui } = await mountTui(DitherTui, { width: 110, height: 40, path, dir });
+  tui.options = { ...tui.options, width: 1920, height: 1440 };
+
+  vaiA(tui, 'width');
+  press(tui, '\r');
+  // Il campo parte col valore attuale: si cancella tutto e si conferma.
+  for (let i = 0; i < 6; i++) press(tui, '\x7f');
+  press(tui, '\r');
+  assert.equal(tui.options.width, 0, 'vuoto deve voler dire auto');
+});
