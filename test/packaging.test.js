@@ -133,16 +133,18 @@ test('la versione della formula e quella che il programma dichiara', () => {
  * lasciata indietro il rilascio si fermava li', versione gia' scritta e
  * nessun tag, e succedeva solo dal secondo rilascio in poi.
  */
-test('allineare la versione porta avanti package.json, version.js e la formula', (t) => {
+test('allineare la versione porta avanti package.json, il lockfile, version.js e la formula', (t) => {
   const dir = tempDir(t);
   const percorsi = {
     pkg: join(dir, 'package.json'),
+    lock: join(dir, 'package-lock.json'),
     versione: join(dir, 'version.js'),
     formula: join(dir, 'ditherbox.rb'),
     dillo: () => {},
   };
   // Si parte dai file veri, non da finzioni: e' la loro forma che conta.
   writeFileSync(percorsi.pkg, readFileSync(join(ROOT, 'package.json'), 'utf8'));
+  writeFileSync(percorsi.lock, readFileSync(join(ROOT, 'package-lock.json'), 'utf8'));
   writeFileSync(percorsi.versione, readFileSync(join(ROOT, 'src', 'cli', 'version.js'), 'utf8'));
   writeFileSync(percorsi.formula, formula);
 
@@ -153,6 +155,15 @@ test('allineare la versione porta avanti package.json, version.js e la formula',
   const nuovaFormula = leggiFormula(readFileSync(percorsi.formula, 'utf8'));
 
   assert.equal(nuovoPkg.version, '9.9.9');
+
+  // Il lockfile porta la versione in due punti, e restava fermo alla 0.1.0
+  // mentre il pacchetto arrivava alla 0.3.3: se ne accorgeva solo il primo
+  // `npm install` di qualcuno, che lo riscriveva lasciandogli una modifica
+  // da committare che non aveva fatto lui.
+  const nuovoLock = JSON.parse(readFileSync(percorsi.lock, 'utf8'));
+  assert.equal(nuovoLock.version, '9.9.9', 'lockfile: version in cima rimasta indietro');
+  assert.equal(nuovoLock.packages[''].version, '9.9.9', 'lockfile: packages[""] rimasto indietro');
+
   assert.equal(nuovaVersione.match(/const VERSION = '([^']+)'/)?.[1], '9.9.9');
   assert.equal(nuovaFormula.version, '9.9.9', 'la formula e rimasta indietro');
   assert.match(nuovaFormula.url, /v9\.9\.9\.tar\.gz$/);
@@ -248,4 +259,10 @@ test('aggiornaTap dice dove clonare il tap se non lo trova', async () => {
     () => aggiornaTap('/percorso/che/non/esiste', '1.0.0'),
     /non trovo il tap[\s\S]*git clone/,
   );
+});
+
+test('il lockfile dichiara la stessa versione del package.json', () => {
+  const lock = JSON.parse(readFileSync(join(ROOT, 'package-lock.json'), 'utf8'));
+  assert.equal(lock.version, pkg.version, 'package-lock.json e indietro rispetto a package.json');
+  assert.equal(lock.packages[''].version, pkg.version);
 });

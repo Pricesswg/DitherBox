@@ -31,6 +31,7 @@ import {
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const FORMULA = join(ROOT, 'packaging', 'homebrew', 'ditherbox.rb');
 const PKG = join(ROOT, 'package.json');
+const LOCK = join(ROOT, 'package-lock.json');
 const VERSIONE = join(ROOT, 'src', 'cli', 'version.js');
 
 const git = (...args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim();
@@ -114,6 +115,7 @@ async function impronta(url) {
  */
 export function allineaVersione(nuova, {
   pkg: pkgPath = PKG,
+  lock: lockPath = LOCK,
   versione: versionePath = VERSIONE,
   formula: formulaPath = FORMULA,
   dillo = dimmi,
@@ -124,6 +126,23 @@ export function allineaVersione(nuova, {
     writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
     dillo(`package.json portato a ${nuova}`);
   }
+
+  // Il lockfile ripete la versione in due punti. Lasciato indietro non
+  // rompe niente subito: lo rompe al primo `npm install` di chiunque, che
+  // lo riscrive e gli lascia nell'albero una modifica che non ha fatto lui.
+  // E' rimasto fermo alla 0.1.0 per cinque versioni prima che qualcuno se
+  // ne accorgesse.
+  if (existsSync(lockPath)) {
+    const lock = JSON.parse(readFileSync(lockPath, 'utf8'));
+    const radice = lock.packages?.[''];
+    if (lock.version !== nuova || (radice && radice.version !== nuova)) {
+      lock.version = nuova;
+      if (radice) radice.version = nuova;
+      writeFileSync(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
+      dillo(`package-lock.json portato a ${nuova}`);
+    }
+  }
+
   // Se questa resta indietro, `ditherbox --version` mente e la prova della
   // formula, che confronta le due, se ne accorge.
   const sorgente = readFileSync(versionePath, 'utf8');

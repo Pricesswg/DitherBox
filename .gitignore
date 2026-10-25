@@ -11,6 +11,3 @@ node_modules/
 # Uscite di prova
 /schermate/
 /esiti/
-
-# Istruzioni locali per Claude Code: restano su questa macchina
-CLAUDE.md
